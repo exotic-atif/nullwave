@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Search, Library, ListMusic, Settings, X, Radio } from 'lucide-react'
+import { Home, Search, Library, ListMusic, Settings, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
