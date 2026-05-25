@@ -1,0 +1,10 @@
+name = "nullwave-worker"
+main = "src/index.ts"
+compatibility_date = "2025-05-20"
+
+[vars]
+ALLOWED_ORIGINS = "*"
+
+# Secrets (set via `wrangler secret put`):
+# SPOTIFY_CLIENT
+# SPOTIFY_SECRET
