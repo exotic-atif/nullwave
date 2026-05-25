@@ -13,7 +13,7 @@ export function PlaylistDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const { setTrack, togglePlay, currentTrack, isPlaying } = usePlayerStore()
+  const { setTrack, togglePlay, isPlaying } = usePlayerStore()
   const { setQueue } = useQueueStore()
   
   const [playlist, setPlaylist] = useState<Playlist | null>(null)
