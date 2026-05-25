@@ -9,6 +9,7 @@ interface QueueStore {
   addMultipleToQueue: (tracks: Track[]) => void
   removeFromQueue: (trackId: string) => void
   clearQueue: () => void
+  setQueue: (tracks: Track[]) => void
   playNext: () => Track | null
   playPrevious: () => Track | null
   moveInQueue: (fromIndex: number, toIndex: number) => void
@@ -36,6 +37,11 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     })),
 
   clearQueue: () => set({ queue: [] }),
+
+  setQueue: (tracks) =>
+    set(() => ({
+      queue: tracks,
+    })),
 
   playNext: () => {
     const { queue } = get()
