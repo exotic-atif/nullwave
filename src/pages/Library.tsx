@@ -7,7 +7,6 @@ import { fetchPlayHistory, clearPlayHistory, getUserPlaylists } from '@/lib/supa
 import type { Track, Playlist } from '@/types'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { ListMusic } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PlaylistCover } from '@/components/ui/PlaylistCover'
 
