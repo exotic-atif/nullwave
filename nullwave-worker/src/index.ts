@@ -174,8 +174,13 @@ async function handleStream(title: string, artist: string): Promise<unknown> {
       return { streamUrl: '', error: 'No audio stream available' }
     }
 
+    // Return the proxy URL instead of the direct YouTube URL
+    // The worker origin will be replaced dynamically in the route handler, 
+    // or we can just return a relative path and let the frontend prepend it.
+    // Actually, since this is JSON, returning the absolute URL is easiest.
+    // Wait, handleStream doesn't know the request URL origin here. Let's pass it.
     return {
-      streamUrl: bestStream.url,
+      streamUrl: bestStream.url, // We will map this in the route handler
       quality: bestStream.quality,
       mimeType: bestStream.mimeType,
       videoId,
@@ -322,6 +327,27 @@ async function handleTrack(trackId: string): Promise<unknown> {
   return { track: mapTrack(data.results[0]) }
 }
 
+async function handleProxyStream(request: Request, urlParam: string): Promise<Response> {
+  try {
+    // We only fetch the upstream URL and proxy the response back.
+    // Ensure we forward Range headers if present.
+    const headers = new Headers()
+    const range = request.headers.get('Range')
+    if (range) headers.set('Range', range)
+
+    const upstreamResponse = await fetch(urlParam, {
+      method: 'GET',
+      headers,
+    })
+
+    // Create a new response so we can modify CORS headers if needed
+    const proxyResponse = new Response(upstreamResponse.body, upstreamResponse)
+    return proxyResponse
+  } catch (err) {
+    return new Response('Proxy error', { status: 500 })
+  }
+}
+
 // ===== MAIN HANDLER =====
 
 export default {
@@ -357,7 +383,32 @@ export default {
         const title = url.searchParams.get('title')?.trim()
         const artist = url.searchParams.get('artist')?.trim()
         if (!title) return json({ error: 'Missing "title"' }, 400, origin, env)
-        return json(await handleStream(title, artist || ''), 200, origin, env)
+        const result = await handleStream(title, artist || '')
+        
+        // Rewrite the streamUrl to use our proxy
+        if (result.streamUrl && !result.error) {
+          result.streamUrl = `${url.origin}/proxy-stream?url=${encodeURIComponent(result.streamUrl)}`
+        }
+        return json(result, 200, origin, env)
+      }
+
+      // GET /proxy-stream?url=...
+      if (path === '/proxy-stream') {
+        const targetUrl = url.searchParams.get('url')
+        if (!targetUrl) return json({ error: 'Missing "url"' }, 400, origin, env)
+        
+        const proxyRes = await handleProxyStream(request, targetUrl)
+        // Add CORS to the proxied response
+        const newHeaders = new Headers(proxyRes.headers)
+        const cors = corsHeaders(origin, env)
+        for (const [k, v] of Object.entries(cors)) {
+          newHeaders.set(k, v)
+        }
+        return new Response(proxyRes.body, {
+          status: proxyRes.status,
+          statusText: proxyRes.statusText,
+          headers: newHeaders
+        })
       }
 
       // GET /lyrics?title=X&artist=Y
