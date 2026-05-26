@@ -77,12 +77,28 @@ export async function removeLikedSong(userId: string, trackId: string) {
 // ===== PLAY HISTORY =====
 
 export async function recordPlayHistory(userId: string, track: Track) {
+  // Deduplication: Remove any previous history entry for this track
+  await supabase
+    .from('play_history')
+    .delete()
+    .eq('user_id', userId)
+    .eq('track_id', track.id)
+
+  // Insert the new play record
   const { error } = await supabase.from('play_history').insert({
     user_id: userId,
     track_id: track.id,
     track_data: track,
   })
   if (error) console.error('Failed to record history:', error.message)
+
+  // Cleanup: Delete history older than 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  await supabase
+    .from('play_history')
+    .delete()
+    .eq('user_id', userId)
+    .lt('played_at', sevenDaysAgo)
 }
 
 export async function fetchPlayHistory(userId: string, limit = 30): Promise<Track[]> {
