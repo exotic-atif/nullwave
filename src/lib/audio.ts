@@ -16,7 +16,7 @@ class AudioManager {
   constructor() {
     this.audio = new Audio()
     this.audio.preload = 'auto'
-    // Removed crossOrigin='anonymous' to allow direct playback of Google Video streams without CORS errors
+    this.audio.crossOrigin = 'anonymous'
 
     this.audio.addEventListener('timeupdate', () => {
       this.onTimeUpdateCallback?.(this.audio.currentTime, this.audio.duration || 0)
