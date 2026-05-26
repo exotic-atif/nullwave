@@ -119,9 +119,15 @@ export function Player() {
       if (result.streamUrl) {
         // Switch to full stream
         audioManager.playUrl(result.streamUrl)
+      } else if (currentTrack.audioUrl) {
+        // Fallback to preview if stream is unavailable
+        audioManager.playUrl(currentTrack.audioUrl)
       }
     }).catch(() => {
-      // Stream failed. Do nothing, avoid fallback to preview.
+      // Stream failed. Fallback to preview
+      if (!cancelled && currentTrack.audioUrl) {
+        audioManager.playUrl(currentTrack.audioUrl)
+      }
     })
 
     // Fetch lyrics
