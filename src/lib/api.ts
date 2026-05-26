@@ -73,10 +73,7 @@ export const api = {
   /** Get full YouTube audio stream URL for a track */
   async stream(title: string, artist: string): Promise<StreamResult> {
     try {
-      // Use yt-dlp Node server (port 4000)
-      const res = await fetch(`http://localhost:4000/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)
-      if (!res.ok) throw new Error('Stream failed')
-      const data = await res.json()
+      const data = await request<StreamResult>(`/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)
       return {
         streamUrl: data.streamUrl,
         quality: data.quality || 'high',
