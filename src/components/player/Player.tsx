@@ -19,6 +19,7 @@ import {
   ListMusic,
   Mic2,
   Heart,
+  Loader2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -52,6 +53,7 @@ export function Player() {
   const [isDragging, setIsDragging] = useState(false)
   const [showLyrics, setShowLyrics] = useState(false)
   const [lyricsData, setLyricsData] = useState<SyncedLine[] | null>(null)
+  const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
 
   // ===== AUDIO ENGINE BINDINGS =====
@@ -99,6 +101,11 @@ export function Player() {
 
     audioManager.onError((msg) => {
       console.warn('Audio error:', msg)
+      setStreamStatus('Playback failed. Trying preview if available.')
+    })
+
+    audioManager.onLoaded(() => {
+      setStreamStatus(null)
     })
   }, [isDragging])
 
@@ -106,32 +113,63 @@ export function Player() {
   useEffect(() => {
     if (!currentTrack) return
 
+    const track = currentTrack
     let cancelled = false
+    const healthPendingTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setStreamStatus('Waiting for the stream server to respond...')
+      }
+    }, 5000)
+    const longHealthPendingTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setStreamStatus('The stream server has not responded yet.')
+      }
+    }, 25000)
     
     // Stop and clear audio source immediately to prevent old track from resuming
     audioManager.stop()
     // Clear lyrics immediately so old lyrics don't show for the new song
     setLyricsData(null)
+    setStreamStatus('Checking stream server...')
 
-    // Fetch full YouTube audio stream
-    api.stream(currentTrack.title, currentTrack.artist).then((result) => {
-      if (cancelled) return
-      if (result.streamUrl) {
-        // Switch to full stream
-        audioManager.playUrl(result.streamUrl)
-      } else if (currentTrack.audioUrl) {
-        // Fallback to preview if stream is unavailable
-        audioManager.playUrl(currentTrack.audioUrl)
+    async function loadStream() {
+      try {
+        await api.streamHealth()
+        if (cancelled) return
+        window.clearTimeout(healthPendingTimer)
+        window.clearTimeout(longHealthPendingTimer)
+        setStreamStatus('Stream server online. Finding audio...')
+
+        const result = await api.stream(track.title, track.artist)
+        if (cancelled) return
+
+        if (result.streamUrl) {
+          setStreamStatus('Buffering audio...')
+          audioManager.playUrl(result.streamUrl)
+        } else if (track.audioUrl) {
+          setStreamStatus('Full stream unavailable. Playing preview.')
+          audioManager.playUrl(track.audioUrl)
+        } else {
+          setStreamStatus('No audio stream available for this track.')
+        }
+      } catch {
+        window.clearTimeout(healthPendingTimer)
+        window.clearTimeout(longHealthPendingTimer)
+        if (cancelled) return
+
+        if (track.audioUrl) {
+          setStreamStatus('Stream server unavailable. Playing preview.')
+          audioManager.playUrl(track.audioUrl)
+        } else {
+          setStreamStatus('Stream server unavailable.')
+        }
       }
-    }).catch(() => {
-      // Stream failed. Fallback to preview
-      if (!cancelled && currentTrack.audioUrl) {
-        audioManager.playUrl(currentTrack.audioUrl)
-      }
-    })
+    }
+
+    loadStream()
 
     // Fetch lyrics
-    api.lyrics(currentTrack.title, currentTrack.artist).then((result) => {
+    api.lyrics(track.title, track.artist).then((result) => {
       if (cancelled) return
       if (result.synced) {
         setLyricsData(parseLRC(result.synced))
@@ -144,12 +182,16 @@ export function Player() {
     })
 
     // Record play history
-    if (user?.id && lastRecordedTrack.current !== currentTrack.id) {
-      lastRecordedTrack.current = currentTrack.id
-      recordPlayHistory(user.id, currentTrack)
+    if (user?.id && lastRecordedTrack.current !== track.id) {
+      lastRecordedTrack.current = track.id
+      recordPlayHistory(user.id, track)
     }
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      window.clearTimeout(healthPendingTimer)
+      window.clearTimeout(longHealthPendingTimer)
+    }
   }, [currentTrack?.id])
 
   // Sync play/pause state
@@ -335,6 +377,12 @@ export function Player() {
                   <p className="text-[11px] md:text-xs text-nw-text-tertiary truncate">
                     {currentTrack.artist}
                   </p>
+                  {streamStatus && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] md:text-[11px] text-nw-accent truncate">
+                      <Loader2 size={11} className="shrink-0 animate-spin" />
+                      <span className="truncate">{streamStatus}</span>
+                    </p>
+                  )}
                 </div>
                 <IconButton
                   size="sm"

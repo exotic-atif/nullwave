@@ -3,9 +3,10 @@
 import type { Track, Album, Artist } from '@/types'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const STREAM_BASE_URL = import.meta.env.VITE_STREAM_API_URL || 'http://localhost:4000'
 
-async function request<T>(endpoint: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`)
+async function request<T>(endpoint: string, baseUrl = BASE_URL): Promise<T> {
+  const res = await fetch(`${baseUrl}${endpoint}`)
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Request failed' }))
     throw new Error((body as { error?: string }).error || `HTTP ${res.status}`)
@@ -19,6 +20,13 @@ export interface StreamResult {
   mimeType?: string
   videoId?: string
   error?: string
+}
+
+export interface StreamHealthResult {
+  ok: boolean
+  service: string
+  startedAt: string
+  uptime: number
 }
 
 export interface LyricsResult {
@@ -70,10 +78,18 @@ export const api = {
     return data.track
   },
 
+  /** Check whether the Node stream server has responded */
+  async streamHealth(): Promise<StreamHealthResult> {
+    return request<StreamHealthResult>('/health', STREAM_BASE_URL)
+  },
+
   /** Get full YouTube audio stream URL for a track */
   async stream(title: string, artist: string): Promise<StreamResult> {
     try {
-      const data = await request<StreamResult>(`/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)
+      const data = await request<StreamResult>(
+        `/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+        STREAM_BASE_URL,
+      )
       return {
         streamUrl: data.streamUrl,
         quality: data.quality || 'high',
