@@ -134,55 +134,45 @@ async function handleStream(title: string, artist: string): Promise<unknown> {
   try {
     const query = `${title} ${artist} audio`
 
-    // Search YouTube via Piped
-    const searchData = (await pipedFetch(
-      `/search?q=${encodeURIComponent(query)}&filter=music_songs`
-    )) as { items: PipedSearchItem[] }
+    // 1. Search YouTube HTML to find the video ID
+    const searchRes = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    })
+    const html = await searchRes.text()
+    
+    const match = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/)
+    if (!match) {
+      return { streamUrl: '', error: 'No results found on YouTube' }
+    }
+    const videoId = match[1]
 
-    const items = (searchData.items || []).filter((i) => i.type === 'stream')
-    if (items.length === 0) {
-      // Fallback: try without music_songs filter
-      const fallback = (await pipedFetch(
-        `/search?q=${encodeURIComponent(query)}&filter=all`
-      )) as { items: PipedSearchItem[] }
-      items.push(...(fallback.items || []).filter((i) => i.type === 'stream'))
+    // 2. Fetch stream from Cobalt API
+    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'NullWave/1.0'
+      },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        isAudioOnly: true
+      })
+    })
+
+    if (!cobaltRes.ok) {
+      return { streamUrl: '', error: 'Cobalt API failed to extract stream' }
     }
 
-    if (items.length === 0) {
-      return { streamUrl: '', error: 'No results found' }
+    const cobaltData = await cobaltRes.json() as any
+    if (cobaltData.status !== 'stream' && cobaltData.status !== 'redirect') {
+      return { streamUrl: '', error: 'Cobalt API did not return a stream' }
     }
 
-    // Get the video ID from the URL (/watch?v=XXXX)
-    const videoPath = items[0].url
-    const videoId = videoPath.replace('/watch?v=', '')
-
-    // Get audio streams
-    const streamData = (await pipedFetch(
-      `/streams/${videoId}`
-    )) as PipedStreamResponse
-
-    // Pick best audio stream (prefer m4a/mp4, highest bitrate)
-    const audioStreams = (streamData.audioStreams || [])
-      .filter((s) => s.mimeType.includes('audio'))
-      .sort((a, b) => b.bitrate - a.bitrate)
-
-    // Prefer m4a/mp4 for browser compatibility
-    const m4aStream = audioStreams.find((s) => s.mimeType.includes('mp4'))
-    const bestStream = m4aStream || audioStreams[0]
-
-    if (!bestStream) {
-      return { streamUrl: '', error: 'No audio stream available' }
-    }
-
-    // Return the proxy URL instead of the direct YouTube URL
-    // The worker origin will be replaced dynamically in the route handler, 
-    // or we can just return a relative path and let the frontend prepend it.
-    // Actually, since this is JSON, returning the absolute URL is easiest.
-    // Wait, handleStream doesn't know the request URL origin here. Let's pass it.
     return {
-      streamUrl: bestStream.url, // We will map this in the route handler
-      quality: bestStream.quality,
-      mimeType: bestStream.mimeType,
+      streamUrl: cobaltData.url, 
+      quality: 'high',
+      mimeType: 'audio/mp4',
       videoId,
     }
   } catch (err) {
