@@ -79,6 +79,7 @@ async function findStreamUrl(title, artist) {
         noCheckCertificate: true,
         defaultSearch: 'ytsearch',
         userAgent: MOCK_USER_AGENT,
+        extractorArgs: 'youtube:player_client=android',
       });
       const streamUrl = output.url;
       if (streamUrl) {
