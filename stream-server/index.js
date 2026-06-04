@@ -22,12 +22,75 @@ const AUDIO_HEADERS = new Set([
   'last-modified',
 ]);
 
+const MOCK_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
 }
 
 function sendError(res, status, message) {
   res.status(status).json({ error: message });
+}
+
+function cleanSearchText(value = '') {
+  return String(value)
+    .replace(/\([^)]*(feat\.?|ft\.?|with)[^)]*\)/gi, '')
+    .replace(/\[[^\]]*(feat\.?|ft\.?|with)[^\]]*\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getPrimaryArtist(value = '') {
+  return String(value)
+    .split(/,|&| and | feat\.?| ft\.?/i)[0]
+    .trim();
+}
+
+function getFirstUrl(output) {
+  if (typeof output !== 'string') return null;
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.startsWith('http')) || null;
+}
+
+async function findStreamUrl(title, artist) {
+  const cleanTitle = cleanSearchText(title);
+  const cleanArtist = cleanSearchText(getPrimaryArtist(artist));
+  const rawArtist = cleanSearchText(artist);
+  const queries = [
+    `${cleanTitle} ${cleanArtist} official audio`,
+    `${cleanTitle} ${rawArtist} audio`,
+    `${cleanTitle} ${cleanArtist}`,
+    `${title} ${artist} audio`,
+  ].filter((query, index, all) => query.trim() && all.indexOf(query) === index);
+
+  const errors = [];
+
+  for (const searchText of queries) {
+    const query = `ytsearch3:${searchText}`;
+    console.log(`[Stream] Searching for: ${query}`);
+
+    try {
+      const output = await youtubedl(query, {
+        format: 'bestaudio[ext=m4a]/bestaudio/best',
+        dumpSingleJson: true,
+        noWarnings: true,
+        noCheckCertificate: true,
+        defaultSearch: 'ytsearch',
+        userAgent: MOCK_USER_AGENT,
+      });
+      const streamUrl = output.url;
+      if (streamUrl) {
+        return { streamUrl, query, errors };
+      }
+    } catch (error) {
+      console.warn(`[Stream] Query failed: ${query}`, error.message);
+      errors.push({ query, message: error.message });
+    }
+  }
+
+  return { streamUrl: null, query: queries[0] || title, errors };
 }
 
 app.get('/', (req, res) => {
@@ -43,6 +106,22 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/debug/ytdlp', async (req, res) => {
+  try {
+    const output = await youtubedl('--version');
+    res.json({
+      ok: true,
+      version: typeof output === 'string' ? output.trim() : output,
+    });
+  } catch (error) {
+    console.error('[Debug] yt-dlp failed:', error.message);
+    res.status(500).json({
+      ok: false,
+      error: error.message,
+    });
+  }
+});
+
 app.get('/stream', async (req, res) => {
   const { title, artist } = req.query;
 
@@ -50,27 +129,15 @@ app.get('/stream', async (req, res) => {
     return res.status(400).json({ error: 'Missing title' });
   }
 
-  const query = `ytsearch1:"${title} ${artist || ''} audio"`;
-  console.log(`[Stream] Searching for: ${query}`);
-
   try {
-    // Run yt-dlp to get the direct stream URL
-    // -f bestaudio gets the best audio format
-    // -g gets the direct URL instead of downloading
-    const output = await youtubedl(query, {
-      extractAudio: true,
-      audioFormat: 'best',
-      getUrl: true,
-      noWarnings: true,
-      noCheckCertificate: true,
-      preferFreeFormats: true,
-    });
+    const { streamUrl, query, errors } = await findStreamUrl(title, artist || '');
 
-    // The output is just the raw URL string
-    const streamUrl = typeof output === 'string' ? output.trim() : null;
-
-    if (!streamUrl || !streamUrl.startsWith('http')) {
-      return res.status(404).json({ error: 'No stream URL found' });
+    if (!streamUrl) {
+      return res.status(404).json({
+        error: 'No stream URL found',
+        query,
+        details: errors.slice(-3),
+      });
     }
 
     console.log(`[Stream] Found URL: ${streamUrl.substring(0, 50)}...`);
@@ -86,8 +153,11 @@ app.get('/stream', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[Stream] Exception for ${query}:`, error.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error(`[Stream] Exception:`, error.message);
+    res.status(500).json({
+      error: 'Stream server failed before search completed',
+      details: error.message,
+    });
   }
 });
 
@@ -110,7 +180,7 @@ app.get('/audio', async (req, res) => {
   }
 
   const upstreamHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': MOCK_USER_AGENT,
   };
 
   const range = req.headers.range;
@@ -118,8 +188,14 @@ app.get('/audio', async (req, res) => {
     upstreamHeaders.Range = range;
   }
 
+  const controller = new AbortController();
+  req.on('close', () => controller.abort());
+
   try {
-    const upstream = await fetch(parsedUrl, { headers: upstreamHeaders });
+    const upstream = await fetch(parsedUrl, { 
+      headers: upstreamHeaders,
+      signal: controller.signal
+    });
 
     if (!upstream.ok && upstream.status !== 206) {
       return sendError(res, upstream.status, `Upstream audio request failed: ${upstream.status}`);
@@ -146,6 +222,10 @@ app.get('/audio', async (req, res) => {
 
     Readable.fromWeb(upstream.body).pipe(res);
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('[Audio] Client disconnected, upstream fetch aborted.');
+      return;
+    }
     console.error('[Audio] Proxy error:', error.message);
     if (!res.headersSent) {
       sendError(res, 502, 'Audio proxy failed');
