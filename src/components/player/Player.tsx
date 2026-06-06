@@ -147,10 +147,10 @@ export function Player() {
           setStreamStatus('Buffering audio...')
           audioManager.playUrl(result.streamUrl)
         } else if (track.audioUrl) {
-          setStreamStatus('Full stream unavailable. Playing preview.')
+          setStreamStatus(result.error ? `${result.error}. Playing preview.` : 'Full stream unavailable. Playing preview.')
           audioManager.playUrl(track.audioUrl)
         } else {
-          setStreamStatus('No audio stream available for this track.')
+          setStreamStatus(result.error || 'No audio stream available for this track.')
         }
       } catch {
         window.clearTimeout(healthPendingTimer)
