@@ -5,8 +5,12 @@ import type { Track, Album, Artist } from '@/types'
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 const STREAM_BASE_URL = import.meta.env.VITE_STREAM_API_URL || 'http://localhost:4000'
 
+function joinUrl(baseUrl: string, endpoint: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/${endpoint.replace(/^\/+/, '')}`
+}
+
 async function request<T>(endpoint: string, baseUrl = BASE_URL): Promise<T> {
-  const res = await fetch(`${baseUrl}${endpoint}`)
+  const res = await fetch(joinUrl(baseUrl, endpoint))
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Request failed' }))
     throw new Error((body as { error?: string }).error || `HTTP ${res.status}`)
@@ -96,7 +100,10 @@ export const api = {
         mimeType: data.mimeType || 'audio/mp4',
       }
     } catch (err) {
-      return { streamUrl: '', error: 'Streaming service temporarily unavailable' }
+      return {
+        streamUrl: '',
+        error: err instanceof Error ? err.message : 'Streaming service temporarily unavailable',
+      }
     }
   },
 
