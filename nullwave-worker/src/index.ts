@@ -48,25 +48,6 @@ interface iTunesResponse {
   results: iTunesResult[]
 }
 
-// ===== Piped TYPES =====
-
-interface PipedSearchItem {
-  url: string
-  title: string
-  uploaderName: string
-  duration: number
-  type: string
-}
-
-interface PipedStreamResponse {
-  audioStreams: {
-    url: string
-    mimeType: string
-    quality: string
-    bitrate: number
-  }[]
-}
-
 // ===== LRCLIB TYPES =====
 
 interface LrcLibResult {
@@ -101,85 +82,7 @@ function mapTrack(t: iTunesResult) {
   }
 }
 
-// ===== PIPED — YouTube Audio Streams =====
 
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.smnz.de',
-  'https://pi.ggtyler.dev/api',
-  'https://pipedapi.tokhmi.xyz',
-  'https://pipedapi.lunar.icu'
-]
-
-async function pipedFetch(path: string): Promise<unknown> {
-  for (const instance of PIPED_INSTANCES) {
-    try {
-      const res = await fetch(`${instance}${path}`, {
-        headers: { 'User-Agent': 'NullWave/1.0' },
-      })
-      if (res.ok) {
-        return await res.json()
-      } else {
-        throw new Error(`HTTP Error ${res.status}`)
-      }
-    } catch (err) {
-      console.log(`Failed piped instance ${instance}:`, err)
-      continue
-    }
-  }
-  throw new Error('All Piped instances failed')
-}
-
-async function handleStream(title: string, artist: string): Promise<unknown> {
-  try {
-    const query = `${title} ${artist} audio`
-
-    // 1. Search YouTube HTML to find the video ID
-    const searchRes = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    })
-    const html = await searchRes.text()
-    
-    const match = html.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/)
-    if (!match) {
-      return { streamUrl: '', error: 'No results found on YouTube' }
-    }
-    const videoId = match[1]
-
-    // 2. Fetch stream from Cobalt API
-    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'NullWave/1.0'
-      },
-      body: JSON.stringify({
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        isAudioOnly: true
-      })
-    })
-
-    if (!cobaltRes.ok) {
-      return { streamUrl: '', error: 'Cobalt API failed to extract stream' }
-    }
-
-    const cobaltData = await cobaltRes.json() as any
-    if (cobaltData.status !== 'stream' && cobaltData.status !== 'redirect') {
-      return { streamUrl: '', error: 'Cobalt API did not return a stream' }
-    }
-
-    return {
-      streamUrl: cobaltData.url, 
-      quality: 'high',
-      mimeType: 'audio/mp4',
-      videoId,
-    }
-  } catch (err) {
-    console.error('handleStream error:', err)
-    return { streamUrl: '', error: 'Streaming service temporarily unavailable' }
-  }
-}
 
 // ===== LRCLIB — Synced Lyrics =====
 
@@ -317,26 +220,7 @@ async function handleTrack(trackId: string): Promise<unknown> {
   return { track: mapTrack(data.results[0]) }
 }
 
-async function handleProxyStream(request: Request, urlParam: string): Promise<Response> {
-  try {
-    // We only fetch the upstream URL and proxy the response back.
-    // Ensure we forward Range headers if present.
-    const headers = new Headers()
-    const range = request.headers.get('Range')
-    if (range) headers.set('Range', range)
 
-    const upstreamResponse = await fetch(urlParam, {
-      method: 'GET',
-      headers,
-    })
-
-    // Create a new response so we can modify CORS headers if needed
-    const proxyResponse = new Response(upstreamResponse.body, upstreamResponse)
-    return proxyResponse
-  } catch (err) {
-    return new Response('Proxy error', { status: 500 })
-  }
-}
 
 // ===== MAIN HANDLER =====
 
@@ -368,38 +252,7 @@ export default {
         return json(await handleSearch(query), 200, origin, env)
       }
 
-      // GET /stream?title=X&artist=Y
-      if (path === '/stream') {
-        const title = url.searchParams.get('title')?.trim()
-        const artist = url.searchParams.get('artist')?.trim()
-        if (!title) return json({ error: 'Missing "title"' }, 400, origin, env)
-        const result = await handleStream(title, artist || '')
-        
-        // Rewrite the streamUrl to use our proxy
-        if (result.streamUrl && !result.error) {
-          result.streamUrl = `${url.origin}/proxy-stream?url=${encodeURIComponent(result.streamUrl)}`
-        }
-        return json(result, 200, origin, env)
-      }
 
-      // GET /proxy-stream?url=...
-      if (path === '/proxy-stream') {
-        const targetUrl = url.searchParams.get('url')
-        if (!targetUrl) return json({ error: 'Missing "url"' }, 400, origin, env)
-        
-        const proxyRes = await handleProxyStream(request, targetUrl)
-        // Add CORS to the proxied response
-        const newHeaders = new Headers(proxyRes.headers)
-        const cors = corsHeaders(origin, env)
-        for (const [k, v] of Object.entries(cors)) {
-          newHeaders.set(k, v)
-        }
-        return new Response(proxyRes.body, {
-          status: proxyRes.status,
-          statusText: proxyRes.statusText,
-          headers: newHeaders
-        })
-      }
 
       // GET /lyrics?title=X&artist=Y
       if (path === '/lyrics') {
