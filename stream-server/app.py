@@ -69,8 +69,17 @@ def _find_stream_url(title: str, artist: str) -> dict:
         f"{title} {artist} audio",
     ])))
 
-    cookies_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
-    use_cookies = os.path.isfile(cookies_path)
+    # Check for cookies in multiple locations:
+    # 1. Local file next to app.py
+    # 2. Render Secret Files location (/etc/secrets/)
+    # 3. Custom path via COOKIES_PATH env var
+    cookies_candidates = [
+        os.environ.get("COOKIES_PATH", ""),
+        "/etc/secrets/cookies.txt",
+        os.path.join(os.path.dirname(__file__), "cookies.txt"),
+    ]
+    cookies_path = next((p for p in cookies_candidates if p and os.path.isfile(p)), None)
+    use_cookies = cookies_path is not None
 
     errors = []
     for q in queries:
@@ -125,6 +134,25 @@ def index():
 @app.route("/health")
 def health():
     return jsonify(ok=True, service="nullwave-stream-py")
+
+
+@app.route("/debug/cookies")
+def debug_cookies():
+    paths = [
+        os.environ.get("COOKIES_PATH", ""),
+        "/etc/secrets/cookies.txt",
+        os.path.join(os.path.dirname(__file__), "cookies.txt"),
+    ]
+    results = {}
+    for p in paths:
+        if not p:
+            continue
+        results[p] = {
+            "exists": os.path.isfile(p),
+            "size": os.path.getsize(p) if os.path.isfile(p) else 0,
+        }
+    found = next((p for p in paths if p and os.path.isfile(p)), None)
+    return jsonify(found=found, checked=results)
 
 
 @app.route("/stream")
