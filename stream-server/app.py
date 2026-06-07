@@ -1,20 +1,32 @@
 """
-NullWave Stream Server — Python / yt-dlp
-A lightweight Flask server that searches YouTube for a track,
-extracts the best audio stream URL via yt-dlp, and proxies the
-audio bytes back to the browser with proper Range / Accept-Ranges
-headers so that mobile browsers can seek and play without issues.
+NullWave Stream Server — Python
+Primary source: JioSaavn (works from datacenter IPs, 320kbps MP4)
+Fallback: yt-dlp / YouTube (works from residential IPs only)
 """
 
 import os
 import re
+import json
 import logging
 import subprocess
+import base64
+import shutil
 from urllib.parse import urlparse
 
 import requests
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
+
+# Try to import pycryptodome for JioSaavn URL decryption
+try:
+    from Crypto.Cipher import DES
+    HAS_CRYPTO = True
+except ImportError:
+    try:
+        from Cryptodome.Cipher import DES
+        HAS_CRYPTO = True
+    except ImportError:
+        HAS_CRYPTO = False
 
 # ---------------------------------------------------------------------------
 # Config
@@ -27,13 +39,24 @@ CORS(app, expose_headers=[
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nullwave-stream")
 
-# ---------------------------------------------------------------------------
-# Resolve cookies once at startup — copy to /tmp so yt-dlp can write to it
-# ---------------------------------------------------------------------------
-import shutil
+MOCK_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+)
 
-def _resolve_cookies() -> str | None:
-    """Find the cookies file and copy it to a writable location."""
+PASSTHROUGH_HEADERS = {
+    "accept-ranges", "content-length", "content-range",
+    "content-type", "etag", "last-modified",
+}
+
+# JioSaavn decryption key (well-known, used by all open-source wrappers)
+JIOSAAVN_KEY = b"38346591"
+
+# ---------------------------------------------------------------------------
+# Cookies for yt-dlp fallback
+# ---------------------------------------------------------------------------
+
+def _resolve_cookies():
     candidates = [
         os.environ.get("COOKIES_PATH", ""),
         "/etc/secrets/cookies.txt",
@@ -42,60 +65,135 @@ def _resolve_cookies() -> str | None:
     source = next((p for p in candidates if p and os.path.isfile(p)), None)
     if not source:
         return None
-    # Copy to /tmp so yt-dlp can read AND write
     writable = "/tmp/cookies.txt"
-    shutil.copy2(source, writable)
-    log.info("Cookies copied from %s to %s (%d bytes)", source, writable, os.path.getsize(writable))
-    return writable
+    try:
+        shutil.copy2(source, writable)
+        log.info("Cookies: %s -> %s", source, writable)
+        return writable
+    except Exception:
+        return source
 
 COOKIES_PATH = _resolve_cookies()
-
-MOCK_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-)
-
-# Headers we pass through from the upstream audio response
-PASSTHROUGH_HEADERS = {
-    "accept-ranges", "content-length", "content-range",
-    "content-type", "etag", "last-modified",
-}
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _clean(text: str) -> str:
-    """Strip feat/ft tags and extra whitespace."""
+def _clean(text):
     text = re.sub(r"\([^)]*(feat\.?|ft\.?|with)[^)]*\)", "", text, flags=re.I)
     text = re.sub(r"\[[^\]]*(feat\.?|ft\.?|with)[^\]]*\]", "", text, flags=re.I)
     return " ".join(text.split()).strip()
 
-
-def _primary_artist(artist: str) -> str:
+def _primary_artist(artist):
     return re.split(r",|&| and | feat\.?| ft\.?", artist, flags=re.I)[0].strip()
 
+# ---------------------------------------------------------------------------
+# JioSaavn — Primary source (works from datacenter IPs)
+# ---------------------------------------------------------------------------
 
-def _find_stream_url(title: str, artist: str) -> dict:
-    """
-    Use yt-dlp to search YouTube and return the direct audio URL.
-    We try multiple query variations to maximise hit-rate.
-    """
+def _decrypt_jiosaavn_url(encrypted_url):
+    """Decrypt JioSaavn's encrypted media URL using DES-ECB."""
+    if not HAS_CRYPTO:
+        return None
+    try:
+        encrypted_data = base64.b64decode(encrypted_url.strip())
+        cipher = DES.new(JIOSAAVN_KEY, DES.MODE_ECB)
+        decrypted = cipher.decrypt(encrypted_data)
+        # Remove PKCS5 padding
+        pad_len = decrypted[-1]
+        if isinstance(pad_len, int) and 1 <= pad_len <= 8:
+            decrypted = decrypted[:-pad_len]
+        return decrypted.decode("utf-8")
+    except Exception as e:
+        log.warning("[JioSaavn] Decrypt failed: %s", e)
+        return None
+
+
+def _jiosaavn_search(title, artist):
+    """Search JioSaavn and return a direct 320kbps audio URL."""
+    query = f"{_clean(title)} {_clean(_primary_artist(artist))}"
+    log.info("[JioSaavn] Searching: %s", query)
+
+    try:
+        # Use JioSaavn's internal search API
+        res = requests.get(
+            "https://www.jiosaavn.com/api.php",
+            params={
+                "__call": "search.getResults",
+                "_format": "json",
+                "_marker": "0",
+                "ctx": "web6dot0",
+                "q": query,
+                "n": "5",
+                "p": "1",
+            },
+            headers={"User-Agent": MOCK_UA},
+            timeout=10,
+        )
+        
+        if not res.ok:
+            log.warning("[JioSaavn] Search HTTP %d", res.status_code)
+            return None
+
+        data = res.json()
+        results = data.get("results", [])
+        if not results:
+            log.warning("[JioSaavn] No results for: %s", query)
+            return None
+
+        # Pick the best matching result
+        song = results[0]
+        encrypted_url = song.get("encrypted_media_url", "")
+        
+        if not encrypted_url:
+            log.warning("[JioSaavn] No encrypted URL in result")
+            return None
+
+        decrypted_url = _decrypt_jiosaavn_url(encrypted_url)
+        if not decrypted_url:
+            return None
+
+        # Upgrade quality to 320kbps
+        stream_url = decrypted_url.replace("_96.mp4", "_320.mp4")
+        
+        # Verify the URL works
+        check = requests.head(stream_url, timeout=5, allow_redirects=True)
+        if check.status_code == 200:
+            log.info("[JioSaavn] Got 320kbps stream: %s...", stream_url[:60])
+            return stream_url
+        
+        # Try 160kbps fallback
+        stream_url = decrypted_url.replace("_96.mp4", "_160.mp4")
+        check = requests.head(stream_url, timeout=5, allow_redirects=True)
+        if check.status_code == 200:
+            log.info("[JioSaavn] Got 160kbps stream: %s...", stream_url[:60])
+            return stream_url
+
+        # Use whatever quality we got
+        log.info("[JioSaavn] Using default quality: %s...", decrypted_url[:60])
+        return decrypted_url
+
+    except Exception as e:
+        log.warning("[JioSaavn] Error: %s", e)
+        return None
+
+# ---------------------------------------------------------------------------
+# yt-dlp — Fallback source (residential IPs only)
+# ---------------------------------------------------------------------------
+
+def _ytdlp_search(title, artist):
+    """Use yt-dlp to find a YouTube audio stream. Only works on residential IPs."""
     clean_title = _clean(title)
     clean_artist = _clean(_primary_artist(artist))
-    raw_artist = _clean(artist)
 
     queries = list(dict.fromkeys(filter(None, [
         f"{clean_title} {clean_artist} official audio",
-        f"{clean_title} {raw_artist} audio",
         f"{clean_title} {clean_artist}",
-        f"{title} {artist} audio",
     ])))
 
-    errors = []
     for q in queries:
         search = f"ytsearch1:{q}"
-        log.info("[Stream] Searching: %s (cookies=%s)", search, COOKIES_PATH or "none")
+        log.info("[yt-dlp] Searching: %s", search)
 
         cmd = [
             "yt-dlp",
@@ -111,23 +209,32 @@ def _find_stream_url(title: str, artist: str) -> dict:
         cmd.append(search)
 
         try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=30,
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             url = (result.stdout or "").strip().split("\n")[0].strip()
             if url.startswith("http"):
-                log.info("[Stream] Found URL: %s...", url[:60])
-                return {"streamUrl": url, "query": q, "errors": errors}
-            else:
-                msg = (result.stderr or "").strip() or "No URL in output"
-                log.warning("[Stream] Query failed: %s — %s", q, msg)
-                errors.append({"query": q, "message": msg})
-        except subprocess.TimeoutExpired:
-            errors.append({"query": q, "message": "yt-dlp timed out"})
-        except Exception as exc:
-            errors.append({"query": q, "message": str(exc)})
+                log.info("[yt-dlp] Found URL: %s...", url[:60])
+                return url
+        except Exception as e:
+            log.warning("[yt-dlp] Failed: %s", e)
 
-    return {"streamUrl": None, "query": queries[0] if queries else title, "errors": errors}
+    return None
+
+# ---------------------------------------------------------------------------
+# Combined search: JioSaavn first, then yt-dlp fallback
+# ---------------------------------------------------------------------------
+
+def _find_stream_url(title, artist):
+    # 1. Try JioSaavn (works from datacenter IPs)
+    url = _jiosaavn_search(title, artist)
+    if url:
+        return {"streamUrl": url, "source": "jiosaavn"}
+
+    # 2. Fallback to yt-dlp (works from residential IPs)
+    url = _ytdlp_search(title, artist)
+    if url:
+        return {"streamUrl": url, "source": "ytdlp"}
+
+    return {"streamUrl": None, "source": None}
 
 
 def _base_url():
@@ -139,32 +246,11 @@ def _base_url():
 
 @app.route("/")
 def index():
-    return "NullWave Stream Server (Python / yt-dlp) is running"
-
+    return "NullWave Stream Server is running"
 
 @app.route("/health")
 def health():
-    return jsonify(ok=True, service="nullwave-stream-py")
-
-
-@app.route("/debug/cookies")
-def debug_cookies():
-    paths = [
-        os.environ.get("COOKIES_PATH", ""),
-        "/etc/secrets/cookies.txt",
-        os.path.join(os.path.dirname(__file__), "cookies.txt"),
-    ]
-    results = {}
-    for p in paths:
-        if not p:
-            continue
-        results[p] = {
-            "exists": os.path.isfile(p),
-            "size": os.path.getsize(p) if os.path.isfile(p) else 0,
-        }
-    found = next((p for p in paths if p and os.path.isfile(p)), None)
-    return jsonify(found=found, checked=results)
-
+    return jsonify(ok=True, service="nullwave-stream", crypto=HAS_CRYPTO)
 
 @app.route("/stream")
 def stream():
@@ -176,16 +262,10 @@ def stream():
     result = _find_stream_url(title, artist)
 
     if not result["streamUrl"]:
-        return jsonify(
-            error="No stream URL found",
-            query=result["query"],
-            details=result["errors"][-3:],
-        ), 404
+        return jsonify(error="No stream URL found"), 404
 
-    # Return a proxied URL so the browser never touches the raw Google CDN link
     proxied = f"{_base_url()}/audio?url={requests.utils.quote(result['streamUrl'], safe='')}"
-    return jsonify(streamUrl=proxied, quality="high", mimeType="audio/mp4")
-
+    return jsonify(streamUrl=proxied, quality="high", mimeType="audio/mp4", source=result["source"])
 
 @app.route("/audio")
 def audio():
