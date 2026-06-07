@@ -168,7 +168,13 @@ def _jiosaavn_search(title, artist):
                 "n": "5",
                 "p": "1",
             },
-            headers={"User-Agent": MOCK_UA},
+            headers={
+                "User-Agent": MOCK_UA,
+                "X-Forwarded-For": "122.160.10.1",  # Spoof Airtel India IP
+                "X-Real-IP": "122.160.10.1",
+                "client-ip": "122.160.10.1",
+                "X-Country-Code": "IN"
+            },
             timeout=10,
         )
         
