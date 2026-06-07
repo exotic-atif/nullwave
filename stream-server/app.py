@@ -27,6 +27,29 @@ CORS(app, expose_headers=[
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nullwave-stream")
 
+# ---------------------------------------------------------------------------
+# Resolve cookies once at startup — copy to /tmp so yt-dlp can write to it
+# ---------------------------------------------------------------------------
+import shutil
+
+def _resolve_cookies() -> str | None:
+    """Find the cookies file and copy it to a writable location."""
+    candidates = [
+        os.environ.get("COOKIES_PATH", ""),
+        "/etc/secrets/cookies.txt",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt"),
+    ]
+    source = next((p for p in candidates if p and os.path.isfile(p)), None)
+    if not source:
+        return None
+    # Copy to /tmp so yt-dlp can read AND write
+    writable = "/tmp/cookies.txt"
+    shutil.copy2(source, writable)
+    log.info("Cookies copied from %s to %s (%d bytes)", source, writable, os.path.getsize(writable))
+    return writable
+
+COOKIES_PATH = _resolve_cookies()
+
 MOCK_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
@@ -69,22 +92,10 @@ def _find_stream_url(title: str, artist: str) -> dict:
         f"{title} {artist} audio",
     ])))
 
-    # Check for cookies in multiple locations:
-    # 1. Local file next to app.py
-    # 2. Render Secret Files location (/etc/secrets/)
-    # 3. Custom path via COOKIES_PATH env var
-    cookies_candidates = [
-        os.environ.get("COOKIES_PATH", ""),
-        "/etc/secrets/cookies.txt",
-        os.path.join(os.path.dirname(__file__), "cookies.txt"),
-    ]
-    cookies_path = next((p for p in cookies_candidates if p and os.path.isfile(p)), None)
-    use_cookies = cookies_path is not None
-
     errors = []
     for q in queries:
         search = f"ytsearch1:{q}"
-        log.info("[Stream] Searching: %s", search)
+        log.info("[Stream] Searching: %s (cookies=%s)", search, COOKIES_PATH or "none")
 
         cmd = [
             "yt-dlp",
@@ -95,8 +106,8 @@ def _find_stream_url(title: str, artist: str) -> dict:
             "--user-agent", MOCK_UA,
             "--extractor-args", "youtube:player_client=tv,android",
         ]
-        if use_cookies:
-            cmd += ["--cookies", cookies_path]
+        if COOKIES_PATH:
+            cmd += ["--cookies", COOKIES_PATH]
         cmd.append(search)
 
         try:
