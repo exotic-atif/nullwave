@@ -13,7 +13,7 @@ export function ArtistDetailPage() {
   const [artist, setArtist] = useState<Artist | null>(null)
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
-  const setCurrentTrack = usePlayerStore((s) => s.setCurrentTrack)
+  const setTrack = usePlayerStore((s) => s.setTrack)
   const { setQueue } = useQueueStore()
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function ArtistDetailPage() {
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
-      setCurrentTrack(tracks[0])
+      setTrack(tracks[0])
       setQueue(tracks)
     }
   }
@@ -41,15 +41,12 @@ export function ArtistDetailPage() {
   const handleShuffle = () => {
     if (tracks.length > 0) {
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      setCurrentTrack(shuffled[0])
+      setTrack(shuffled[0])
       setQueue(shuffled)
     }
   }
 
-  const handleTrackClick = (track: Track) => {
-    setCurrentTrack(track)
-    setQueue(tracks)
-  }
+
 
   if (loading) {
     return (
@@ -180,7 +177,6 @@ export function ArtistDetailPage() {
                 key={`${track.id}-${index}`}
                 track={track}
                 index={index + 1}
-                onClick={() => handleTrackClick(track)}
               />
             ))}
           </div>
