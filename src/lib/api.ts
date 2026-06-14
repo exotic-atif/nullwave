@@ -116,4 +116,10 @@ export const api = {
   async artist(name: string): Promise<{ artist: Artist; tracks: Track[] }> {
     return request(`/artist?name=${encodeURIComponent(name)}`)
   },
+
+  /** Get a smart song recommendation */
+  async recommend(artist: string, exclude: string): Promise<Track> {
+    const data = await request<{ track: Track }>(`/recommend?artist=${encodeURIComponent(artist)}&exclude=${encodeURIComponent(exclude)}`)
+    return data.track
+  },
 }

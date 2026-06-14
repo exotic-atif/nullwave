@@ -267,11 +267,58 @@ async function handleArtist(artistId: string): Promise<unknown> {
         genres: [],
       }
 
-  const tracks = songResults
-    .map(mapTrack)
-    .filter((t) => t.artist.toLowerCase().includes(artistId.toLowerCase()))
+  const seenTracks = new Set<string>()
+  const tracks = []
+  for (const s of songResults) {
+    const track = mapTrack(s)
+    if (track.artist.toLowerCase().includes(artistId.toLowerCase())) {
+      const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
+      if (!seenTracks.has(key)) {
+        seenTracks.add(key)
+        tracks.push(track)
+      }
+    }
+  }
 
   return { artist, tracks }
+}
+
+async function handleRecommend(artistId: string, excludeTitle: string): Promise<unknown> {
+  // Fetch top songs by the given artist
+  const data = await saavnFetch({
+    __call: 'search.getResults',
+    q: artistId,
+    n: '20',
+    p: '1',
+  })
+
+  const songResults = (data.results || []) as any[]
+  
+  // Filter and deduplicate
+  const seenTracks = new Set<string>()
+  const tracks = []
+  for (const s of songResults) {
+    const track = mapTrack(s)
+    // Basic filter to ensure we get actual songs by the artist
+    if (track.artist.toLowerCase().includes(artistId.toLowerCase())) {
+      const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
+      if (!seenTracks.has(key)) {
+        seenTracks.add(key)
+        tracks.push(track)
+      }
+    }
+  }
+
+  // Remove the currently playing song from recommendations
+  const validTracks = tracks.filter(t => t.title.toLowerCase() !== excludeTitle.toLowerCase())
+  
+  // Pick a random track
+  if (validTracks.length === 0) {
+    throw new Error('No recommendations found')
+  }
+  
+  const recommended = validTracks[Math.floor(Math.random() * validTracks.length)]
+  return { track: recommended }
 }
 
 // ===== MAIN HANDLER =====
@@ -317,6 +364,14 @@ export default {
         const name = url.searchParams.get('name')?.trim()
         if (!name) return json({ error: 'Missing "name"' }, 400, origin, env)
         return json(await handleArtist(name), 200, origin, env)
+      }
+
+      // GET /recommend?artist=X&exclude=Y
+      if (path === '/recommend') {
+        const artist = url.searchParams.get('artist')?.trim()
+        const exclude = url.searchParams.get('exclude')?.trim() || ''
+        if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
+        return json(await handleRecommend(artist, exclude), 200, origin, env)
       }
 
       // GET /track/:id

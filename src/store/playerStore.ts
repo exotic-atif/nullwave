@@ -33,7 +33,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   progress: 0,
   duration: 0,
   isMuted: false,
-  isShuffled: false,
+  isShuffled: true,
   repeatMode: 'off',
 
   setTrack: (track) =>

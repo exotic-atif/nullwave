@@ -77,15 +77,12 @@ export function Player() {
         if (next) {
           usePlayerStore.getState().setTrack(next)
         } else {
-          // Infinite Autoplay: Fetch related tracks if queue is empty
+          // Infinite Autoplay: Fetch smart recommendation if queue is empty
           const current = usePlayerStore.getState().currentTrack
           if (current) {
-            api.search(current.artist).then((res) => {
-              const tracks = res.tracks.filter(t => t.id !== current.id)
-              if (tracks.length > 0) {
-                // Pick a random track from the search results
-                const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
-                usePlayerStore.getState().setTrack(randomTrack)
+            api.recommend(current.artist, current.title).then((track) => {
+              if (track) {
+                usePlayerStore.getState().setTrack(track)
               } else {
                 usePlayerStore.setState({ isPlaying: false, progress: 0 })
               }
@@ -254,13 +251,11 @@ export function Player() {
           usePlayerStore.getState().setTrack(next)
         } else if (current) {
           // Infinite Autoplay fallback
-          api.search(current.artist).then((res) => {
-            const tracks = res.tracks.filter(t => t.id !== current.id)
-            if (tracks.length > 0) {
-              const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
-              usePlayerStore.getState().setTrack(randomTrack)
+          api.recommend(current.artist, current.title).then((track) => {
+            if (track) {
+              usePlayerStore.getState().setTrack(track)
             }
-          })
+          }).catch(console.error)
         }
       })
     }
@@ -286,13 +281,11 @@ export function Player() {
       setTrack(next)
     } else if (currentTrack) {
       // Infinite Autoplay
-      api.search(currentTrack.artist).then((res) => {
-        const tracks = res.tracks.filter(t => t.id !== currentTrack.id)
-        if (tracks.length > 0) {
-          const randomTrack = tracks[Math.floor(Math.random() * tracks.length)]
-          setTrack(randomTrack)
+      api.recommend(currentTrack.artist, currentTrack.title).then((track) => {
+        if (track) {
+          setTrack(track)
         }
-      })
+      }).catch(console.error)
     }
   }, [currentTrack, addToHistory, playNext, setTrack])
 
@@ -340,7 +333,10 @@ export function Player() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed bottom-0 left-0 right-0 z-50 glass-heavy border-t border-nw-border-subtle"
+          className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/60 backdrop-blur-3xl border-t border-white/5"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`,
+          }}
         >
           {/* Mobile top progress bar - Removed in favor of proper scrubber */}
 

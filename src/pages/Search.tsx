@@ -28,6 +28,7 @@ export function SearchPage() {
   const [artists, setArtists] = useState<Artist[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [activeTab, setActiveTab] = useState<'all' | 'songs' | 'artists' | 'albums'>('all')
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('nw-recent-searches') || '[]')
@@ -129,6 +130,32 @@ export function SearchPage() {
         </div>
       </motion.div>
 
+      {/* Tabs */}
+      <AnimatePresence>
+        {query.trim() && hasSearched && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none"
+          >
+            {['all', 'songs', 'artists', 'albums'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'bg-white text-black'
+                    : 'bg-white/5 text-white/70 hover:bg-white/10'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         {query.trim() ? (
           <motion.div
@@ -147,29 +174,57 @@ export function SearchPage() {
               </section>
             ) : hasResults ? (
               <>
-                {artists.length > 0 && (
+                {/* TOP RESULT CARD (Only on 'All') */}
+                {activeTab === 'all' && artists.length > 0 && (
+                  <section className="flex flex-col md:flex-row gap-6 mb-8">
+                    <div className="flex-1">
+                      <SectionHeader title="Top Result" />
+                      <div className="bg-white/5 hover:bg-white/10 transition-colors p-5 rounded-2xl cursor-pointer group flex flex-col">
+                        <img 
+                          src={artists[0].imageUrl} 
+                          className="w-24 h-24 rounded-full object-cover mb-4 group-hover:scale-105 transition-transform" 
+                          alt={artists[0].name} 
+                        />
+                        <h3 className="text-2xl font-bold text-white mb-1">{artists[0].name}</h3>
+                        <p className="text-sm text-white/60">Artist</p>
+                      </div>
+                    </div>
+                    <div className="flex-[2]">
+                      <SectionHeader title="Songs" />
+                      <div className="space-y-0.5">
+                        {tracks.slice(0, 4).map((track, i) => (
+                          <TrackRow key={track.id} track={track} index={i} />
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {(activeTab === 'all' || activeTab === 'artists') && artists.length > 0 && activeTab !== 'all' && (
                   <section>
-                    <SectionHeader title="Artists" subtitle={`${artists.length} results`} />
-                    <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+                    <SectionHeader title="Artists" subtitle={activeTab === 'artists' ? `${artists.length} results` : undefined} />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pb-4">
                       {artists.map((artist, i) => (
                         <ArtistCard key={artist.id} artist={artist} index={i} />
                       ))}
                     </div>
                   </section>
                 )}
-                {tracks.length > 0 && (
+                
+                {(activeTab === 'all' || activeTab === 'songs') && tracks.length > 0 && (
                   <section>
-                    <SectionHeader title="Tracks" subtitle={`${tracks.length} results`} />
+                    <SectionHeader title={activeTab === 'all' ? "More Songs" : "Songs"} subtitle={activeTab === 'songs' ? `${tracks.length} results` : undefined} />
                     <div className="space-y-0.5">
-                      {tracks.map((track, i) => (
+                      {(activeTab === 'all' ? tracks.slice(4) : tracks).map((track, i) => (
                         <TrackRow key={track.id} track={track} index={i} />
                       ))}
                     </div>
                   </section>
                 )}
-                {albums.length > 0 && (
+
+                {(activeTab === 'all' || activeTab === 'albums') && albums.length > 0 && (
                   <section>
-                    <SectionHeader title="Albums" subtitle={`${albums.length} results`} />
+                    <SectionHeader title="Albums" subtitle={activeTab === 'albums' ? `${albums.length} results` : undefined} />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
                       {albums.map((album, i) => (
                         <AlbumCard key={album.id} album={album as Album} index={i} />
