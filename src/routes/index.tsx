@@ -8,6 +8,7 @@ import { QueuePage } from '@/pages/Queue'
 import { SettingsPage } from '@/pages/Settings'
 import { LoginPage } from '@/pages/Login'
 import { PlaylistDetail } from '@/pages/PlaylistDetail'
+import { ArtistDetailPage } from '@/pages/ArtistDetail'
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
           { path: 'search', element: <SearchPage /> },
           { path: 'library', element: <LibraryPage /> },
           { path: 'playlist/:id', element: <PlaylistDetail /> },
+          { path: 'artist/:name', element: <ArtistDetailPage /> },
           { path: 'queue', element: <QueuePage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
@@ -32,3 +34,4 @@ export const router = createBrowserRouter([
     ],
   },
 ])
+

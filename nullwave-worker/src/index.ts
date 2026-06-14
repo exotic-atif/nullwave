@@ -1,4 +1,4 @@
-// ===== NULLWAVE WORKER — iTunes + Piped + LRCLIB =====
+// ===== NULLWAVE WORKER — JioSaavn + LRCLIB =====
 
 interface Env {
   ALLOWED_ORIGINS: string
@@ -27,25 +27,52 @@ function json(data: unknown, status: number, origin: string, env: Env): Response
   })
 }
 
-// ===== iTunes TYPES =====
+// ===== JIOSAAVN HELPERS =====
 
-interface iTunesResult {
-  trackId: number
-  trackName: string
-  artistName: string
-  collectionName: string
-  collectionId: number
-  artworkUrl100: string
-  previewUrl: string
-  trackTimeMillis: number
-  releaseDate: string
-  primaryGenreName: string
-  trackViewUrl: string
+const SAAVN_BASE = 'https://www.jiosaavn.com/api.php'
+const SAAVN_PARAMS = { _format: 'json', _marker: '0', ctx: 'web6dot0' }
+
+async function saavnFetch(params: Record<string, string>): Promise<any> {
+  const url = new URL(SAAVN_BASE)
+  for (const [k, v] of Object.entries({ ...SAAVN_PARAMS, ...params })) {
+    url.searchParams.set(k, v)
+  }
+  const res = await fetch(url.toString(), {
+    headers: { 'User-Agent': 'NullWave/1.0' },
+  })
+  if (!res.ok) throw new Error(`JioSaavn API error: ${res.status}`)
+  return res.json()
 }
 
-interface iTunesResponse {
-  resultCount: number
-  results: iTunesResult[]
+function getHiResImage(url: string): string {
+  return url
+    .replace(/150x150/g, '500x500')
+    .replace(/50x50/g, '500x500')
+}
+
+function htmlDecode(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+}
+
+function mapTrack(s: any) {
+  return {
+    id: s.id || '',
+    title: htmlDecode(s.song || s.title || ''),
+    artist: htmlDecode(s.primary_artists || s.singers || s.music || ''),
+    album: htmlDecode(s.album || 'Single'),
+    albumId: s.albumid || s.id || '',
+    duration: parseInt(s.duration) || 0,
+    coverUrl: getHiResImage(s.image || ''),
+    audioUrl: '', // Stream server handles playback
+    year: s.year ? parseInt(s.year) : (s.release_date ? parseInt(s.release_date.substring(0, 4)) : 0),
+    genre: htmlDecode(s.language || ''),
+    spotifyUrl: s.perma_url || '',
+  }
 }
 
 // ===== LRCLIB TYPES =====
@@ -60,35 +87,10 @@ interface LrcLibResult {
   plainLyrics: string | null
 }
 
-// ===== MAPPING =====
-
-function getHiResArtwork(url: string): string {
-  return url.replace('100x100bb', '600x600bb')
-}
-
-function mapTrack(t: iTunesResult) {
-  return {
-    id: String(t.trackId),
-    title: t.trackName,
-    artist: t.artistName,
-    album: t.collectionName || 'Single',
-    albumId: String(t.collectionId || t.trackId),
-    duration: Math.floor((t.trackTimeMillis || 0) / 1000),
-    coverUrl: getHiResArtwork(t.artworkUrl100 || ''),
-    audioUrl: t.previewUrl || '',
-    year: t.releaseDate ? parseInt(t.releaseDate.substring(0, 4)) : 0,
-    genre: t.primaryGenreName || '',
-    spotifyUrl: t.trackViewUrl || '',
-  }
-}
-
-
-
 // ===== LRCLIB — Synced Lyrics =====
 
 async function handleLyrics(title: string, artist: string): Promise<unknown> {
   try {
-    // Try exact match first
     const res = await fetch(
       `https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`,
       { headers: { 'User-Agent': 'NullWave/1.0' } }
@@ -104,7 +106,6 @@ async function handleLyrics(title: string, artist: string): Promise<unknown> {
       return { synced: null, plain: null }
     }
 
-    // Pick the best result (prefer one with synced lyrics)
     const withSynced = results.find((r) => r.syncedLyrics)
     const best = withSynced || results[0]
 
@@ -120,88 +121,88 @@ async function handleLyrics(title: string, artist: string): Promise<unknown> {
   }
 }
 
-// ===== iTunes HANDLERS =====
+// ===== JIOSAAVN HANDLERS =====
 
-async function handleTrending(env: Env): Promise<unknown> {
-  const queries = [
-    'The Weeknd',
-    'Arijit Singh',
-    'Char Diwari',
-    'Coke Studio',
-    'Pritam',
-    'Dua Lipa',
-    'Anuv Jain',
-    'Post Malone',
-  ]
-  
-  // Pick 3 random artists/queries to fetch to save time
-  const shuffledQueries = queries.sort(() => 0.5 - Math.random()).slice(0, 3)
+async function handleTrending(): Promise<unknown> {
+  // Use JioSaavn's "Trending Today" playlist (ID: 110858205)
+  // and "Weekly Top Songs" for variety
+  const playlistIds = ['110858205', '93518779', '93520680']
+  const picked = playlistIds[Math.floor(Math.random() * playlistIds.length)]
 
-  const allTracks: ReturnType<typeof mapTrack>[] = []
-  const seenIds = new Set<string>()
+  try {
+    const data = await saavnFetch({
+      __call: 'playlist.getDetails',
+      listid: picked,
+    })
 
-  for (const q of shuffledQueries) {
-    try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=10`
-      )
-      if (!res.ok) continue
-      const data = (await res.json()) as iTunesResponse
+    const songs = (data.songs || []) as any[]
+    const tracks = songs.slice(0, 25).map(mapTrack)
 
-      for (const t of data.results) {
-        const id = String(t.trackId)
-        if (!seenIds.has(id)) {
-          seenIds.add(id)
-          allTracks.push(mapTrack(t))
-        }
-      }
-    } catch {
-      // Skip failed queries
+    // Shuffle for variety
+    for (let i = tracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
+
+    return { tracks: tracks.slice(0, 20) }
+  } catch {
+    return { tracks: [] }
   }
-
-  // Shuffle the combined tracks
-  const randomMix = allTracks.sort(() => 0.5 - Math.random()).slice(0, 20)
-
-  return { tracks: randomMix }
 }
 
 async function handleSearch(query: string): Promise<unknown> {
-  const res = await fetch(
-    `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=25`
-  )
+  const data = await saavnFetch({
+    __call: 'search.getResults',
+    q: query,
+    n: '25',
+    p: '1',
+  })
 
-  if (!res.ok) {
-    throw new Error(`iTunes API error: ${res.status}`)
-  }
+  const results = (data.results || []) as any[]
 
-  const data = (await res.json()) as iTunesResponse
-  
-  // Deduplicate tracks by title and artist
-  const uniqueTracks = []
+  // Deduplicate by title + artist
   const seenTracks = new Set<string>()
-  
-  for (const t of data.results) {
-    const track = mapTrack(t)
+  const tracks = []
+  for (const s of results) {
+    const track = mapTrack(s)
     const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
     if (!seenTracks.has(key)) {
       seenTracks.add(key)
-      uniqueTracks.push(track)
+      tracks.push(track)
     }
   }
-  const tracks = uniqueTracks
 
-  const albumMap = new Map<string, { id: string; title: string; artist: string; coverUrl: string; year: number; totalTracks: number }>()
+  // Build albums from tracks
+  const albumMap = new Map<string, any>()
   for (const t of tracks) {
     if (!albumMap.has(t.albumId)) {
-      albumMap.set(t.albumId, { id: t.albumId, title: t.album, artist: t.artist, coverUrl: t.coverUrl, year: t.year, totalTracks: 1 })
+      albumMap.set(t.albumId, {
+        id: t.albumId,
+        title: t.album,
+        artist: t.artist,
+        coverUrl: t.coverUrl,
+        year: t.year,
+        totalTracks: 1,
+      })
     }
   }
 
-  const artistMap = new Map<string, { id: string; name: string; imageUrl: string; genres: string[] }>()
-  for (const t of data.results) {
-    if (!artistMap.has(t.artistName)) {
-      artistMap.set(t.artistName, { id: t.artistName, name: t.artistName, imageUrl: getHiResArtwork(t.artworkUrl100 || ''), genres: t.primaryGenreName ? [t.primaryGenreName] : [] })
+  // Build artists from tracks
+  const artistMap = new Map<string, any>()
+  for (const s of results) {
+    const ids = (s.primary_artists_id || '').split(',')
+    const names = (s.primary_artists || '').split(',')
+    for (let i = 0; i < ids.length && i < names.length; i++) {
+      const id = ids[i].trim()
+      const name = htmlDecode(names[i].trim())
+      if (id && name && !artistMap.has(id)) {
+        artistMap.set(id, {
+          id,
+          name,
+          imageUrl: getHiResImage(s.image || ''),
+          genres: s.language ? [htmlDecode(s.language)] : [],
+        })
+      }
     }
   }
 
@@ -213,14 +214,57 @@ async function handleSearch(query: string): Promise<unknown> {
 }
 
 async function handleTrack(trackId: string): Promise<unknown> {
-  const res = await fetch(`https://itunes.apple.com/lookup?id=${trackId}`)
-  if (!res.ok) throw new Error(`iTunes API error: ${res.status}`)
-  const data = (await res.json()) as iTunesResponse
-  if (data.results.length === 0) throw new Error('Track not found')
-  return { track: mapTrack(data.results[0]) }
+  const data = await saavnFetch({
+    __call: 'song.getDetails',
+    pids: trackId,
+  })
+
+  const songs = (data.songs || []) as any[]
+  if (songs.length === 0) throw new Error('Track not found')
+
+  return { track: mapTrack(songs[0]) }
 }
 
+async function handleArtist(artistId: string): Promise<unknown> {
+  // Get artist info from artist search
+  const searchData = await saavnFetch({
+    __call: 'search.getArtistResults',
+    q: artistId,
+    n: '1',
+    p: '1',
+  })
 
+  // Also get songs by this artist
+  const songsData = await saavnFetch({
+    __call: 'search.getResults',
+    q: artistId,
+    n: '20',
+    p: '1',
+  })
+
+  const artistResults = (searchData.results || []) as any[]
+  const songResults = (songsData.results || []) as any[]
+
+  const artist = artistResults.length > 0
+    ? {
+        id: artistResults[0].artistId || artistResults[0].id || artistId,
+        name: htmlDecode(artistResults[0].name || artistId),
+        imageUrl: getHiResImage(artistResults[0].image || ''),
+        bio: htmlDecode(artistResults[0].description || ''),
+        genres: [],
+      }
+    : {
+        id: artistId,
+        name: artistId,
+        imageUrl: '',
+        bio: '',
+        genres: [],
+      }
+
+  const tracks = songResults.map(mapTrack)
+
+  return { artist, tracks }
+}
 
 // ===== MAIN HANDLER =====
 
@@ -242,7 +286,7 @@ export default {
 
       // GET /songs/trending
       if (path === '/songs/trending') {
-        return json(await handleTrending(env), 200, origin, env)
+        return json(await handleTrending(), 200, origin, env)
       }
 
       // GET /search?q=
@@ -252,8 +296,6 @@ export default {
         return json(await handleSearch(query), 200, origin, env)
       }
 
-
-
       // GET /lyrics?title=X&artist=Y
       if (path === '/lyrics') {
         const title = url.searchParams.get('title')?.trim()
@@ -262,8 +304,15 @@ export default {
         return json(await handleLyrics(title, artist || ''), 200, origin, env)
       }
 
+      // GET /artist?name=X
+      if (path === '/artist') {
+        const name = url.searchParams.get('name')?.trim()
+        if (!name) return json({ error: 'Missing "name"' }, 400, origin, env)
+        return json(await handleArtist(name), 200, origin, env)
+      }
+
       // GET /track/:id
-      const trackMatch = path.match(/^\/track\/([0-9]+)$/)
+      const trackMatch = path.match(/^\/track\/(.+)$/)
       if (trackMatch) {
         return json(await handleTrack(trackMatch[1]), 200, origin, env)
       }

@@ -146,7 +146,9 @@ export function LyricsPanel({ isOpen, onClose, track, progress, lyricsData }: Ly
                     className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
                     style={{
                       WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                      maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)'
+                      maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                      paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
+                      paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
                     }}
                   >
                     {lyricsData.map((line, i) => {
