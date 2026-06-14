@@ -151,19 +151,33 @@ async function handleTrending(): Promise<unknown> {
 }
 
 async function handleSearch(query: string): Promise<unknown> {
-  const data = await saavnFetch({
-    __call: 'search.getResults',
-    q: query,
-    n: '25',
-    p: '1',
-  })
+  // Fetch tracks, artists, and albums in parallel
+  const [songsData, artistsData, albumsData] = await Promise.all([
+    saavnFetch({
+      __call: 'search.getResults',
+      q: query,
+      n: '25',
+      p: '1',
+    }).catch(() => ({ results: [] })),
+    saavnFetch({
+      __call: 'search.getArtistResults',
+      q: query,
+      n: '10',
+      p: '1',
+    }).catch(() => ({ results: [] })),
+    saavnFetch({
+      __call: 'search.getAlbumResults',
+      q: query,
+      n: '10',
+      p: '1',
+    }).catch(() => ({ results: [] }))
+  ])
 
-  const results = (data.results || []) as any[]
-
-  // Deduplicate by title + artist
+  // Tracks
+  const songResults = (songsData.results || []) as any[]
   const seenTracks = new Set<string>()
   const tracks = []
-  for (const s of results) {
+  for (const s of songResults) {
     const track = mapTrack(s)
     const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
     if (!seenTracks.has(key)) {
@@ -172,44 +186,30 @@ async function handleSearch(query: string): Promise<unknown> {
     }
   }
 
-  // Build albums from tracks
-  const albumMap = new Map<string, any>()
-  for (const t of tracks) {
-    if (!albumMap.has(t.albumId)) {
-      albumMap.set(t.albumId, {
-        id: t.albumId,
-        title: t.album,
-        artist: t.artist,
-        coverUrl: t.coverUrl,
-        year: t.year,
-        totalTracks: 1,
-      })
-    }
-  }
+  // Artists
+  const artistResults = (artistsData.results || []) as any[]
+  const artists = artistResults.map((s) => ({
+    id: s.artistId || s.id || '',
+    name: htmlDecode(s.name || s.title || ''),
+    imageUrl: getHiResImage(s.image || ''),
+    genres: s.language ? [htmlDecode(s.language)] : [],
+  }))
 
-  // Build artists from tracks
-  const artistMap = new Map<string, any>()
-  for (const s of results) {
-    const ids = (s.primary_artists_id || '').split(',')
-    const names = (s.primary_artists || '').split(',')
-    for (let i = 0; i < ids.length && i < names.length; i++) {
-      const id = ids[i].trim()
-      const name = htmlDecode(names[i].trim())
-      if (id && name && !artistMap.has(id)) {
-        artistMap.set(id, {
-          id,
-          name,
-          imageUrl: getHiResImage(s.image || ''),
-          genres: s.language ? [htmlDecode(s.language)] : [],
-        })
-      }
-    }
-  }
+  // Albums
+  const albumResults = (albumsData.results || []) as any[]
+  const albums = albumResults.map((s) => ({
+    id: s.id || '',
+    title: htmlDecode(s.title || ''),
+    artist: htmlDecode(s.music || s.primary_artists || ''),
+    coverUrl: getHiResImage(s.image || ''),
+    year: s.year ? parseInt(s.year) : 0,
+    totalTracks: s.more_info?.song_pids ? s.more_info.song_pids.split(',').length : 1,
+  }))
 
   return {
     tracks,
-    albums: Array.from(albumMap.values()).slice(0, 10),
-    artists: Array.from(artistMap.values()).slice(0, 10),
+    artists,
+    albums,
   }
 }
 
