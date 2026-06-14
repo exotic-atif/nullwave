@@ -147,22 +147,22 @@ export function SearchPage() {
               </section>
             ) : hasResults ? (
               <>
-                {tracks.length > 0 && (
-                  <section>
-                    <SectionHeader title="Tracks" subtitle={`${tracks.length} results`} />
-                    <div className="space-y-0.5">
-                      {tracks.map((track, i) => (
-                        <TrackRow key={track.id} track={track} index={i} />
-                      ))}
-                    </div>
-                  </section>
-                )}
                 {artists.length > 0 && (
                   <section>
                     <SectionHeader title="Artists" subtitle={`${artists.length} results`} />
                     <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
                       {artists.map((artist, i) => (
                         <ArtistCard key={artist.id} artist={artist} index={i} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {tracks.length > 0 && (
+                  <section>
+                    <SectionHeader title="Tracks" subtitle={`${tracks.length} results`} />
+                    <div className="space-y-0.5">
+                      {tracks.map((track, i) => (
+                        <TrackRow key={track.id} track={track} index={i} />
                       ))}
                     </div>
                   </section>
