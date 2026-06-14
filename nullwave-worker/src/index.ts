@@ -38,7 +38,13 @@ async function saavnFetch(params: Record<string, string>): Promise<any> {
     url.searchParams.set(k, v)
   }
   const res = await fetch(url.toString(), {
-    headers: { 'User-Agent': 'NullWave/1.0' },
+    headers: { 
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      'X-Forwarded-For': '122.160.10.1',
+      'X-Real-IP': '122.160.10.1',
+      'client-ip': '122.160.10.1',
+      'X-Country-Code': 'IN'
+    },
   })
   if (!res.ok) throw new Error(`JioSaavn API error: ${res.status}`)
   return res.json()
@@ -261,7 +267,9 @@ async function handleArtist(artistId: string): Promise<unknown> {
         genres: [],
       }
 
-  const tracks = songResults.map(mapTrack)
+  const tracks = songResults
+    .map(mapTrack)
+    .filter((t) => t.artist.toLowerCase().includes(artistId.toLowerCase()))
 
   return { artist, tracks }
 }
