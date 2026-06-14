@@ -82,7 +82,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-4 mt-auto border-t border-nw-border-subtle pt-4 space-y-0.5">
+      <div className="px-3 pb-24 lg:pb-4 mt-auto border-t border-nw-border-subtle pt-4 space-y-0.5">
         {bottomItems.map((item) => (
           <NavLink
             key={item.to}

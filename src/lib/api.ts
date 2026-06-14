@@ -111,4 +111,9 @@ export const api = {
   async lyrics(title: string, artist: string): Promise<LyricsResult> {
     return request(`/lyrics?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)
   },
+
+  /** Get artist details + top songs */
+  async artist(name: string): Promise<{ artist: Artist; tracks: Track[] }> {
+    return request(`/artist?name=${encodeURIComponent(name)}`)
+  },
 }

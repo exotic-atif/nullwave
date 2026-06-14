@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "stream": "npm --prefix stream-server run start",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
