@@ -20,8 +20,6 @@ interface FullScreenPlayerProps {
 export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [showLyrics, setShowLyrics] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isDragging, setIsDragging] = useState(false)
   
   const {
     isPlaying,
@@ -177,9 +175,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                       step={0.1}
                       value={progress}
                       onChange={(e) => handleSeek(Number(e.target.value))}
-                      onMouseDown={() => setIsDragging(true)}
                       onMouseUp={() => {
-                        setIsDragging(false)
                         audioManager.seek(progress)
                       }}
                       className="flex-1 cursor-pointer nw-slider min-w-0"
