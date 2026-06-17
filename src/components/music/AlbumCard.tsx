@@ -3,6 +3,7 @@ import { AlbumArt } from '../ui/AlbumArt'
 import { usePlayerStore, useQueueStore } from '@/store'
 import { Play, ListPlus, PlayCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { ContextMenu } from '../ui/ContextMenu'
 import { useContextMenu } from '@/hooks/useContextMenu'
 
@@ -40,14 +41,14 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
 
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.05, duration: 0.4 }}
-        className="group flex flex-col gap-3 p-3 rounded-xl transition-all duration-300 hover:bg-white/[0.03] cursor-pointer"
-        onClick={handlePlay}
-        onContextMenu={openContextMenu}
-      >
+      <Link to={`/album/${album.id}`} className="block">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.05, duration: 0.4 }}
+          className="group flex flex-col gap-3 p-3 rounded-xl transition-all duration-300 hover:bg-white/[0.03] cursor-pointer"
+          onContextMenu={openContextMenu}
+        >
         {/* Cover */}
         <div className="relative aspect-square w-full overflow-hidden rounded-xl shadow-lg shadow-black/30">
           <AlbumArt
@@ -77,7 +78,8 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
             {album.artist} • {album.year}
           </p>
         </div>
-      </motion.div>
+        </motion.div>
+      </Link>
 
       <ContextMenu
         isOpen={isOpen}

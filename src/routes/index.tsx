@@ -9,6 +9,7 @@ import { SettingsPage } from '@/pages/Settings'
 import { LoginPage } from '@/pages/Login'
 import { PlaylistDetail } from '@/pages/PlaylistDetail'
 import { ArtistDetailPage } from '@/pages/ArtistDetail'
+import { AlbumDetailPage } from '@/pages/AlbumDetail'
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
           { path: 'library', element: <LibraryPage /> },
           { path: 'playlist/:id', element: <PlaylistDetail /> },
           { path: 'artist/:name', element: <ArtistDetailPage /> },
+          { path: 'album/:id', element: <AlbumDetailPage /> },
           { path: 'queue', element: <QueuePage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],

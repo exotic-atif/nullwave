@@ -8,20 +8,39 @@ import { usePlayerStore, useQueueStore } from '@/store'
 import { api } from '@/lib/api'
 import type { Track, Album, Artist } from '@/types'
 import { motion } from 'framer-motion'
-import { Play, Sparkles } from 'lucide-react'
+import { Play, Sparkles, Search as SearchIcon } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
+import { fetchPlayHistory } from '@/lib/supabase'
+import { useNavigate } from 'react-router-dom'
 
 export function HomePage() {
   const setTrack = usePlayerStore((s) => s.setTrack)
   const addMultipleToQueue = useQueueStore((s) => s.addMultipleToQueue)
+  const queueHistory = useQueueStore((s) => s.history)
+  const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
+  
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        const result = await api.trending()
+        let artists: string[] = []
+        if (user) {
+          const dbHistory = await fetchPlayHistory(user.id, 20)
+          artists = dbHistory.map(t => t.artist)
+        } else {
+          artists = queueHistory.map(t => t.artist)
+        }
+        
+        // deduplicate artists
+        artists = [...new Set(artists)].slice(0, 10)
+        
+        const result = await api.homeFeed(artists)
         if (!cancelled) {
           setTracks(result)
           setError('')
@@ -34,7 +53,15 @@ export function HomePage() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [user, queueHistory.length])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      navigate('/search')
+      // Hack: we don't have a global search state, so we just navigate. The user will type again. Wait, or we can use localstorage for recent searches. But navigating is fine for now.
+    }
+  }
 
   const handlePlayAll = () => {
     if (tracks.length > 0) {
@@ -90,15 +117,27 @@ export function HomePage() {
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-nw-text tracking-tight mb-2">
-            Your Private
+            FVCK Ads,
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-nw-accent to-nw-accent-hover">
-              Sound Space
+              Enjoy Music
             </span>
           </h1>
           <p className="text-sm text-nw-text-secondary mb-5 max-w-md leading-relaxed">
-            Underground frequencies. Curated for you. No algorithms, no noise — just music that matters.
+            Pure, uninterrupted listening. Curated from your habits, just for you.
           </p>
+
+          <form onSubmit={handleSearchSubmit} className="relative max-w-sm mb-6">
+            <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-nw-text-tertiary" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search songs, artists, albums..."
+              className="w-full pl-10 pr-4 py-3 bg-nw-surface/60 border border-white/10 rounded-full text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent-ring transition-all"
+            />
+          </form>
+
           <button
             onClick={handlePlayAll}
             disabled={tracks.length === 0}

@@ -1,0 +1,296 @@
+import type { Track } from '@/types'
+import type { SyncedLine } from '@/lib/api'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Music2, ChevronDown, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Mic2 } from 'lucide-react'
+import { AlbumArt } from '../ui/AlbumArt'
+import { useEffect, useRef, useState } from 'react'
+import { usePlayerStore, useQueueStore } from '@/store'
+import { audioManager } from '@/lib/audio'
+import { formatTime } from '@/lib/utils'
+
+interface FullScreenPlayerProps {
+  isOpen: boolean
+  onClose: () => void
+  track: Track
+  progress: number
+  duration: number
+  lyricsData: SyncedLine[] | null
+}
+
+export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData }: FullScreenPlayerProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [showLyrics, setShowLyrics] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  
+  const {
+    isPlaying,
+    isShuffled,
+    repeatMode,
+    togglePlay,
+    setProgress,
+    toggleShuffle,
+    cycleRepeat,
+    setTrack,
+  } = usePlayerStore()
+
+  const { playNext, playPrevious } = useQueueStore()
+
+  // Find active line index
+  const activeIndex = lyricsData
+    ? lyricsData.findIndex((line, i) => {
+        const nextLine = lyricsData[i + 1]
+        return progress >= line.time && (!nextLine || progress < nextLine.time)
+      })
+    : -1
+
+  // Auto-scroll to active line
+  useEffect(() => {
+    if (isOpen && showLyrics && activeIndex >= 0 && containerRef.current) {
+      const activeEl = containerRef.current.children[activeIndex] as HTMLElement
+      if (activeEl) {
+        containerRef.current.scrollTo({
+          top: activeEl.offsetTop - containerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
+          behavior: 'smooth'
+        })
+      }
+    }
+  }, [activeIndex, isOpen, showLyrics])
+
+  const handleNext = () => {
+    const next = playNext()
+    if (next) setTrack(next)
+  }
+
+  const handlePrevious = () => {
+    if (progress > 3) {
+      audioManager.seek(0)
+      setProgress(0)
+      return
+    }
+    const prev = playPrevious()
+    if (prev) setTrack(prev)
+  }
+
+  const handleSeek = (value: number) => {
+    setProgress(value)
+    audioManager.seek(value)
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          {/* Panel */}
+          <motion.div
+            initial={{ y: '100%', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 32, stiffness: 300 }}
+            className="fixed inset-0 z-[70] flex flex-col bg-gradient-to-b from-nw-void via-nw-black to-nw-black overflow-hidden"
+          >
+            {/* Ambient background glow */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-nw-accent/[0.06] blur-[120px]" />
+              <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-nw-accent-glow/[0.04] blur-[100px]" />
+            </div>
+
+            {/* Header */}
+            <div className="relative z-10 flex items-center justify-between px-5 md:px-8 pt-5 pb-3">
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 text-nw-text-secondary hover:text-nw-text transition-colors text-sm"
+              >
+                <ChevronDown size={20} />
+                <span className="hidden sm:inline">Close</span>
+              </button>
+
+              <div className="text-center">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-nw-muted font-semibold flex items-center justify-center gap-2">
+                  Now Playing
+                  <button onClick={() => setShowLyrics(!showLyrics)} className={`p-1.5 rounded-full transition-colors ${showLyrics ? 'bg-nw-accent text-nw-black' : 'bg-white/10 text-white'}`}>
+                    <Mic2 size={12} />
+                  </button>
+                </p>
+              </div>
+
+              <button
+                onClick={onClose}
+                className="text-nw-text-secondary hover:text-nw-text transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 px-5 md:px-12 pb-24 overflow-hidden">
+              {/* Left: Album art + track info */}
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+                className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full md:w-auto scale-90' : 'w-full scale-100'}`}
+              >
+                <div className="relative">
+                  <AlbumArt
+                    src={track.coverUrl}
+                    alt={track.album}
+                    size="hero"
+                    rounded="2xl"
+                    showShadow
+                    className={`transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? '!w-48 !h-48 md:!w-64 md:!h-64' : '!w-64 !h-64 md:!w-96 md:!h-96'}`}
+                  />
+                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite]" />
+                </div>
+
+                <div className="mt-8 text-center max-w-[320px]">
+                  <h2 className={`${showLyrics ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'} font-display font-bold text-nw-text truncate transition-all`}>
+                    {track.title}
+                  </h2>
+                  <p className={`${showLyrics ? 'text-sm' : 'text-lg'} text-nw-text-secondary mt-1 truncate transition-all`}>
+                    {track.artist}
+                  </p>
+                  <p className="text-xs text-nw-text-tertiary mt-1 truncate">
+                    {track.album} {track.year ? `• ${track.year}` : ''}
+                  </p>
+                </div>
+
+                {/* Scrubber & Controls (Only show here if NOT in lyrics mode OR on desktop) */}
+                <div className={`w-full max-w-md mt-10 transition-all duration-500 ${showLyrics ? 'hidden md:block' : 'block'}`}>
+                  {/* Scrubber */}
+                  <div className="flex items-center gap-3 w-full mb-6">
+                    <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(progress)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 100}
+                      step={0.1}
+                      value={progress}
+                      onChange={(e) => handleSeek(Number(e.target.value))}
+                      onMouseDown={() => setIsDragging(true)}
+                      onMouseUp={() => {
+                        setIsDragging(false)
+                        audioManager.seek(progress)
+                      }}
+                      className="flex-1 cursor-pointer nw-slider min-w-0"
+                      style={{
+                        background: `linear-gradient(to right, #38bdf8 ${
+                          duration > 0 ? (progress / duration) * 100 : 0
+                        }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
+                      }}
+                    />
+                    <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(duration)}</span>
+                  </div>
+
+                  {/* Playback Controls */}
+                  <div className="flex items-center justify-between px-4">
+                    <button onClick={toggleShuffle} className={`p-2 rounded-full transition-colors ${isShuffled ? 'text-nw-accent bg-nw-accent/10' : 'text-nw-text-secondary hover:text-white hover:bg-white/5'}`}>
+                      <Shuffle size={20} />
+                    </button>
+                    
+                    <button onClick={handlePrevious} className="p-3 text-white hover:text-nw-accent transition-colors">
+                      <SkipBack size={28} fill="currentColor" />
+                    </button>
+                    
+                    <button
+                      onClick={togglePlay}
+                      className="w-16 h-16 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer shadow-lg shadow-nw-accent/20"
+                    >
+                      {isPlaying ? (
+                        <Pause size={28} className="text-nw-black" fill="currentColor" />
+                      ) : (
+                        <Play size={28} className="text-nw-black ml-1" fill="currentColor" />
+                      )}
+                    </button>
+                    
+                    <button onClick={handleNext} className="p-3 text-white hover:text-nw-accent transition-colors">
+                      <SkipForward size={28} fill="currentColor" />
+                    </button>
+
+                    <button onClick={cycleRepeat} className={`p-2 rounded-full transition-colors ${repeatMode !== 'off' ? 'text-nw-accent bg-nw-accent/10' : 'text-nw-text-secondary hover:text-white hover:bg-white/5'}`}>
+                      {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Right: Lyrics */}
+              {showLyrics && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden"
+                >
+                  {!lyricsData || lyricsData.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-20">
+                      <div className="w-16 h-16 rounded-2xl bg-nw-surface/50 flex items-center justify-center mb-4">
+                        <Music2 size={28} className="text-nw-muted" />
+                      </div>
+                      <p className="text-nw-text-secondary font-medium">No lyrics available</p>
+                      <p className="text-xs text-nw-text-tertiary mt-1 max-w-[240px]">
+                        Lyrics for "{track.title}" haven't been added yet
+                      </p>
+                    </div>
+                  ) : (
+                    <div 
+                      ref={containerRef}
+                      className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
+                      style={{
+                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                        maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                        paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
+                        paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
+                      }}
+                    >
+                      {lyricsData.map((line, i) => {
+                        const isActive = i === activeIndex
+                        const isPassed = i < activeIndex
+                        return (
+                          <div 
+                            key={i} 
+                            className={`text-2xl md:text-4xl lg:text-5xl font-display font-bold transition-all duration-500 cursor-default ${
+                              isActive ? 'text-nw-text scale-100 opacity-100 blur-0' : 
+                              isPassed ? 'text-nw-text-secondary/50 scale-95 opacity-40 blur-[2px] hover:text-nw-text-secondary/80 hover:opacity-80' : 
+                              'text-nw-text-secondary/30 scale-95 opacity-40 blur-[2px] hover:text-nw-text-secondary/60 hover:opacity-60'
+                            }`}
+                          >
+                            {line.text}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+            
+            {/* Mobile Controls when Lyrics are shown (Fixed at bottom) */}
+            {showLyrics && (
+               <div className="md:hidden absolute bottom-6 left-0 right-0 px-6 z-50">
+                  <div className="flex items-center justify-between bg-black/40 backdrop-blur-xl p-4 rounded-3xl border border-white/10">
+                     <button onClick={togglePlay} className="p-3 bg-white text-black rounded-full shadow-lg">
+                       {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                     </button>
+                     <div className="flex gap-4">
+                        <button onClick={handlePrevious} className="p-2 text-white/70 hover:text-white"><SkipBack size={24} fill="currentColor" /></button>
+                        <button onClick={handleNext} className="p-2 text-white/70 hover:text-white"><SkipForward size={24} fill="currentColor" /></button>
+                     </div>
+                  </div>
+               </div>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}

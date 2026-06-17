@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LyricsPanel } from './LyricsPanel'
+import { FullScreenPlayer } from './FullScreenPlayer'
 
 export function Player() {
   const navigate = useNavigate()
@@ -51,7 +51,7 @@ export function Player() {
   const { isLiked, toggle: toggleLike } = useLikedStore()
 
   const [isDragging, setIsDragging] = useState(false)
-  const [showLyrics, setShowLyrics] = useState(false)
+  const [showFullScreen, setShowFullScreen] = useState(false)
   const [lyricsData, setLyricsData] = useState<SyncedLine[] | null>(null)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
@@ -318,12 +318,13 @@ export function Player() {
 
   return (
     <>
-      {/* Lyrics Panel */}
-      <LyricsPanel
-        isOpen={showLyrics}
-        onClose={() => setShowLyrics(false)}
+      {/* Full Screen Player Overlay */}
+      <FullScreenPlayer
+        isOpen={showFullScreen}
+        onClose={() => setShowFullScreen(false)}
         track={currentTrack}
         progress={progress}
+        duration={duration}
         lyricsData={lyricsData}
       />
 
@@ -365,8 +366,8 @@ export function Player() {
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     className="text-[13px] md:text-sm font-medium text-nw-text truncate cursor-pointer hover:text-nw-accent hover:underline underline-offset-2 transition-colors duration-200"
-                    onClick={() => setShowLyrics(true)}
-                    title="View lyrics"
+                    onClick={() => setShowFullScreen(true)}
+                    title="Open Player"
                   >
                     {currentTrack.title}
                   </motion.p>
@@ -488,7 +489,7 @@ export function Player() {
                   <IconButton size="sm" active={repeatMode !== 'off'} onClick={cycleRepeat}>
                     {repeatMode === 'one' ? <Repeat1 size={14} /> : <Repeat size={14} />}
                   </IconButton>
-                  <IconButton size="sm" active={showLyrics} onClick={() => setShowLyrics(!showLyrics)}>
+                  <IconButton size="sm" onClick={() => setShowFullScreen(true)}>
                     <Mic2 size={14} />
                   </IconButton>
                   <IconButton size="sm" onClick={() => navigate('/queue')}>
@@ -500,7 +501,7 @@ export function Player() {
 
             {/* Right Controls (Hidden on mobile) */}
             <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
-              <IconButton size="sm" active={showLyrics} onClick={() => setShowLyrics(!showLyrics)}>
+              <IconButton size="sm" onClick={() => setShowFullScreen(true)} title="Full Screen Player">
                 <Mic2 size={15} />
               </IconButton>
               <IconButton size="sm" onClick={() => navigate('/queue')}>

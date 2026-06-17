@@ -117,6 +117,17 @@ export const api = {
     return request(`/artist?name=${encodeURIComponent(name)}`)
   },
 
+  /** Get album details + tracks */
+  async album(id: string): Promise<{ album: Album; tracks: Track[] }> {
+    return request(`/album?id=${encodeURIComponent(id)}`)
+  },
+
+  /** Get personalized home feed */
+  async homeFeed(recentArtists: string[]): Promise<Track[]> {
+    const data = await request<{ tracks: Track[] }>(`/home-feed?history=${encodeURIComponent(JSON.stringify(recentArtists))}`)
+    return data.tracks
+  },
+
   /** Get a smart song recommendation */
   async recommend(artist: string, exclude: string): Promise<Track> {
     const data = await request<{ track: Track }>(`/recommend?artist=${encodeURIComponent(artist)}&exclude=${encodeURIComponent(exclude)}`)

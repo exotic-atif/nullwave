@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { debounce } from '@/lib/utils'
 import type { Track, Album, Artist } from '@/types'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 
 const TRENDING_TERMS = [
   'Coke Studio Bangla',
@@ -179,7 +180,7 @@ export function SearchPage() {
                   <section className="flex flex-col md:flex-row gap-6 mb-8">
                     <div className="flex-1">
                       <SectionHeader title="Top Result" />
-                      <div className="bg-white/5 hover:bg-white/10 transition-colors p-5 rounded-2xl cursor-pointer group flex flex-col">
+                      <Link to={`/artist/${encodeURIComponent(artists[0].name)}`} className="block bg-white/5 hover:bg-white/10 transition-colors p-5 rounded-2xl cursor-pointer group flex flex-col">
                         <img 
                           src={artists[0].imageUrl} 
                           className="w-24 h-24 rounded-full object-cover mb-4 group-hover:scale-105 transition-transform" 
@@ -187,7 +188,7 @@ export function SearchPage() {
                         />
                         <h3 className="text-2xl font-bold text-white mb-1">{artists[0].name}</h3>
                         <p className="text-sm text-white/60">Artist</p>
-                      </div>
+                      </Link>
                     </div>
                     <div className="flex-[2]">
                       <SectionHeader title="Songs" />

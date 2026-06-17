@@ -231,6 +231,26 @@ async function handleTrack(trackId: string): Promise<unknown> {
   return { track: mapTrack(songs[0]) }
 }
 
+async function handleAlbum(albumId: string): Promise<unknown> {
+  const data = await saavnFetch({
+    __call: 'content.getAlbumDetails',
+    albumid: albumId,
+  })
+
+  const album = {
+    id: data.id || albumId,
+    title: htmlDecode(data.title || ''),
+    artist: htmlDecode(data.primary_artists || ''),
+    coverUrl: getHiResImage(data.image || ''),
+    year: data.year ? parseInt(data.year) : 0,
+    totalTracks: data.songs ? data.songs.length : 0,
+  }
+
+  const tracks = (data.songs || []).map(mapTrack)
+
+  return { album, tracks }
+}
+
 async function handleArtist(artistId: string): Promise<unknown> {
   // Get artist info from artist search
   const searchData = await saavnFetch({
@@ -284,28 +304,34 @@ async function handleArtist(artistId: string): Promise<unknown> {
 }
 
 async function handleRecommend(artistId: string, excludeTitle: string): Promise<unknown> {
-  // Fetch top songs by the given artist
-  const data = await saavnFetch({
-    __call: 'search.getResults',
-    q: artistId,
-    n: '20',
-    p: '1',
-  })
+  // Fetch songs by artist and potentially a related genre search
+  const [artistData, hitsData] = await Promise.all([
+    saavnFetch({ __call: 'search.getResults', q: artistId, n: '20', p: '1' }).catch(() => ({ results: [] })),
+    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] }))
+  ])
 
-  const songResults = (data.results || []) as any[]
+  const songResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
   
   // Filter and deduplicate
   const seenTracks = new Set<string>()
   const tracks = []
+  
+  const badKeywords = ['slowed', 'reverb', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke']
+
   for (const s of songResults) {
     const track = mapTrack(s)
-    // Basic filter to ensure we get actual songs by the artist
-    if (track.artist.toLowerCase().includes(artistId.toLowerCase())) {
-      const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
-      if (!seenTracks.has(key)) {
-        seenTracks.add(key)
-        tracks.push(track)
-      }
+    const titleLower = track.title.toLowerCase()
+    
+    // Skip bad versions unless the excluded title was already a bad version
+    const isGarbage = badKeywords.some(b => titleLower.includes(b))
+    const wasExcludeGarbage = badKeywords.some(b => excludeTitle.toLowerCase().includes(b))
+    
+    if (isGarbage && !wasExcludeGarbage) continue
+
+    const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
+    if (!seenTracks.has(key)) {
+      seenTracks.add(key)
+      tracks.push(track)
     }
   }
 
@@ -314,11 +340,53 @@ async function handleRecommend(artistId: string, excludeTitle: string): Promise<
   
   // Pick a random track
   if (validTracks.length === 0) {
-    throw new Error('No recommendations found')
+    // Ultimate fallback if filtered out everything
+    const randomFallback = songResults[Math.floor(Math.random() * songResults.length)]
+    if (!randomFallback) throw new Error('No recommendations found')
+    return { track: mapTrack(randomFallback) }
   }
   
   const recommended = validTracks[Math.floor(Math.random() * validTracks.length)]
   return { track: recommended }
+}
+
+async function handleHomeFeed(recentArtistsStr: string): Promise<unknown> {
+  try {
+    const recentArtists = JSON.parse(recentArtistsStr) as string[]
+    if (!recentArtists || recentArtists.length === 0) {
+      return await handleTrending()
+    }
+
+    // Pick up to 3 random artists from history to search
+    const shuffledArtists = [...recentArtists].sort(() => 0.5 - Math.random()).slice(0, 3)
+    const fetchPromises = shuffledArtists.map(a => 
+      saavnFetch({ __call: 'search.getResults', q: a, n: '15', p: '1' }).catch(() => ({ results: [] }))
+    )
+    
+    const resultsArray = await Promise.all(fetchPromises)
+    const songResults = resultsArray.flatMap(r => r.results || [])
+
+    const seenTracks = new Set<string>()
+    const tracks = []
+    
+    for (const s of songResults) {
+      const track = mapTrack(s)
+      if (!seenTracks.has(track.id)) {
+        seenTracks.add(track.id)
+        tracks.push(track)
+      }
+    }
+
+    // Shuffle final tracks
+    for (let i = tracks.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+    }
+
+    return { tracks: tracks.slice(0, 25) }
+  } catch {
+    return await handleTrending()
+  }
 }
 
 // ===== MAIN HANDLER =====
@@ -366,12 +434,25 @@ export default {
         return json(await handleArtist(name), 200, origin, env)
       }
 
+      // GET /album?id=X
+      if (path === '/album') {
+        const id = url.searchParams.get('id')?.trim()
+        if (!id) return json({ error: 'Missing "id"' }, 400, origin, env)
+        return json(await handleAlbum(id), 200, origin, env)
+      }
+
       // GET /recommend?artist=X&exclude=Y
       if (path === '/recommend') {
         const artist = url.searchParams.get('artist')?.trim()
         const exclude = url.searchParams.get('exclude')?.trim() || ''
         if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
         return json(await handleRecommend(artist, exclude), 200, origin, env)
+      }
+
+      // GET /home-feed?history=X
+      if (path === '/home-feed') {
+        const historyStr = url.searchParams.get('history')?.trim() || '[]'
+        return json(await handleHomeFeed(historyStr), 200, origin, env)
       }
 
       // GET /track/:id
