@@ -20,6 +20,7 @@ interface FullScreenPlayerProps {
 export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [showLyrics, setShowLyrics] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isDragging, setIsDragging] = useState(false)
   
   const {
