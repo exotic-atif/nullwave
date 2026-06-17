@@ -113,7 +113,7 @@ export function HomePage() {
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={14} className="text-nw-accent" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-nw-accent">
-              Welcome back
+              Welcome back {user?.username ? `, ${user.username}` : ''}
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-nw-text tracking-tight mb-2">
