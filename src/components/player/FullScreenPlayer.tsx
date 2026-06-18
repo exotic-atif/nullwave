@@ -1,7 +1,7 @@
 import type { Track } from '@/types'
 import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Music2, ChevronDown, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Mic2 } from 'lucide-react'
+import { X, Music2, ChevronDown, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useEffect, useRef, useState } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
