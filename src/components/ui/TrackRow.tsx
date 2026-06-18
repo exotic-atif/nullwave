@@ -83,7 +83,7 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
         onClick={handleClick}
         onContextMenu={openContextMenu}
         className={cn(
-          'group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200',
+          'group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 select-none',
           'hover:bg-white/[0.04]',
           isActive && 'bg-nw-accent-dim',
           className

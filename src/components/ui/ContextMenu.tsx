@@ -65,10 +65,11 @@ export function ContextMenu({ isOpen, position, items, onClose }: ContextMenuPro
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.92, y: -4 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[100] min-w-[180px] py-1.5 rounded-xl glass-heavy shadow-2xl shadow-black/40 border border-nw-border"
+          className="fixed z-[100] min-w-[180px] py-1.5 rounded-xl bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl shadow-black/50 border border-white/5 overflow-hidden"
           style={{
             left: adjustedPosition.x,
             top: adjustedPosition.y,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`,
           }}
         >
           {items.map((item, i) => (

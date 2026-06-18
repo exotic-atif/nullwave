@@ -163,9 +163,9 @@ export function SettingsPage() {
         </div>
 
         <div className="p-4 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
-          <div className="flex items-center justify-between py-2 border-b border-white/5">
+          <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary">Version</span>
-            <span className="text-nw-text font-medium">1.1.6</span>
+            <span className="text-nw-text font-medium">1.1.10</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary">Access</span>
