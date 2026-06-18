@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Search, Library, ListMusic } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { usePlayerStore } from '@/store'
 import { motion } from 'framer-motion'
 
 const tabs = [
@@ -13,14 +12,12 @@ const tabs = [
 
 export function MobileNavBar() {
   const location = useLocation()
-  const currentTrack = usePlayerStore((s) => s.currentTrack)
 
   return (
     <nav
       className={cn(
-        'lg:hidden fixed left-0 right-0 z-30 bg-nw-void/95 backdrop-blur-xl border-t border-white/[0.06]',
-        'transition-all duration-300',
-        currentTrack ? 'bottom-[72px]' : 'bottom-0'
+        'lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-xl border-t border-white/[0.06]',
+        'transition-all duration-300'
       )}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
