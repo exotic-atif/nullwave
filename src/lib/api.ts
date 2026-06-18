@@ -128,9 +128,9 @@ export const api = {
     return data.tracks
   },
 
-  /** Get a smart song recommendation */
-  async recommend(artist: string, exclude: string): Promise<Track> {
-    const data = await request<{ track: Track }>(`/recommend?artist=${encodeURIComponent(artist)}&exclude=${encodeURIComponent(exclude)}`)
-    return data.track
+  /** Get a smart infinite radio queue */
+  async radio(artist: string, historyTitles: string[]): Promise<Track[]> {
+    const data = await request<{ tracks: Track[] }>(`/radio?artist=${encodeURIComponent(artist)}&history=${encodeURIComponent(JSON.stringify(historyTitles))}`)
+    return data.tracks
   },
 }

@@ -69,7 +69,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
   addToHistory: (track) =>
     set((state) => ({
-      history: [...state.history.slice(-49), track],
+      history: [...state.history.slice(-99), track],
     })),
 
   clearHistory: () => set({ history: [] }),

@@ -92,16 +92,24 @@ export async function recordPlayHistory(userId: string, track: Track) {
   })
   if (error) console.error('Failed to record history:', error.message)
 
-  // Cleanup: Delete history older than 7 days
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  await supabase
+  // Cleanup: Delete history older than the 100th most recent track
+  const { data: keepData } = await supabase
     .from('play_history')
-    .delete()
+    .select('played_at')
     .eq('user_id', userId)
-    .lt('played_at', sevenDaysAgo)
+    .order('played_at', { ascending: false })
+    .range(99, 99) // Get exactly the 100th track (0-indexed)
+
+  if (keepData && keepData.length > 0 && keepData[0].played_at) {
+    await supabase
+      .from('play_history')
+      .delete()
+      .eq('user_id', userId)
+      .lt('played_at', keepData[0].played_at)
+  }
 }
 
-export async function fetchPlayHistory(userId: string, limit = 30): Promise<Track[]> {
+export async function fetchPlayHistory(userId: string, limit = 100): Promise<Track[]> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data, error } = await supabase

@@ -308,16 +308,22 @@ async function handleArtist(artistId: string): Promise<unknown> {
   return { artist, tracks }
 }
 
-async function handleRecommend(artistId: string, excludeTitle: string): Promise<unknown> {
+async function handleRadio(artistId: string, historyStr: string): Promise<unknown> {
+  let historyExclude: string[] = []
+  try {
+    const raw = JSON.parse(historyStr)
+    if (Array.isArray(raw)) historyExclude = raw.map(t => getBaseTitle(String(t)))
+  } catch {
+    // Ignore parse errors
+  }
+
   // Fetch songs by artist and potentially a related genre search
   const [artistData, hitsData] = await Promise.all([
-    saavnFetch({ __call: 'search.getResults', q: artistId, n: '20', p: '1' }).catch(() => ({ results: [] })),
-    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] }))
+    saavnFetch({ __call: 'search.getResults', q: artistId, n: '30', p: '1' }).catch(() => ({ results: [] })),
+    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '30', p: '1' }).catch(() => ({ results: [] }))
   ])
 
   const songResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
-  
-  const baseExclude = getBaseTitle(excludeTitle)
   
   // Filter and deduplicate
   const seenTracks = new Set<string>()
@@ -329,18 +335,19 @@ async function handleRecommend(artistId: string, excludeTitle: string): Promise<
     const track = mapTrack(s)
     const titleLower = track.title.toLowerCase()
     
-    // Skip bad versions unless the excluded title was already a bad version
+    // Skip bad versions
     const isGarbage = badKeywords.some(b => titleLower.includes(b))
-    const wasExcludeGarbage = badKeywords.some(b => excludeTitle.toLowerCase().includes(b))
-    
-    if (isGarbage && !wasExcludeGarbage) continue
+    if (isGarbage) continue
 
     const baseTitle = getBaseTitle(track.title)
     
-    // Aggressively skip if it matches the excluded song's base title
-    if (baseTitle === baseExclude || baseTitle.includes(baseExclude) || baseExclude.includes(baseTitle)) {
-      if (baseTitle !== "" && baseExclude !== "") continue
-    }
+    // Aggressively skip if it matches any recently played song's base title
+    const isInHistory = historyExclude.some(hx => {
+      if (!baseTitle || !hx) return false
+      return baseTitle === hx || baseTitle.includes(hx) || hx.includes(baseTitle)
+    })
+    
+    if (isInHistory) continue
 
     // Deduplicate by base title so we don't return 5 versions of another song
     const key = `${baseTitle}::${track.artist.toLowerCase()}`
@@ -350,16 +357,23 @@ async function handleRecommend(artistId: string, excludeTitle: string): Promise<
     }
   }
 
-  // Pick a random track
-  if (tracks.length === 0) {
+  // Shuffle the valid tracks
+  for (let i = tracks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+  }
+
+  // Pick up to 20 tracks
+  let batch = tracks.slice(0, 20)
+  
+  if (batch.length === 0) {
     // Ultimate fallback if filtered out everything
     const randomFallback = songResults[Math.floor(Math.random() * songResults.length)]
     if (!randomFallback) throw new Error('No recommendations found')
-    return { track: mapTrack(randomFallback) }
+    batch = [mapTrack(randomFallback)]
   }
   
-  const recommended = tracks[Math.floor(Math.random() * tracks.length)]
-  return { track: recommended }
+  return { tracks: batch }
 }
 
 async function handleHomeFeed(recentArtistsStr: string): Promise<unknown> {
@@ -453,12 +467,12 @@ export default {
         return json(await handleAlbum(id), 200, origin, env)
       }
 
-      // GET /recommend?artist=X&exclude=Y
-      if (path === '/recommend') {
+      // GET /radio?artist=X&history=["A", "B"]
+      if (path === '/radio') {
         const artist = url.searchParams.get('artist')?.trim()
-        const exclude = url.searchParams.get('exclude')?.trim() || ''
+        const historyStr = url.searchParams.get('history')?.trim() || '[]'
         if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
-        return json(await handleRecommend(artist, exclude), 200, origin, env)
+        return json(await handleRadio(artist, historyStr), 200, origin, env)
       }
 
       // GET /home-feed?history=X

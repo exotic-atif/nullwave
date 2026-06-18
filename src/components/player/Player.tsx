@@ -77,12 +77,16 @@ export function Player() {
         if (next) {
           usePlayerStore.getState().setTrack(next)
         } else {
-          // Infinite Autoplay: Fetch smart recommendation if queue is empty
+          // Infinite Autoplay: Fetch smart radio queue if queue is empty
           const current = usePlayerStore.getState().currentTrack
           if (current) {
-            api.recommend(current.artist, current.title).then((track) => {
-              if (track) {
-                usePlayerStore.getState().setTrack(track)
+            const historyTitles = useQueueStore.getState().history.map(t => t.title)
+            api.radio(current.artist, historyTitles).then((tracks) => {
+              if (tracks.length > 0) {
+                usePlayerStore.getState().setTrack(tracks[0])
+                if (tracks.length > 1) {
+                  useQueueStore.getState().setQueue(tracks.slice(1))
+                }
               } else {
                 usePlayerStore.setState({ isPlaying: false, progress: 0 })
               }
@@ -251,9 +255,13 @@ export function Player() {
           usePlayerStore.getState().setTrack(next)
         } else if (current) {
           // Infinite Autoplay fallback
-          api.recommend(current.artist, current.title).then((track) => {
-            if (track) {
-              usePlayerStore.getState().setTrack(track)
+          const historyTitles = useQueueStore.getState().history.map(t => t.title)
+          api.radio(current.artist, historyTitles).then((tracks) => {
+            if (tracks.length > 0) {
+              usePlayerStore.getState().setTrack(tracks[0])
+              if (tracks.length > 1) {
+                useQueueStore.getState().setQueue(tracks.slice(1))
+              }
             }
           }).catch(console.error)
         }
@@ -281,9 +289,13 @@ export function Player() {
       setTrack(next)
     } else if (currentTrack) {
       // Infinite Autoplay
-      api.recommend(currentTrack.artist, currentTrack.title).then((track) => {
-        if (track) {
-          setTrack(track)
+      const historyTitles = useQueueStore.getState().history.map(t => t.title)
+      api.radio(currentTrack.artist, historyTitles).then((tracks) => {
+        if (tracks.length > 0) {
+          setTrack(tracks[0])
+          if (tracks.length > 1) {
+            useQueueStore.getState().setQueue(tracks.slice(1))
+          }
         }
       }).catch(console.error)
     }

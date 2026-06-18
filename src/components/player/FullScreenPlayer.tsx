@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 interface FullScreenPlayerProps {
   isOpen: boolean
@@ -56,8 +57,24 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
   }, [activeIndex, isOpen, showLyrics])
 
   const handleNext = () => {
+    const { history, setQueue } = useQueueStore.getState()
+    if (track) {
+       useQueueStore.getState().addToHistory(track)
+    }
     const next = playNext()
-    if (next) setTrack(next)
+    if (next) {
+       setTrack(next)
+    } else if (track) {
+       const historyTitles = history.map(t => t.title)
+       api.radio(track.artist, historyTitles).then((tracks) => {
+         if (tracks.length > 0) {
+           setTrack(tracks[0])
+           if (tracks.length > 1) {
+             setQueue(tracks.slice(1))
+           }
+         }
+       }).catch(console.error)
+    }
   }
 
   const handlePrevious = () => {
@@ -114,12 +131,20 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
               </button>
 
               <div className="text-center">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-nw-muted font-semibold flex items-center justify-center gap-2">
-                  Now Playing
-                  <button onClick={() => setShowLyrics(!showLyrics)} className={`p-1.5 rounded-full transition-colors ${showLyrics ? 'bg-nw-accent text-nw-black' : 'bg-white/10 text-white'}`}>
-                    <Mic2 size={12} />
-                  </button>
-                </p>
+                <div className="bg-white/5 p-1 rounded-full flex items-center backdrop-blur-md">
+                   <button 
+                     onClick={() => setShowLyrics(false)} 
+                     className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-colors ${!showLyrics ? 'bg-nw-accent text-nw-black' : 'text-nw-text-secondary hover:text-white'}`}
+                   >
+                     Cover
+                   </button>
+                   <button 
+                     onClick={() => setShowLyrics(true)} 
+                     className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-colors ${showLyrics ? 'bg-nw-accent text-nw-black' : 'text-nw-text-secondary hover:text-white'}`}
+                   >
+                     Lyrics
+                   </button>
+                </div>
               </div>
 
               <button
