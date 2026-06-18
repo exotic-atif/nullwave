@@ -23,11 +23,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </button>
 
         {/* Navigation arrows */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="flex items-center gap-1">
           <IconButton onClick={() => navigate(-1)} size="sm">
             <ChevronLeft size={18} />
           </IconButton>
-          <IconButton onClick={() => navigate(1)} size="sm">
+          <IconButton onClick={() => navigate(1)} size="sm" className="hidden md:flex">
             <ChevronRight size={18} />
           </IconButton>
         </div>
