@@ -65,6 +65,11 @@ function htmlDecode(str: string): string {
     .replace(/&gt;/g, '>')
 }
 
+function getBaseTitle(title: string): string {
+  // Remove everything inside () or [] and common words like "feat.", "ft.", "-"
+  return title.replace(/\[.*?\]|\(.*?\)/g, '').split('-')[0].trim().toLowerCase()
+}
+
 function mapTrack(s: any) {
   return {
     id: s.id || '',
@@ -312,11 +317,13 @@ async function handleRecommend(artistId: string, excludeTitle: string): Promise<
 
   const songResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
   
+  const baseExclude = getBaseTitle(excludeTitle)
+  
   // Filter and deduplicate
   const seenTracks = new Set<string>()
   const tracks = []
   
-  const badKeywords = ['slowed', 'reverb', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke']
+  const badKeywords = ['slowed', 'reverb', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live']
 
   for (const s of songResults) {
     const track = mapTrack(s)
@@ -328,25 +335,30 @@ async function handleRecommend(artistId: string, excludeTitle: string): Promise<
     
     if (isGarbage && !wasExcludeGarbage) continue
 
-    const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
+    const baseTitle = getBaseTitle(track.title)
+    
+    // Aggressively skip if it matches the excluded song's base title
+    if (baseTitle === baseExclude || baseTitle.includes(baseExclude) || baseExclude.includes(baseTitle)) {
+      if (baseTitle !== "" && baseExclude !== "") continue
+    }
+
+    // Deduplicate by base title so we don't return 5 versions of another song
+    const key = `${baseTitle}::${track.artist.toLowerCase()}`
     if (!seenTracks.has(key)) {
       seenTracks.add(key)
       tracks.push(track)
     }
   }
 
-  // Remove the currently playing song from recommendations
-  const validTracks = tracks.filter(t => t.title.toLowerCase() !== excludeTitle.toLowerCase())
-  
   // Pick a random track
-  if (validTracks.length === 0) {
+  if (tracks.length === 0) {
     // Ultimate fallback if filtered out everything
     const randomFallback = songResults[Math.floor(Math.random() * songResults.length)]
     if (!randomFallback) throw new Error('No recommendations found')
     return { track: mapTrack(randomFallback) }
   }
   
-  const recommended = validTracks[Math.floor(Math.random() * validTracks.length)]
+  const recommended = tracks[Math.floor(Math.random() * tracks.length)]
   return { track: recommended }
 }
 
