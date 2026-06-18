@@ -3,11 +3,13 @@ import { cn } from '@/lib/utils'
 import type { Track } from '@/types'
 import { AlbumArt } from './AlbumArt'
 import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
-import { Play, MoreHorizontal, ListPlus, Heart, PlayCircle, Plus, Trash2 } from 'lucide-react'
+import { Play, MoreHorizontal, ListPlus, Heart, PlayCircle, Plus, Trash2, User, Disc3, Share2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ContextMenu } from './ContextMenu'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { PlaylistModal } from './PlaylistModal'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 interface TrackRowProps {
   track: Track
@@ -17,9 +19,10 @@ interface TrackRowProps {
   className?: string
   playlistId?: string
   onRemove?: (trackId: string) => void
+  onClick?: () => void
 }
 
-export function TrackRow({ track, index, showIndex = false, showAlbum = true, className, playlistId, onRemove }: TrackRowProps) {
+export function TrackRow({ track, index, showIndex = false, showAlbum = true, className, playlistId, onRemove, onClick }: TrackRowProps) {
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore()
   const { addToQueue } = useQueueStore()
@@ -28,9 +31,12 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
   const isActive = currentTrack?.id === track.id
   const liked = isLiked(track.id)
   const { isOpen, position, openContextMenu, openFromButton, close } = useContextMenu()
+  const navigate = useNavigate()
 
   const handleClick = () => {
-    if (isActive) {
+    if (onClick) {
+      onClick()
+    } else if (isActive) {
       togglePlay()
     } else {
       setTrack(track)
@@ -43,6 +49,20 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/search?q=${encodeURIComponent(track.title + ' ' + track.artist)}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${track.title} — ${track.artist}`, url: shareUrl })
+      } else {
+        await navigator.clipboard.writeText(shareUrl)
+        toast.success('Link copied to clipboard')
+      }
+    } catch {
+      // User cancelled share dialog
+    }
+  }
+
   const menuItems = [
     {
       label: 'Play now',
@@ -52,17 +72,39 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
     {
       label: 'Add to queue',
       icon: <ListPlus size={14} />,
-      onClick: () => addToQueue(track),
+      onClick: () => { addToQueue(track); toast.success('Added to queue') },
     },
     {
       label: liked ? 'Remove from liked' : 'Add to liked songs',
-      icon: <Heart size={14} fill={liked ? 'currentColor' : 'none'} />,
-      onClick: () => { if (user) toggle(user.id, track) },
+      icon: (
+        <motion.div
+          animate={liked ? { scale: [1, 1.4, 1], color: ['#fff', '#ec4899', '#ec4899'] } : { scale: 1, color: '#fff' }}
+          transition={{ duration: 0.3 }}
+        >
+          <Heart size={14} fill={liked ? '#ec4899' : 'none'} color={liked ? '#ec4899' : 'currentColor'} />
+        </motion.div>
+      ),
+      onClick: () => { if (user) { toggle(user.id, track); toast.success(liked ? 'Removed from liked' : 'Added to liked songs') } },
     },
     {
       label: 'Add to playlist',
       icon: <Plus size={14} />,
       onClick: () => setIsPlaylistModalOpen(true),
+    },
+    {
+      label: 'Go to Artist',
+      icon: <User size={14} />,
+      onClick: () => navigate(`/artist/${encodeURIComponent(track.artist.split(',')[0].trim())}`),
+    },
+    {
+      label: 'Go to Album',
+      icon: <Disc3 size={14} />,
+      onClick: () => navigate(`/album/${encodeURIComponent(track.albumId)}`),
+    },
+    {
+      label: 'Share',
+      icon: <Share2 size={14} />,
+      onClick: handleShare,
     },
   ]
 

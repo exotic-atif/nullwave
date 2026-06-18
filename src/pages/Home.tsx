@@ -21,6 +21,7 @@ export function HomePage() {
   const navigate = useNavigate()
   
   const [tracks, setTracks] = useState<Track[]>([])
+  const [recentTracks, setRecentTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -30,10 +31,13 @@ export function HomePage() {
     async function load() {
       try {
         let artists: string[] = []
+        let recents: Track[] = []
         if (user) {
           const dbHistory = await fetchPlayHistory(user.id, 20)
+          recents = dbHistory
           artists = dbHistory.map(t => t.artist)
         } else {
+          recents = [...queueHistory].reverse()
           artists = queueHistory.map(t => t.artist)
         }
         
@@ -43,6 +47,7 @@ export function HomePage() {
         const result = await api.homeFeed(artists)
         if (!cancelled) {
           setTracks(result)
+          setRecentTracks(recents)
           setError('')
         }
       } catch (err) {
@@ -113,7 +118,11 @@ export function HomePage() {
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={14} className="text-nw-accent" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-nw-accent">
-              Welcome back {user?.displayName ? `, ${user.displayName}` : ''}
+              {(() => {
+                const h = new Date().getHours()
+                const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'
+                return `${greeting}${user?.displayName ? `, ${user.displayName}` : ''}`
+              })()}
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-nw-text tracking-tight mb-2">
@@ -160,14 +169,28 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Random Mix Tracks */}
+      {/* Recently Played */}
+      {!loading && recentTracks.length > 0 && (
+        <section>
+          <SectionHeader title="Recently Played" subtitle="Jump right back in" />
+          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+            {recentTracks.slice(0, 10).map((track, i) => (
+              <div key={`${track.id}-${i}`} className="w-[280px] shrink-0 bg-nw-surface/40 hover:bg-white/[0.04] transition-colors rounded-xl overflow-hidden border border-white/5">
+                <TrackRow track={track} showAlbum={false} className="hover:bg-transparent" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Made For You */}
       <section>
-        <SectionHeader title="Daily Random Mix" subtitle="Fresh picks just for you" />
-        <div className="space-y-0.5">
+        <SectionHeader title="Made For You" subtitle="Fresh picks based on your taste" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
           {loading
-            ? Array.from({ length: 6 }).map((_, i) => <TrackRowSkeleton key={i} />)
+            ? Array.from({ length: 8 }).map((_, i) => <TrackRowSkeleton key={i} />)
             : tracks.slice(0, 8).map((track, i) => (
-                <TrackRow key={track.id} track={track} index={i + 1} showIndex />
+                <TrackRow key={track.id} track={track} index={i + 1} />
               ))}
         </div>
       </section>

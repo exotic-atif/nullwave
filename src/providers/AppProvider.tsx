@@ -4,6 +4,7 @@ import { router } from '@/routes'
 import { useThemeInit } from '@/hooks/useThemeInit'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAuthStore, useLikedStore } from '@/store'
+import { Toaster } from 'sonner'
 
 export function AppProvider() {
   useThemeInit()
@@ -25,5 +26,23 @@ export function AppProvider() {
     }
   }, [user?.id, fetchLiked])
 
-  return <RouterProvider router={router} />
+  return (
+    <>
+      <RouterProvider router={router} />
+      <Toaster
+        position="bottom-center"
+        offset={100}
+        toastOptions={{
+          style: {
+            background: '#18181b',
+            border: '1px solid rgba(255,255,255,0.06)',
+            color: '#fafafa',
+            fontSize: '13px',
+            borderRadius: '12px',
+            backdropFilter: 'blur(20px)',
+          },
+        }}
+      />
+    </>
+  )
 }

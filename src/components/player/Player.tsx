@@ -55,6 +55,10 @@ export function Player() {
   const [lyricsData, setLyricsData] = useState<SyncedLine[] | null>(null)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
+  
+  const [hoverTime, setHoverTime] = useState<number | null>(null)
+  const [hoverPos, setHoverPos] = useState<number>(0)
+  const scrubberRef = useRef<HTMLInputElement>(null)
 
   // ===== AUDIO ENGINE BINDINGS =====
 
@@ -471,26 +475,48 @@ export function Player() {
                   {formatTime(progress)}
                 </span>
                 
-                {/* Scrubber */}
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  step={0.1}
-                  value={progress}
-                  onChange={(e) => handleSeek(Number(e.target.value))}
-                  onMouseDown={() => setIsDragging(true)}
-                  onMouseUp={() => {
-                    setIsDragging(false)
-                    audioManager.seek(progress)
+                {/* Scrubber Container */}
+                <div 
+                  className="flex-1 relative group py-2"
+                  onMouseMove={(e) => {
+                    if (!scrubberRef.current || !duration) return
+                    const rect = scrubberRef.current.getBoundingClientRect()
+                    let pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+                    setHoverPos(pos)
+                    setHoverTime((pos / rect.width) * duration)
                   }}
-                  className="flex-1 cursor-pointer nw-slider min-w-0"
-                  style={{
-                    background: `linear-gradient(to right, #38bdf8 ${
-                      duration > 0 ? (progress / duration) * 100 : 0
-                    }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
-                  }}
-                />
+                  onMouseLeave={() => setHoverTime(null)}
+                >
+                  <input
+                    ref={scrubberRef}
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    step={0.1}
+                    value={progress}
+                    onChange={(e) => handleSeek(Number(e.target.value))}
+                    onMouseDown={() => setIsDragging(true)}
+                    onMouseUp={() => {
+                      setIsDragging(false)
+                      audioManager.seek(progress)
+                    }}
+                    className="w-full cursor-pointer nw-slider h-1 group-hover:h-1.5 transition-[height] duration-200"
+                    style={{
+                      background: `linear-gradient(to right, #38bdf8 ${
+                        duration > 0 ? (progress / duration) * 100 : 0
+                      }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
+                    }}
+                  />
+                  {/* Tooltip */}
+                  {hoverTime !== null && (
+                    <div 
+                      className="absolute -top-6 -translate-x-1/2 bg-nw-black border border-white/10 text-xs text-white px-2 py-1 rounded shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ left: hoverPos }}
+                    >
+                      {formatTime(hoverTime)}
+                    </div>
+                  )}
+                </div>
 
                 <span className="text-[10px] tabular-nums text-nw-text-tertiary w-8 hidden md:block">
                   {formatTime(duration)}

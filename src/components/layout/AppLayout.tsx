@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { MobileNavBar } from './MobileNavBar'
 import { Player } from '../player/Player'
 import { useState } from 'react'
 import { usePlayerStore } from '@/store'
@@ -19,10 +20,12 @@ export function AppLayout() {
         {/* Topbar */}
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
 
-        {/* Content */}
+        {/* Content — extra pb on mobile for bottom nav + player */}
         <main
           className={`flex-1 overflow-y-auto overflow-x-hidden ${
-            currentTrack ? 'pb-[88px] md:pb-[96px]' : ''
+            currentTrack
+              ? 'pb-[144px] lg:pb-[96px]'  /* mobile: 72px player + 56px nav + 16px; desktop: 96px player */
+              : 'pb-[72px] lg:pb-0'          /* mobile: 56px nav + 16px */
           }`}
         >
           <div className="gradient-mesh min-h-full">
@@ -30,6 +33,9 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNavBar />
 
       {/* Player */}
       <Player />

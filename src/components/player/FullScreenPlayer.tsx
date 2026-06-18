@@ -3,7 +3,7 @@ import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Music2, ChevronDown, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
@@ -20,6 +20,8 @@ interface FullScreenPlayerProps {
 
 export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animFrameRef = useRef<number>(0)
   const [showLyrics, setShowLyrics] = useState(false)
   
   const {
@@ -55,6 +57,71 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
       }
     }
   }, [activeIndex, isOpen, showLyrics])
+
+  // ===== Audio Visualizer =====
+  const drawVisualizer = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || showLyrics || !isOpen) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const analyser = audioManager.getAnalyser()
+    if (!analyser) return
+
+    const bufferLength = analyser.frequencyBinCount
+    const dataArray = new Uint8Array(bufferLength)
+
+    const render = () => {
+      animFrameRef.current = requestAnimationFrame(render)
+      analyser.getByteFrequencyData(dataArray)
+
+      const w = canvas.width
+      const h = canvas.height
+      const cx = w / 2
+      const cy = h / 2
+      const radius = Math.min(cx, cy) * 0.55
+      const barCount = 64
+      const maxBarHeight = radius * 0.6
+
+      ctx.clearRect(0, 0, w, h)
+
+      for (let i = 0; i < barCount; i++) {
+        const dataIndex = Math.floor(i * bufferLength / barCount)
+        const value = dataArray[dataIndex] / 255
+        const barHeight = value * maxBarHeight + 2
+        const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2
+
+        const x1 = cx + Math.cos(angle) * (radius + 4)
+        const y1 = cy + Math.sin(angle) * (radius + 4)
+        const x2 = cx + Math.cos(angle) * (radius + 4 + barHeight)
+        const y2 = cy + Math.sin(angle) * (radius + 4 + barHeight)
+
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.strokeStyle = `rgba(56, 189, 248, ${0.3 + value * 0.7})`
+        ctx.lineWidth = 2.5
+        ctx.lineCap = 'round'
+        ctx.stroke()
+      }
+    }
+
+    render()
+
+    return () => cancelAnimationFrame(animFrameRef.current)
+  }, [showLyrics, isOpen])
+
+  useEffect(() => {
+    if (isOpen && !showLyrics && isPlaying) {
+      const cleanup = drawVisualizer()
+      return () => {
+        cleanup?.()
+        cancelAnimationFrame(animFrameRef.current)
+      }
+    } else {
+      cancelAnimationFrame(animFrameRef.current)
+    }
+  }, [isOpen, showLyrics, isPlaying, drawVisualizer])
 
   const handleNext = () => {
     const { history, setQueue } = useQueueStore.getState()
@@ -165,15 +232,25 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                 className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
                 <div className="relative">
+                  {/* Audio Visualizer Canvas */}
+                  {!showLyrics && (
+                    <canvas
+                      ref={canvasRef}
+                      width={500}
+                      height={500}
+                      className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  )}
                   <AlbumArt
                     src={track.coverUrl}
                     alt={track.album}
                     size="hero"
                     rounded="2xl"
                     showShadow
-                    className={`transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? '!w-48 !h-48 md:!w-64 md:!h-64' : '!w-64 !h-64 md:!w-96 md:!h-96'}`}
+                    className={`relative z-10 transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? '!w-48 !h-48 md:!w-64 md:!h-64' : '!w-64 !h-64 md:!w-96 md:!h-96'}`}
                   />
-                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite]" />
+                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10" />
                 </div>
 
                 <div className="mt-8 text-center max-w-[320px]">

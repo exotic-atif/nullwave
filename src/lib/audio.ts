@@ -13,6 +13,11 @@ class AudioManager {
   private onLoadedCallback: AudioEventHandler | null = null
   private onErrorCallback: ((message: string) => void) | null = null
 
+  // Web Audio API for visualizer
+  private audioCtx: AudioContext | null = null
+  private analyser: AnalyserNode | null = null
+  private sourceNode: MediaElementAudioSourceNode | null = null
+
   constructor() {
     this.audio = new Audio()
     this.audio.preload = 'auto'
@@ -28,6 +33,10 @@ class AudioManager {
 
     this.audio.addEventListener('play', () => {
       this.onPlayCallback?.()
+      // Resume AudioContext on play (required by browsers)
+      if (this.audioCtx?.state === 'suspended') {
+        this.audioCtx.resume()
+      }
     })
 
     this.audio.addEventListener('pause', () => {
@@ -42,6 +51,28 @@ class AudioManager {
       const msg = this.audio.error?.message || 'Audio playback error'
       this.onErrorCallback?.(msg)
     })
+  }
+
+  /** Get or create an AnalyserNode for visualizations */
+  getAnalyser(): AnalyserNode | null {
+    try {
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioContext()
+      }
+      if (!this.sourceNode) {
+        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio)
+      }
+      if (!this.analyser) {
+        this.analyser = this.audioCtx.createAnalyser()
+        this.analyser.fftSize = 256
+        this.analyser.smoothingTimeConstant = 0.8
+        this.sourceNode.connect(this.analyser)
+        this.analyser.connect(this.audioCtx.destination)
+      }
+      return this.analyser
+    } catch {
+      return null
+    }
   }
 
   /** Load and play a URL */

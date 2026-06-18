@@ -45,6 +45,7 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
+          whileHover={{ scale: 1.03, y: -4 }}
           transition={{ delay: index * 0.05, duration: 0.4 }}
           className="group flex flex-col gap-3 p-3 rounded-xl transition-all duration-300 hover:bg-white/[0.03] cursor-pointer"
           onContextMenu={openContextMenu}

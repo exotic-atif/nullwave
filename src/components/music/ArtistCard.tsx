@@ -17,6 +17,7 @@ export function ArtistCard({ artist, index = 0 }: ArtistCardProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.05, y: -4 }}
         transition={{ delay: index * 0.06, duration: 0.35 }}
         className="group flex flex-col items-center gap-3 p-4 cursor-pointer"
       >
