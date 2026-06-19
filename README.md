@@ -13,7 +13,7 @@
 
   <br />
 
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-Play_Now-38bdf8?style=for-the-badge&logo=vercel)](https://nullwave.onrender.com)
+  [![Live Demo](https://img.shields.io/badge/Live_Demo-Play_Now-38bdf8?style=for-the-badge&logo=vercel)](https://thenullwave.vercel.app)
   [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
@@ -38,7 +38,7 @@
 
 ## 🚀 Live Demo
 
-Experience the music live at: **[nullwave.onrender.com](https://nullwave.onrender.com)**
+Experience the music live at: **[thenullwave.vercel.app](https://thenullwave.vercel.app)**
 
 ---
 
