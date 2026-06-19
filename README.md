@@ -1,73 +1,93 @@
-# React + TypeScript + Vite
+<div align="center">
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+  <img src="public/og-banner.png" alt="NullWave Banner" width="100%" />
 
-Currently, two official plugins are available:
+  <br />
+  <br />
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+  # 🌊 NullWave
 
-## React Compiler
+  **The ultimate premium, ad-free underground music streaming experience.**
+  
+  Created by **Atif Arman** (exotic Atif)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+  <br />
 
-## Expanding the ESLint configuration
+  [![Live Demo](https://img.shields.io/badge/Live_Demo-Play_Now-38bdf8?style=for-the-badge&logo=vercel)](https://nullwave.onrender.com)
+  [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+  [![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
+  [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+  [![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)](https://supabase.com/)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+</div>
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## ✨ Features
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- 🎧 **High-Quality Streaming** - Crystal clear audio directly from our streaming servers.
+- 🚫 **Zero Ads** - Pure, uninterrupted music. FVCK Ads, enjoy music.
+- 🎨 **Sleek UI/UX** - A gorgeous dark-mode interface with glassmorphism and micro-animations.
+- 📻 **Infinite Radio** - Never stop listening. Queue automatically populates based on your history.
+- 🎛️ **Audio Visualizer** - Built-in canvas visualizer in the Fullscreen Player.
+- 📱 **Mobile Optimized** - A native-feeling bottom navigation bar and mobile player.
+- 🗃️ **History & Favorites** - Built-in liking system and smart queue history tracking.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🚀 Live Demo
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Experience the music live at: **[nullwave.onrender.com](https://nullwave.onrender.com)**
+
+---
+
+## 🛠️ Local Development
+
+Want to run NullWave locally? It's simple.
+
+### Prerequisites
+- Node.js (v18+)
+- npm or pnpm
+- Supabase account (for DB)
+
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/exotic-atif/nullwave.git
+   cd nullwave
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Environment Variables:**
+   Create a `.env` file in the root directory and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+4. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser:**
+   Navigate to `http://localhost:5173`
+
+---
+
+## 👤 Author
+
+**Atif Arman** 
+- GitHub: [@exotic-atif](https://github.com/exotic-atif)
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ for the underground music scene.</sub>
+</div>
