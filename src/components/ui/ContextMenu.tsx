@@ -65,7 +65,7 @@ export function ContextMenu({ isOpen, position, items, onClose }: ContextMenuPro
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.92, y: -4 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[100] min-w-[180px] py-1.5 rounded-xl bg-[#0a0a0a]/90 backdrop-blur-3xl shadow-2xl shadow-black/50 border border-white/5 overflow-hidden"
+          className="fixed z-[100] min-w-[180px] py-1.5 rounded-xl bg-nw-surface/90 backdrop-blur-3xl shadow-2xl shadow-black/50 border border-nw-border-subtle overflow-hidden"
           style={{
             left: adjustedPosition.x,
             top: adjustedPosition.y,
