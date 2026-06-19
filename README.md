@@ -92,5 +92,5 @@ Want to run NullWave locally? It's simple.
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for the underground music scene.</sub>
+  <sub>Built with ❤️ by Exotic Atif (Atif Arman).</sub>
 </div>
