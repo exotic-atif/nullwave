@@ -8,21 +8,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ===== PROFILES =====
 
-export async function upsertProfile(userId: string, username: string, email: string) {
+export async function upsertProfile(userId: string, username: string, email: string, theme: string = 'system') {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, username, email }, { onConflict: 'id' })
+    .upsert({ id: userId, username, email, theme }, { onConflict: 'id' })
   if (error) console.error('Failed to upsert profile:', error.message)
 }
 
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('users')
-    .select('username, avatar_url')
+    .select('username, avatar_url, theme')
     .eq('id', userId)
     .maybeSingle()
   if (error) console.error('Failed to fetch profile:', error.message)
   return data
+}
+
+export async function updateThemePreference(userId: string, theme: string) {
+  const { error } = await supabase
+    .from('users')
+    .update({ theme })
+    .eq('id', userId)
+  if (error) console.error('Failed to update theme preference:', error.message)
 }
 
 // ===== LIKED SONGS =====

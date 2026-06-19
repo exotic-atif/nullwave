@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, upsertProfile, getProfile } from '@/lib/supabase'
+import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
 interface AuthStore {
@@ -39,6 +40,9 @@ export const useAuthStore = create<AuthStore>()(
             if (profile) {
               displayName = profile.username || displayName
               avatarUrl = profile.avatar_url || avatarUrl
+              if (profile.theme && profile.theme !== 'system') {
+                useThemeStore.getState().setTheme(profile.theme as any)
+              }
             } else {
               // Create profile row for new user
               await upsertProfile(u.id, displayName, u.email || '')
@@ -70,6 +74,10 @@ export const useAuthStore = create<AuthStore>()(
             getProfile(u.id).then((profile) => {
               const displayName = profile?.username || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
               const avatarUrl = profile?.avatar_url || u.user_metadata?.avatar_url
+              
+              if (profile?.theme && profile.theme !== 'system') {
+                useThemeStore.getState().setTheme(profile.theme as any)
+              }
 
               set({
                 user: {
@@ -111,6 +119,9 @@ export const useAuthStore = create<AuthStore>()(
           if (profile) {
             displayName = profile.username || displayName
             avatarUrl = profile.avatar_url || avatarUrl
+            if (profile.theme && profile.theme !== 'system') {
+              useThemeStore.getState().setTheme(profile.theme as any)
+            }
           } else {
             // Create profile if first login
             await upsertProfile(u.id, displayName, u.email || '')
