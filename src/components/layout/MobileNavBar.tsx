@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Search, Library, ListMusic } from 'lucide-react'
+import { Home, Search, Library, ListMusic, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
@@ -8,6 +8,7 @@ const tabs = [
   { to: '/search', icon: Search, label: 'Search' },
   { to: '/library', icon: Library, label: 'Library' },
   { to: '/queue', icon: ListMusic, label: 'Queue' },
+  { to: '/you', icon: User, label: 'You' },
 ]
 
 export function MobileNavBar() {

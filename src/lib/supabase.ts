@@ -25,6 +25,14 @@ export async function getProfile(userId: string) {
   return data
 }
 
+export async function updateProfileName(userId: string, newName: string) {
+  const { error } = await supabase
+    .from('users')
+    .update({ username: newName })
+    .eq('id', userId)
+  if (error) console.error('Failed to update profile name:', error.message)
+}
+
 export async function updateThemePreference(userId: string, theme: string) {
   const { error } = await supabase
     .from('users')

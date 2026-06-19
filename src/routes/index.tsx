@@ -6,6 +6,7 @@ import { SearchPage } from '@/pages/Search'
 import { LibraryPage } from '@/pages/Library'
 import { QueuePage } from '@/pages/Queue'
 import { SettingsPage } from '@/pages/Settings'
+import { YouPage } from '@/pages/You'
 import { LoginPage } from '@/pages/Login'
 import { PlaylistDetail } from '@/pages/PlaylistDetail'
 import { ArtistDetailPage } from '@/pages/ArtistDetail'
@@ -31,9 +32,9 @@ export const router = createBrowserRouter([
           { path: 'album/:id', element: <AlbumDetailPage /> },
           { path: 'queue', element: <QueuePage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'you', element: <YouPage /> },
         ],
       },
     ],
   },
 ])
-

@@ -57,12 +57,8 @@ export function SearchPage() {
         setArtists(results.artists || [])
         setHasSearched(true)
 
-        // Save to recent
-        setRecentSearches((prev) => {
-          const updated = [q, ...prev.filter((s) => s !== q)].slice(0, 5)
-          localStorage.setItem('nw-recent-searches', JSON.stringify(updated))
-          return updated
-        })
+        // We no longer automatically save to recent on every debounced search stroke.
+        // It will only be saved when the user presses Enter.
       } catch (err) {
         console.error('Search failed:', err)
       } finally {
@@ -116,6 +112,16 @@ export function SearchPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && query.trim()) {
+                const q = query.trim()
+                setRecentSearches((prev) => {
+                  const updated = [q, ...prev.filter((s) => s !== q)].slice(0, 5)
+                  localStorage.setItem('nw-recent-searches', JSON.stringify(updated))
+                  return updated
+                })
+              }
+            }}
             placeholder="Search songs, albums, artists..."
             className="w-full pl-11 pr-10 py-3.5 bg-nw-surface/60 border border-nw-border-subtle rounded-2xl text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/40 focus:bg-nw-surface/80 focus:ring-1 focus:ring-nw-accent-ring transition-all duration-300"
             autoFocus
