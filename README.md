@@ -7,13 +7,13 @@
 
   # 🌊 NullWave
 
-  **The ultimate premium, ad-free underground music streaming experience.**
+  **An experimental, educational front-end music streaming interface.**
   
   Created by **Atif Arman** (exotic Atif)
 
   <br />
 
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-Play_Now-38bdf8?style=for-the-badge&logo=vercel)](https://thenullwave.vercel.app)
+  [![Play Now](https://img.shields.io/badge/Play_Now-38bdf8?style=for-the-badge&logo=vercel)](https://thenullwave.vercel.app)
   [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)](https://vitejs.dev/)
@@ -26,19 +26,22 @@
 
 ## ✨ Features
 
-- 🎧 **High-Quality Streaming** - Crystal clear audio directly from our streaming servers.
-- 🚫 **Zero Ads** - Pure, uninterrupted music. FVCK Ads, enjoy music.
+- 🎧 **Experimental Audio Player** - A custom React-based audio player built for learning purposes.
+- 🚫 **Zero Ads** - A clean, uninterrupted interface designed to showcase UI/UX concepts.
 - 🎨 **Sleek UI/UX** - A gorgeous dark-mode interface with glassmorphism and micro-animations.
-- 📻 **Infinite Radio** - Never stop listening. Queue automatically populates based on your history.
-- 🎛️ **Audio Visualizer** - Built-in canvas visualizer in the Fullscreen Player.
-- 📱 **Mobile Optimized** - A native-feeling bottom navigation bar and mobile player.
-- 🗃️ **History & Favorites** - Built-in liking system and smart queue history tracking.
+- 📻 **Dynamic Queueing** - Experimental logic that populates the queue based on listening history.
+- 🎛️ **Audio Visualizer** - Built-in canvas visualizer in the Fullscreen Player for audio frequency analysis.
+- 📱 **Mobile Optimized** - A native-feeling bottom navigation bar and responsive mobile player.
 
 ---
 
-## 🚀 Live Demo
+## ⚠️ Disclaimer & Educational Purpose
 
-Experience the music live at: **[thenullwave.vercel.app](https://thenullwave.vercel.app)**
+**NullWave is strictly an experimental and educational project.** 
+- We **do not host, store, or distribute** any copyrighted media files or music on our servers.
+- This project is a proof-of-concept front-end interface built to explore web audio APIs, React state management, and modern UI design.
+- All data, including audio streams, is aggregated from third-party public APIs and services.
+- This is not a commercial product and is not intended for commercial use.
 
 ---
 
