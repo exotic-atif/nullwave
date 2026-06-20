@@ -1,7 +1,7 @@
 import type { Track } from '@/types'
 import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Music2, ChevronDown, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-react'
+import { ChevronDown, X, Heart, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2 } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
@@ -16,9 +16,10 @@ interface FullScreenPlayerProps {
   progress: number
   duration: number
   lyricsData: SyncedLine[] | null
+  isFetchingLyrics: boolean
 }
 
-export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData }: FullScreenPlayerProps) {
+export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
@@ -47,16 +48,22 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
 
   // Auto-scroll to active line
   useEffect(() => {
-    if (isOpen && showLyrics && activeIndex >= 0 && containerRef.current) {
-      const activeEl = containerRef.current.children[activeIndex] as HTMLElement
-      if (activeEl) {
-        containerRef.current.scrollTo({
-          top: activeEl.offsetTop - containerRef.current.clientHeight / 2 + activeEl.clientHeight / 2,
-          behavior: 'smooth'
-        })
+    if (isOpen && showLyrics && containerRef.current) {
+      if (activeIndex >= 0) {
+        const activeEl = containerRef.current.children[activeIndex] as HTMLElement
+        if (activeEl) {
+          const container = containerRef.current
+          const offsetTop = activeEl.offsetTop - container.offsetTop
+          container.scrollTo({
+            top: offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
+            behavior: 'smooth'
+          })
+        }
+      } else if (activeIndex === -1 && progress < 5 && containerRef.current) {
+        containerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
       }
     }
-  }, [activeIndex, isOpen, showLyrics])
+  }, [activeIndex, isOpen, showLyrics, lyricsData, progress])
 
   // ===== Audio Visualizer =====
   const drawVisualizer = useCallback(() => {
@@ -169,7 +176,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-2xl"
             onClick={onClose}
           />
 
@@ -179,12 +186,12 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 32, stiffness: 300 }}
-            className="fixed inset-0 z-[70] flex flex-col bg-gradient-to-b from-nw-void via-nw-black to-nw-black overflow-hidden"
+            className="fixed inset-0 z-[70] flex flex-col bg-nw-void overflow-hidden"
           >
             {/* Ambient background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-nw-accent/[0.06] blur-[120px]" />
-              <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-nw-accent-glow/[0.04] blur-[100px]" />
+              <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-nw-accent-glow/[0.04] blur-[120px]" />
             </div>
 
             {/* Header */}
@@ -248,7 +255,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                     size="hero"
                     rounded="2xl"
                     showShadow
-                    className={`relative z-10 transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? '!w-48 !h-48 md:!w-64 md:!h-64' : '!w-64 !h-64 md:!w-96 md:!h-96'}`}
+                    className={`relative z-10 transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? 'max-w-[40vh] max-h-[40vh]' : 'max-w-[50vh] max-h-[50vh]'} w-full h-auto object-contain aspect-square`}
                   />
                   <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10" />
                 </div>
@@ -330,28 +337,30 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   transition={{ duration: 0.4 }}
                   className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden"
                 >
-                  {!lyricsData || lyricsData.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-20">
-                      <div className="w-16 h-16 rounded-2xl bg-nw-surface/50 flex items-center justify-center mb-4">
-                        <Music2 size={28} className="text-nw-muted" />
+                  <div className="flex-1 w-full flex items-center justify-center h-full relative" ref={containerRef}>
+                    {isFetchingLyrics ? (
+                      <div className="flex flex-col items-center gap-3 py-20">
+                        <Loader2 size={24} className="text-nw-accent animate-spin" />
+                        <p className="text-nw-text-secondary text-sm font-medium">Fetching lyrics...</p>
                       </div>
-                      <p className="text-nw-text-secondary font-medium">No lyrics available</p>
-                      <p className="text-xs text-nw-text-tertiary mt-1 max-w-[240px]">
-                        Lyrics for "{track.title}" haven't been added yet
-                      </p>
-                    </div>
-                  ) : (
-                    <div 
-                      ref={containerRef}
-                      className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
-                      style={{
-                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                        maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                        paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
-                        paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
-                      }}
-                    >
-                      {lyricsData.map((line, i) => {
+                    ) : !lyricsData || lyricsData.length === 0 ? (
+                      <div className="text-center py-20">
+                        <p className="text-nw-text-secondary font-medium">No lyrics available</p>
+                        <p className="text-nw-text-tertiary text-sm mt-1">
+                          Lyrics for "{track.title}" haven't been added yet
+                        </p>
+                      </div>
+                    ) : (
+                      <div
+                        className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
+                        style={{
+                          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                          maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                          paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
+                          paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
+                        }}
+                      >
+                        {lyricsData.map((line, i) => {
                         const isActive = i === activeIndex
                         const isPassed = i < activeIndex
                         return (
@@ -365,10 +374,10 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                           >
                             {line.text}
                           </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </div>

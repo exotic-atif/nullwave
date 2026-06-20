@@ -313,3 +313,27 @@ input[type=range].nw-slider::-webkit-slider-runnable-track {
     margin-top: -5px;
   }
 }
+
+/* ===== CUSTOM SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-nw-border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-nw-muted);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-nw-border) transparent;
+}

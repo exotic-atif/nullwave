@@ -2,6 +2,7 @@
 
 interface Env {
   ALLOWED_ORIGINS: string
+  CLOUDINARY_API_SECRET?: string
 }
 
 // ===== CORS =====
@@ -426,7 +427,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin, env) })
     }
 
-    if (request.method !== 'GET') {
+    if (request.method !== 'GET' && request.method !== 'POST') {
       return json({ error: 'Method not allowed' }, 405, origin, env)
     }
 
@@ -485,6 +486,43 @@ export default {
       const trackMatch = path.match(/^\/track\/(.+)$/)
       if (trackMatch) {
         return json(await handleTrack(trackMatch[1]), 200, origin, env)
+      }
+
+      // POST /sign-upload (Cloudinary)
+      if (path === '/sign-upload' && request.method === 'POST') {
+        if (!env.CLOUDINARY_API_SECRET) {
+          return json({ error: 'Missing CLOUDINARY_API_SECRET in worker' }, 500, origin, env)
+        }
+        
+        try {
+          const body = await request.json() as Record<string, string>
+          const timestamp = Math.round(new Date().getTime() / 1000).toString()
+          
+          // Generate signature based on params
+          // Cloudinary requires alphabetically sorted params joined by '&'
+          const paramsToSign = {
+            timestamp,
+            ...body // Any other params passed from frontend (e.g. folder, public_id)
+          }
+          
+          const sortedKeys = Object.keys(paramsToSign).sort()
+          const signString = sortedKeys.map(k => `${k}=${paramsToSign[k as keyof typeof paramsToSign]}`).join('&')
+          
+          const encoder = new TextEncoder()
+          const data = encoder.encode(signString + env.CLOUDINARY_API_SECRET)
+          const hashBuffer = await crypto.subtle.digest('SHA-1', data)
+          const hashArray = Array.from(new Uint8Array(hashBuffer))
+          const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+          
+          return json({ signature, timestamp }, 200, origin, env)
+        } catch (e) {
+          return json({ error: 'Invalid JSON payload' }, 400, origin, env)
+        }
+      }
+
+      // Add POST to method check for /sign-upload
+      if (request.method !== 'GET' && path !== '/sign-upload') {
+        return json({ error: 'Method not allowed' }, 405, origin, env)
       }
 
       return json({ error: 'Not found' }, 404, origin, env)

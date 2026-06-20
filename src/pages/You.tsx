@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { User, Camera, KeyRound } from 'lucide-react'
+import { User, Camera, KeyRound, Loader2 } from 'lucide-react'
 import { updateProfileName } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
@@ -12,6 +12,9 @@ export function YouPage() {
   const [displayName, setDisplayName] = useState(user?.displayName || '')
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameSuccess, setNameSuccess] = useState(false)
+
+  const [isUploadingPfp, setIsUploadingPfp] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -25,6 +28,75 @@ export function YouPage() {
         <p className="text-nw-text-tertiary">Please log in to view your profile.</p>
       </div>
     )
+  }
+
+  const handleUploadPfp = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Max 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB')
+      return
+    }
+
+    setIsUploadingPfp(true)
+    try {
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'mian-storage'
+      const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY
+      
+      if (!apiKey) {
+        throw new Error('Missing VITE_CLOUDINARY_API_KEY in .env')
+      }
+
+      // 1. Get Signature from our Cloudflare Worker Backend
+      const folder = 'nullwave_pfps'
+      const timestamp = Math.round(new Date().getTime() / 1000).toString()
+      const workerUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+
+      const signRes = await fetch(`${workerUrl}/sign-upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder }) // We only need to sign the folder param
+      })
+
+      if (!signRes.ok) throw new Error('Failed to get signature from backend')
+      const { signature, timestamp: backendTimestamp } = await signRes.json()
+
+      // 2. Upload directly to Cloudinary
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('api_key', apiKey)
+      formData.append('timestamp', backendTimestamp)
+      formData.append('signature', signature)
+      formData.append('folder', folder)
+
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!uploadRes.ok) throw new Error('Failed to upload to Cloudinary')
+      const uploadData = await uploadRes.json()
+      
+      const imageUrl = uploadData.secure_url
+
+      // 3. Save URL to Supabase
+      const { error } = await supabase.auth.updateUser({
+        data: { avatar_url: imageUrl }
+      })
+
+      if (error) throw error
+
+      setUser({ ...user, avatarUrl: imageUrl })
+
+    } catch (err: any) {
+      console.error('PFP Upload error:', err)
+      alert(err.message || 'Failed to upload profile picture')
+    } finally {
+      setIsUploadingPfp(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const handleUpdateName = async (e: React.FormEvent) => {
@@ -111,18 +183,32 @@ export function YouPage() {
         className="p-6 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left"
       >
         <div className="relative group">
+          <input 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleUploadPfp} 
+            disabled={isUploadingPfp}
+          />
           <div className="w-24 h-24 rounded-full bg-gradient-to-br from-nw-accent/30 to-nw-accent-glow/20 flex items-center justify-center ring-4 ring-nw-surface overflow-hidden shadow-xl">
-            {user.avatarUrl ? (
+            {isUploadingPfp ? (
+              <Loader2 size={32} className="text-nw-accent animate-spin" />
+            ) : user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
             ) : (
               <User size={40} className="text-nw-accent" />
             )}
           </div>
-          {/* Overlay indicating feature coming soon */}
-          <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-not-allowed">
+          {/* Overlay indicating change feature */}
+          <button 
+            onClick={() => !isUploadingPfp && fileInputRef.current?.click()}
+            disabled={isUploadingPfp}
+            className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer focus:outline-none"
+          >
             <Camera size={20} className="text-white mb-1" />
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white">Soon</span>
-          </div>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-white">Change</span>
+          </button>
         </div>
 
         <div className="flex-1 mt-2">

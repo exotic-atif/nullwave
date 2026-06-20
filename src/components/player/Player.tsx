@@ -53,6 +53,7 @@ export function Player() {
   const [isDragging, setIsDragging] = useState(false)
   const [showFullScreen, setShowFullScreen] = useState(false)
   const [lyricsData, setLyricsData] = useState<SyncedLine[] | null>(null)
+  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
   
@@ -173,7 +174,7 @@ export function Player() {
 
     loadStream()
 
-    // Fetch lyrics
+    setIsFetchingLyrics(true)
     api.lyrics(track.title, track.artist).then((result) => {
       if (cancelled) return
       if (result.synced) {
@@ -184,6 +185,8 @@ export function Player() {
     }).catch(() => {
       if (cancelled) return
       setLyricsData(null)
+    }).finally(() => {
+      if (!cancelled) setIsFetchingLyrics(false)
     })
 
     // Record play history
@@ -342,6 +345,7 @@ export function Player() {
         progress={progress}
         duration={duration}
         lyricsData={lyricsData}
+        isFetchingLyrics={isFetchingLyrics}
       />
 
       <AnimatePresence>
@@ -350,14 +354,14 @@ export function Player() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed bottom-[56px] md:bottom-0 left-0 right-0 z-40 bg-nw-surface/80 backdrop-blur-3xl border-t border-nw-border-subtle"
+          className="fixed bottom-[56px] md:bottom-0 left-0 lg:left-[240px] right-0 z-40 bg-nw-surface/80 backdrop-blur-3xl border-t border-nw-border-subtle"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`,
           }}
         >
           {/* Mobile top progress bar - Removed in favor of proper scrubber */}
 
-          <div className="flex flex-col md:flex-row items-center justify-between h-auto md:h-[80px] py-2 md:py-0 px-2 md:px-5 gap-2 md:gap-5">
+          <div className="flex flex-col md:flex-row items-center justify-between h-auto md:h-[80px] py-1.5 md:py-0 px-3 md:px-5 gap-1.5 md:gap-5">
             {/* Top Row on mobile: Track Info + Play Controls */}
             <div className="flex items-center justify-between w-full md:w-[30%] md:flex-none">
               <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
