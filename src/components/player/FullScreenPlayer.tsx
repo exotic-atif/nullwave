@@ -1,7 +1,7 @@
 import type { Track } from '@/types'
 import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, X, Heart, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2 } from 'lucide-react'
+import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2 } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
@@ -374,6 +374,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                           >
                             {line.text}
                           </div>
+                        )
                         })}
                       </div>
                     )}

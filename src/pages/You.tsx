@@ -51,7 +51,6 @@ export function YouPage() {
 
       // 1. Get Signature from our Cloudflare Worker Backend
       const folder = 'nullwave_pfps'
-      const timestamp = Math.round(new Date().getTime() / 1000).toString()
       const workerUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 
       const signRes = await fetch(`${workerUrl}/sign-upload`, {
