@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Shield, Camera, KeyRound } from 'lucide-react'
-import { useAuthStore } from '@/store'
+import { User, Camera, KeyRound } from 'lucide-react'
 import { updateProfileName } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
+import { RoleBadge } from '@/components/ui/RoleBadge'
+import { useAuthStore } from '@/store'
 
 export function YouPage() {
   const { user, setUser } = useAuthStore()
@@ -128,10 +129,7 @@ export function YouPage() {
           <h2 className="text-xl font-bold text-nw-text">{user.displayName}</h2>
           <p className="text-sm text-nw-text-tertiary">{user.email}</p>
           <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-3">
-            <span className="px-2.5 py-1 rounded-md text-[10px] uppercase font-bold bg-nw-accent/20 text-nw-accent flex items-center gap-1.5">
-              <Shield size={12} />
-              {user.role}
-            </span>
+            <RoleBadge role={user.role} />
           </div>
         </div>
       </motion.section>

@@ -18,7 +18,7 @@ export async function upsertProfile(userId: string, username: string, email: str
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('users')
-    .select('username, avatar_url, theme')
+    .select('username, avatar_url, theme, role')
     .eq('id', userId)
     .maybeSingle()
   if (error) console.error('Failed to fetch profile:', error.message)

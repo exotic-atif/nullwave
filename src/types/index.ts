@@ -70,7 +70,7 @@ export interface User {
   email: string
   displayName: string
   avatarUrl?: string
-  role: 'admin' | 'member'
+  role: 'member' | 'contributor' | 'bug_tester' | 'helping_dev' | 'admin'
   createdAt: string
 }
 

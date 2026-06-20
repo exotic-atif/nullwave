@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthStore>()(
               email: u.email || '',
               displayName,
               avatarUrl,
-              role: 'member',
+              role: (profile?.role as any) || 'member',
               createdAt: u.created_at,
             }
             set({ user: appUser, isAuthenticated: true })
@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthStore>()(
                   email: u.email || '',
                   displayName,
                   avatarUrl,
-                  role: 'member',
+                  role: (profile?.role as any) || 'member',
                   createdAt: u.created_at,
                 },
                 isAuthenticated: true,
@@ -132,7 +132,7 @@ export const useAuthStore = create<AuthStore>()(
             email: u.email || '',
             displayName,
             avatarUrl,
-            role: 'member',
+            role: (profile?.role as any) || 'member',
             createdAt: u.created_at,
           }
 

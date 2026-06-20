@@ -1,8 +1,9 @@
 import { useThemeStore, useAuthStore } from '@/store'
 import { motion } from 'framer-motion'
-import { Moon, Sun, LogOut, User, Shield, Palette, Volume2, Info } from 'lucide-react'
+import { Moon, Sun, LogOut, User, Palette, Volume2, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
+import { RoleBadge } from '@/components/ui/RoleBadge'
 
 export function SettingsPage() {
   const { theme, toggleTheme } = useThemeStore()
@@ -46,9 +47,8 @@ export function SettingsPage() {
             <div>
               <p className="font-medium text-nw-text">{user.displayName}</p>
               <p className="text-sm text-nw-text-tertiary">{user.email}</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <Shield size={11} className="text-nw-accent" />
-                <span className="text-[11px] text-nw-accent capitalize">{user.role}</span>
+              <div className="mt-2">
+                <RoleBadge role={user.role} />
               </div>
             </div>
           </div>
