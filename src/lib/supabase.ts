@@ -33,6 +33,14 @@ export async function updateProfileName(userId: string, newName: string) {
   if (error) console.error('Failed to update profile name:', error.message)
 }
 
+export async function updateProfileAvatar(userId: string, avatarUrl: string) {
+  const { error } = await supabase
+    .from('users')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', userId)
+  if (error) console.error('Failed to update profile avatar:', error.message)
+}
+
 export async function updateThemePreference(userId: string, theme: string) {
   const { error } = await supabase
     .from('users')

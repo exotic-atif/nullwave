@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { User, Camera, KeyRound, Loader2 } from 'lucide-react'
-import { updateProfileName } from '@/lib/supabase'
+import { updateProfileName, updateProfileAvatar } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
 import { useAuthStore } from '@/store'
@@ -80,12 +80,15 @@ export function YouPage() {
       
       const imageUrl = uploadData.secure_url
 
-      // 3. Save URL to Supabase
+      // 3. Save URL to Supabase auth metadata
       const { error } = await supabase.auth.updateUser({
         data: { avatar_url: imageUrl }
       })
 
       if (error) throw error
+
+      // 4. Save URL to Supabase 'users' table so it persists on reload
+      await updateProfileAvatar(user.id, imageUrl)
 
       setUser({ ...user, avatarUrl: imageUrl })
 
