@@ -275,6 +275,7 @@ export function YouPage() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
               className="w-full px-4 py-2.5 bg-nw-elevated/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 transition-colors"
               placeholder="••••••••"
             />
@@ -288,6 +289,7 @@ export function YouPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
                 className="w-full px-4 py-2.5 bg-nw-elevated/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 transition-colors"
                 placeholder="••••••••"
               />
@@ -300,6 +302,7 @@ export function YouPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
                 className="w-full px-4 py-2.5 bg-nw-elevated/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 transition-colors"
                 placeholder="••••••••"
               />
