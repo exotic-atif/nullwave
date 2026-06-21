@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { User, Camera, KeyRound, Loader2 } from 'lucide-react'
 import { updateProfileName, updateProfileAvatar } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
+import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
 import { useAuthStore } from '@/store'
 
 export function YouPage() {
@@ -14,7 +15,7 @@ export function YouPage() {
   const [nameSuccess, setNameSuccess] = useState(false)
 
   const [isUploadingPfp, setIsUploadingPfp] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -30,16 +31,7 @@ export function YouPage() {
     )
   }
 
-  const handleUploadPfp = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Max 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB')
-      return
-    }
-
+  const handleUploadPfp = async (file: File) => {
     setIsUploadingPfp(true)
     try {
       const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'mian-storage'
@@ -97,7 +89,24 @@ export function YouPage() {
       alert(err.message || 'Failed to upload profile picture')
     } finally {
       setIsUploadingPfp(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDeletePfp = async () => {
+    setIsUploadingPfp(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { avatar_url: null }
+      })
+      if (error) throw error
+
+      await updateProfileAvatar(user.id, '')
+      setUser({ ...user, avatarUrl: undefined })
+    } catch (err: any) {
+      console.error('Delete PFP error:', err)
+      alert(err.message || 'Failed to remove profile picture')
+    } finally {
+      setIsUploadingPfp(false)
     }
   }
 
@@ -184,34 +193,38 @@ export function YouPage() {
         transition={{ delay: 0.05 }}
         className="p-6 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left"
       >
-        <div className="relative group">
-          <input 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
-            ref={fileInputRef} 
-            onChange={handleUploadPfp} 
-            disabled={isUploadingPfp}
-          />
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-nw-accent/30 to-nw-accent-glow/20 flex items-center justify-center ring-4 ring-nw-surface overflow-hidden shadow-xl">
+        <div className="relative group rounded-full overflow-hidden w-28 h-28 sm:w-32 sm:h-32 shadow-2xl bg-nw-surface flex-shrink-0 border-4 border-nw-surface/50">
             {isUploadingPfp ? (
-              <Loader2 size={32} className="text-nw-accent animate-spin" />
+              <div className="w-full h-full flex items-center justify-center">
+                <Loader2 size={32} className="text-nw-accent animate-spin" />
+              </div>
             ) : user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
             ) : (
-              <User size={40} className="text-nw-accent" />
+              <div className="w-full h-full flex items-center justify-center">
+                <User size={48} className="text-nw-text-tertiary" />
+              </div>
             )}
+
+            <button 
+              onClick={() => !isUploadingPfp && setIsPfpModalOpen(true)}
+              disabled={isUploadingPfp}
+              className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer focus:outline-none"
+            >
+              <Camera size={24} className="text-white mb-1" />
+              <span className="text-[10px] font-bold tracking-wider text-white uppercase bg-black/40 px-2 py-0.5 rounded-full">
+                Edit
+              </span>
+            </button>
           </div>
-          {/* Overlay indicating change feature */}
-          <button 
-            onClick={() => !isUploadingPfp && fileInputRef.current?.click()}
-            disabled={isUploadingPfp}
-            className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer focus:outline-none"
-          >
-            <Camera size={20} className="text-white mb-1" />
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white">Change</span>
-          </button>
-        </div>
+
+          <ProfilePictureModal
+            isOpen={isPfpModalOpen}
+            onClose={() => setIsPfpModalOpen(false)}
+            currentAvatar={user.avatarUrl || null}
+            onUpload={handleUploadPfp}
+            onDelete={handleDeletePfp}
+          />
 
         <div className="flex-1 mt-2">
           <h2 className="text-xl font-bold text-nw-text">{user.displayName}</h2>

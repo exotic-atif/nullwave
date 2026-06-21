@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Search as SearchIcon, TrendingUp, Clock, X } from 'lucide-react'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
@@ -10,7 +11,6 @@ import { api } from '@/lib/api'
 import { debounce } from '@/lib/utils'
 import type { Track, Album, Artist } from '@/types'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Link } from 'react-router-dom'
 
 const TRENDING_TERMS = [
   'Coke Studio Bangla',
@@ -24,7 +24,10 @@ const TRENDING_TERMS = [
 ]
 
 export function SearchPage() {
-  const [query, setQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
+  
+  const [query, setQuery] = useState(initialQuery)
   const [tracks, setTracks] = useState<Track[]>([])
   const [albums, setAlbums] = useState<Album[]>([])
   const [artists, setArtists] = useState<Artist[]>([])
@@ -57,9 +60,6 @@ export function SearchPage() {
         setAlbums(results.albums || [])
         setArtists(results.artists || [])
         setHasSearched(true)
-
-        // We no longer automatically save to recent on every debounced search stroke.
-        // It will only be saved when the user presses Enter.
       } catch (err) {
         console.error('Search failed:', err)
       } finally {
@@ -69,20 +69,38 @@ export function SearchPage() {
     []
   )
 
+  // Sync initial query from URL on mount
   useEffect(() => {
-    if (query.trim()) {
-      setIsSearching(true)
-      performSearch(query)
-    } else {
-      setTracks([])
-      setAlbums([])
-      setArtists([])
-      setHasSearched(false)
+    if (initialQuery) {
+      performSearch(initialQuery)
     }
-  }, [query, performSearch])
+  }, []) // Empty dependency array ensures it only runs on mount
 
-  const handleTrendingClick = (term: string) => {
+  const handleSearch = (val: string) => {
+    setQuery(val)
+    if (val.trim()) {
+      setSearchParams({ q: val })
+    } else {
+      setSearchParams({})
+    }
+    performSearch(val)
+  }
+
+  const handleTermClick = (term: string) => {
     setQuery(term)
+    setSearchParams({ q: term })
+    performSearch(term)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && query.trim()) {
+      const q = query.trim()
+      setRecentSearches((prev) => {
+        const updated = [q, ...prev.filter((s) => s !== q)].slice(0, 5)
+        localStorage.setItem('nw-recent-searches', JSON.stringify(updated))
+        return updated
+      })
+    }
   }
 
   const removeRecent = (term: string) => {
@@ -112,24 +130,15 @@ export function SearchPage() {
             id="search-input"
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && query.trim()) {
-                const q = query.trim()
-                setRecentSearches((prev) => {
-                  const updated = [q, ...prev.filter((s) => s !== q)].slice(0, 5)
-                  localStorage.setItem('nw-recent-searches', JSON.stringify(updated))
-                  return updated
-                })
-              }
-            }}
+            onChange={(e) => handleSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search songs, albums, artists..."
             className="w-full pl-11 pr-10 py-3.5 bg-nw-surface/60 border border-nw-border-subtle rounded-2xl text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/40 focus:bg-nw-surface/80 focus:ring-1 focus:ring-nw-accent-ring transition-all duration-300"
             autoFocus
           />
           {query && (
             <button
-              onClick={() => setQuery('')}
+              onClick={() => handleSearch('')}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-nw-text-tertiary hover:text-nw-text transition-colors"
             >
               <X size={16} />
@@ -206,9 +215,11 @@ export function SearchPage() {
                 {(activeTab === 'all' || activeTab === 'artists') && artists.length > 0 && activeTab !== 'all' && (
                   <section>
                     <SectionHeader title="Artists" subtitle={activeTab === 'artists' ? `${artists.length} results` : undefined} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 pb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                       {artists.map((artist, i) => (
-                        <ArtistCard key={artist.id} artist={artist} index={i} />
+                        <div key={artist.id} className="w-full">
+                          <ArtistCard artist={artist as Artist} index={i} />
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -228,9 +239,11 @@ export function SearchPage() {
                 {(activeTab === 'all' || activeTab === 'albums') && albums.length > 0 && (
                   <section>
                     <SectionHeader title="Albums" subtitle={activeTab === 'albums' ? `${albums.length} results` : undefined} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                       {albums.map((album, i) => (
-                        <AlbumCard key={album.id} album={album as Album} index={i} />
+                        <div key={album.id} className="w-full">
+                          <AlbumCard album={album as Album} index={i} />
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -270,7 +283,7 @@ export function SearchPage() {
                       key={term}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      onClick={() => handleTrendingClick(term)}
+                      onClick={() => handleTermClick(term)}
                       className="group flex items-center gap-2 px-3.5 py-2 bg-nw-surface/50 border border-nw-border-subtle rounded-full text-sm text-nw-text-secondary hover:text-nw-text hover:border-nw-accent/20 transition-all duration-200"
                     >
                       <Clock size={13} className="text-nw-muted" />
@@ -300,7 +313,7 @@ export function SearchPage() {
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04 }}
-                    onClick={() => handleTrendingClick(term)}
+                    onClick={() => handleTermClick(term)}
                     className="flex items-center gap-3 px-4 py-3 bg-nw-surface/30 border border-nw-border-subtle rounded-xl text-left hover:bg-white/[0.04] hover:border-nw-accent/10 transition-all duration-200"
                   >
                     <TrendingUp size={14} className="text-nw-accent flex-shrink-0" />

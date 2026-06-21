@@ -202,7 +202,9 @@ export function HomePage() {
           <SectionHeader title="Featured Albums" subtitle="Curated selections from the underground" />
           <ScrollableRow>
             {albums.map((album, i) => (
-              <AlbumCard key={album.id} album={album} index={i} />
+              <div key={album.id} className="w-[150px] sm:w-[180px] flex-shrink-0 snap-start">
+                <AlbumCard album={album} index={i} />
+              </div>
             ))}
           </ScrollableRow>
         </section>
@@ -214,7 +216,9 @@ export function HomePage() {
           <SectionHeader title="Featured Albums" subtitle="Curated selections from the underground" />
           <ScrollableRow>
             {Array.from({ length: 6 }).map((_, i) => (
-              <AlbumCardSkeleton key={i} />
+              <div key={i} className="w-[150px] sm:w-[180px] flex-shrink-0 snap-start">
+                <AlbumCardSkeleton />
+              </div>
             ))}
           </ScrollableRow>
         </section>
@@ -226,7 +230,9 @@ export function HomePage() {
           <SectionHeader title="Artists" subtitle="Discover voices from the region" />
           <ScrollableRow>
             {artists.map((artist, i) => (
-              <ArtistCard key={artist.id} artist={artist} index={i} />
+              <div key={artist.id} className="w-[140px] sm:w-[160px] flex-shrink-0 snap-start">
+                <ArtistCard artist={artist} index={i} />
+              </div>
             ))}
           </ScrollableRow>
         </section>
@@ -238,7 +244,9 @@ export function HomePage() {
           <SectionHeader title="Artists" subtitle="Discover voices from the region" />
           <ScrollableRow>
             {Array.from({ length: 6 }).map((_, i) => (
-              <ArtistCardSkeleton key={i} />
+              <div key={i} className="w-[140px] sm:w-[160px] flex-shrink-0 snap-start">
+                <ArtistCardSkeleton />
+              </div>
             ))}
           </ScrollableRow>
         </section>
