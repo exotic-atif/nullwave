@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Clock, Disc3, Heart } from 'lucide-react'
+import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { TrackRowSkeleton } from '@/components/ui/Skeleton'
@@ -6,16 +8,15 @@ import { useAuthStore, useLikedStore } from '@/store'
 import { fetchPlayHistory, clearPlayHistory, getUserPlaylists } from '@/lib/supabase'
 import type { Track, Playlist } from '@/types'
 import { motion } from 'framer-motion'
-import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 import { PlaylistCover } from '@/components/ui/PlaylistCover'
 
 type Tab = 'liked' | 'history' | 'playlists'
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: 'liked', label: 'Liked Songs' },
-  { id: 'playlists', label: 'Playlists' },
-  { id: 'history', label: 'Recently Played' },
+const tabs: { id: Tab; label: string; icon: any }[] = [
+  { id: 'liked', label: 'Liked Songs', icon: Heart },
+  { id: 'playlists', label: 'Playlists', icon: Disc3 },
+  { id: 'history', label: 'Recently Played', icon: Clock },
 ]
 
 export function LibraryPage() {
@@ -61,22 +62,22 @@ export function LibraryPage() {
       </motion.div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {tabs.map((tab) => (
+      <ScrollableRow className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+        {tabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200',
+            onClick={() => setActiveTab(tab.id as Tab)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-full whitespace-nowrap transition-all font-medium flex-shrink-0 ${
               activeTab === tab.id
-                ? 'bg-nw-accent text-white shadow-md shadow-nw-accent-glow/15'
-                : 'text-nw-text-secondary hover:text-nw-text hover:bg-white/5'
-            )}
+                ? 'bg-nw-text text-nw-black shadow-lg shadow-white/5'
+                : 'bg-nw-surface/50 text-nw-text-secondary hover:text-white hover:bg-nw-surface border border-white/5'
+            }`}
           >
+            <tab.icon size={16} />
             {tab.label}
           </button>
         ))}
-      </div>
+      </ScrollableRow>
 
       {/* Content */}
       <motion.div

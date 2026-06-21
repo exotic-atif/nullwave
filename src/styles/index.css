@@ -83,26 +83,14 @@
 /* ===== BASE STYLES ===== */
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: #27272a transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: #27272a;
-  border-radius: 9999px;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background-color: #3f3f46;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::selection {

@@ -5,6 +5,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader'
 import { TrackRowSkeleton } from '@/components/ui/Skeleton'
 import { AlbumCard } from '@/components/music/AlbumCard'
 import { ArtistCard } from '@/components/music/ArtistCard'
+import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { api } from '@/lib/api'
 import { debounce } from '@/lib/utils'
 import type { Track, Album, Artist } from '@/types'
@@ -140,26 +141,21 @@ export function SearchPage() {
       {/* Tabs */}
       <AnimatePresence>
         {query.trim() && hasSearched && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none"
-          >
+          <ScrollableRow className="mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
             {['all', 'songs', 'artists', 'albums'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`px-6 py-2 rounded-full whitespace-nowrap transition-all capitalize font-medium flex-shrink-0 ${
                   activeTab === tab
-                    ? 'bg-white text-black'
-                    : 'bg-white/5 text-white/70 hover:bg-white/10'
+                    ? 'bg-nw-text text-nw-black shadow-lg shadow-white/5'
+                    : 'bg-nw-surface/50 text-nw-text-secondary hover:text-white hover:bg-nw-surface border border-white/5'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab}
               </button>
             ))}
-          </motion.div>
+          </ScrollableRow>
         )}
       </AnimatePresence>
 

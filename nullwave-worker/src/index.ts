@@ -12,7 +12,7 @@ function corsHeaders(origin: string, env: Env): Record<string, string> {
   const isAllowed = allowed.includes('*') || allowed.includes(origin)
   return {
     'Access-Control-Allow-Origin': isAllowed ? origin : allowed[0],
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
   }

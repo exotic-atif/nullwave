@@ -3,6 +3,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader'
 import { AlbumCard } from '@/components/music/AlbumCard'
 import { ArtistCard } from '@/components/music/ArtistCard'
 import { TrackRow } from '@/components/ui/TrackRow'
+import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRowSkeleton, AlbumCardSkeleton, ArtistCardSkeleton } from '@/components/ui/Skeleton'
 import { usePlayerStore, useQueueStore } from '@/store'
 import { api } from '@/lib/api'
@@ -173,13 +174,13 @@ export function HomePage() {
       {!loading && recentTracks.length > 0 && (
         <section>
           <SectionHeader title="Recently Played" subtitle="Jump right back in" />
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+          <ScrollableRow>
             {recentTracks.slice(0, 10).map((track, i) => (
               <div key={`${track.id}-${i}`} className="w-[280px] shrink-0 bg-nw-surface/40 hover:bg-white/[0.04] transition-colors rounded-xl overflow-hidden border border-white/5">
                 <TrackRow track={track} showAlbum={false} className="hover:bg-transparent" />
               </div>
             ))}
-          </div>
+          </ScrollableRow>
         </section>
       )}
 
@@ -199,11 +200,11 @@ export function HomePage() {
       {!loading && albums.length > 0 && (
         <section>
           <SectionHeader title="Featured Albums" subtitle="Curated selections from the underground" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1">
+          <ScrollableRow>
             {albums.map((album, i) => (
               <AlbumCard key={album.id} album={album} index={i} />
             ))}
-          </div>
+          </ScrollableRow>
         </section>
       )}
 
@@ -211,11 +212,11 @@ export function HomePage() {
       {loading && (
         <section>
           <SectionHeader title="Featured Albums" subtitle="Curated selections from the underground" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1">
+          <ScrollableRow>
             {Array.from({ length: 6 }).map((_, i) => (
               <AlbumCardSkeleton key={i} />
             ))}
-          </div>
+          </ScrollableRow>
         </section>
       )}
 
@@ -223,11 +224,11 @@ export function HomePage() {
       {!loading && artists.length > 0 && (
         <section>
           <SectionHeader title="Artists" subtitle="Discover voices from the region" />
-          <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+          <ScrollableRow>
             {artists.map((artist, i) => (
               <ArtistCard key={artist.id} artist={artist} index={i} />
             ))}
-          </div>
+          </ScrollableRow>
         </section>
       )}
 
@@ -235,11 +236,11 @@ export function HomePage() {
       {loading && (
         <section>
           <SectionHeader title="Artists" subtitle="Discover voices from the region" />
-          <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none">
+          <ScrollableRow>
             {Array.from({ length: 6 }).map((_, i) => (
               <ArtistCardSkeleton key={i} />
             ))}
-          </div>
+          </ScrollableRow>
         </section>
       )}
 

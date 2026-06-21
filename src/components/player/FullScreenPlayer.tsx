@@ -337,7 +337,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   transition={{ duration: 0.4 }}
                   className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden"
                 >
-                  <div className="flex-1 w-full flex items-center justify-center h-full relative" ref={containerRef}>
+                  <div className="flex-1 w-full flex items-center justify-center h-full relative">
                     {isFetchingLyrics ? (
                       <div className="flex flex-col items-center gap-3 py-20">
                         <Loader2 size={24} className="text-nw-accent animate-spin" />
@@ -352,6 +352,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                       </div>
                     ) : (
                       <div
+                        ref={containerRef}
                         className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
                         style={{
                           WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
