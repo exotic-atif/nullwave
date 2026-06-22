@@ -19,7 +19,7 @@ export function ArtistCard({ artist, index = 0 }: ArtistCardProps) {
         animate={{ opacity: 1, scale: 1 }}
         whileHover={{ scale: 1.05, y: -4 }}
         transition={{ delay: index * 0.06, duration: 0.35 }}
-        className="group flex flex-col items-center gap-3 p-4 cursor-pointer"
+        className="group flex flex-col items-center gap-3 p-4 cursor-pointer snap-center"
       >
         {/* Circular avatar */}
         <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden shadow-xl shadow-black/30 group-hover:shadow-nw-accent-glow/10 transition-shadow duration-500">

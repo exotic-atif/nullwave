@@ -1,27 +1,19 @@
-import { Menu, ChevronLeft, ChevronRight, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { IconButton } from '../ui/IconButton'
 import { useAuthStore } from '@/store'
 
 interface TopbarProps {
-  onMenuClick: () => void
+  onMenuClick?: () => void
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({}: TopbarProps) {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuthStore()
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 md:px-6 h-14 glass-heavy">
       <div className="flex items-center gap-2">
-        {/* Mobile hamburger */}
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden text-nw-text-secondary hover:text-nw-text transition-colors p-1"
-        >
-          <Menu size={22} />
-        </button>
-
         {/* Navigation arrows */}
         <div className="flex items-center gap-1">
           <IconButton onClick={() => navigate(-1)} size="sm">
@@ -36,7 +28,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       {/* Right section */}
       <div className="flex items-center gap-3">
         {isAuthenticated && user ? (
-          <div className="flex items-center gap-2.5">
+          <div 
+            className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigate('/you')}
+          >
             <span className="text-xs text-nw-text-secondary hidden sm:block">
               {user.displayName}
             </span>

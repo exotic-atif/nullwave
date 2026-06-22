@@ -37,6 +37,10 @@ export function ScrollableRow({ children, className = '' }: ScrollableRowProps) 
 
   return (
     <div className={`relative group ${className}`}>
+      {/* Left Fade Edge */}
+      <div 
+        className={`absolute left-0 top-0 bottom-4 w-12 bg-gradient-to-r from-nw-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeft ? 'opacity-100' : 'opacity-0'}`} 
+      />
       {/* Left Arrow (Only visible on PC hover if there is content to scroll) */}
       {showLeft && (
         <button
@@ -52,7 +56,7 @@ export function ScrollableRow({ children, className = '' }: ScrollableRowProps) 
       <div 
         ref={rowRef}
         onScroll={handleScroll}
-        className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none snap-x"
+        className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-none snap-x snap-mandatory"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {children}
@@ -68,6 +72,11 @@ export function ScrollableRow({ children, className = '' }: ScrollableRowProps) 
           <ChevronRight size={28} />
         </button>
       )}
+
+      {/* Right Fade Edge */}
+      <div 
+        className={`absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-nw-surface to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRight ? 'opacity-100' : 'opacity-0'}`} 
+      />
     </div>
   )
 }

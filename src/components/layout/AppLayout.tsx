@@ -23,10 +23,15 @@ export function AppLayout() {
         {/* Content — extra pb on mobile for bottom nav + player */}
         <main
           className={`flex-1 overflow-y-auto overflow-x-hidden ${
-            currentTrack
-              ? 'pb-[144px] lg:pb-[96px]'  /* mobile: 72px player + 56px nav + 16px; desktop: 96px player */
-              : 'pb-[72px] lg:pb-0'          /* mobile: 56px nav + 16px */
+            currentTrack ? 'lg:pb-[96px]' : 'lg:pb-0'
           }`}
+          style={{
+            paddingBottom: typeof window !== 'undefined' && window.innerWidth < 1024 
+              ? (currentTrack 
+                  ? 'calc(144px + env(safe-area-inset-bottom))' 
+                  : 'calc(72px + env(safe-area-inset-bottom))')
+              : undefined
+          }}
         >
           <div className="gradient-mesh min-h-full">
             <Outlet />

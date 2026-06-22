@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2 } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePlayerStore, useQueueStore } from '@/store'
+import { usePlayerStore } from '@/store'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
-import { api } from '@/lib/api'
+// api import removed
 
 interface FullScreenPlayerProps {
   isOpen: boolean
@@ -17,13 +17,19 @@ interface FullScreenPlayerProps {
   duration: number
   lyricsData: SyncedLine[] | null
   isFetchingLyrics: boolean
+  onNext: () => void
+  onPrevious: () => void
 }
 
-export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics }: FullScreenPlayerProps) {
+export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics, onNext, onPrevious }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
   const [showLyrics, setShowLyrics] = useState(false)
+  const scrubberRef = useRef<HTMLInputElement>(null)
+  const [hoverTime, setHoverTime] = useState<number | null>(null)
+  const [hoverPos, setHoverPos] = useState(0)
+  const [, setIsDragging] = useState(false)
   
   const {
     isPlaying,
@@ -34,10 +40,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
     setProgress,
     toggleShuffle,
     cycleRepeat,
-    setTrack,
   } = usePlayerStore()
-
-  const { playNext, playPrevious } = useQueueStore()
 
   // Find active line index
   const activeIndex = lyricsData
@@ -87,31 +90,56 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
       const h = canvas.height
       const cx = w / 2
       const cy = h / 2
-      const radius = Math.min(cx, cy) * 0.55
-      const barCount = 64
-      const maxBarHeight = radius * 0.6
+      const radius = Math.min(cx, cy) * 0.45 // Base radius
 
       ctx.clearRect(0, 0, w, h)
 
-      for (let i = 0; i < barCount; i++) {
-        const dataIndex = Math.floor(i * bufferLength / barCount)
-        const value = dataArray[dataIndex] / 255
-        const barHeight = value * maxBarHeight + 2
-        const angle = (i / barCount) * Math.PI * 2 - Math.PI / 2
+      // Calculate bass intensity for core glow/pulse
+      let bassSum = 0
+      for (let i = 0; i < 10; i++) bassSum += dataArray[i]
+      const bassAvg = bassSum / 10 / 255
+      const pulseScale = 1 + bassAvg * 0.3
 
-        const x1 = cx + Math.cos(angle) * (radius + 4)
-        const y1 = cy + Math.sin(angle) * (radius + 4)
-        const x2 = cx + Math.cos(angle) * (radius + 4 + barHeight)
-        const y2 = cy + Math.sin(angle) * (radius + 4 + barHeight)
-
+      const drawBlob = (offset: number, color: string, isFill: boolean, blur: number) => {
         ctx.beginPath()
-        ctx.moveTo(x1, y1)
-        ctx.lineTo(x2, y2)
-        ctx.strokeStyle = `rgba(56, 189, 248, ${0.3 + value * 0.7})`
-        ctx.lineWidth = 2.5
-        ctx.lineCap = 'round'
-        ctx.stroke()
+        const points = 32
+        for (let i = 0; i <= points; i++) {
+          const dataIndex = Math.floor((i % points) * bufferLength / points)
+          const value = dataArray[dataIndex] / 255
+          
+          // Organic smoothing
+          const r = radius * pulseScale + (value * radius * 0.4) + offset
+          const angle = (i / points) * Math.PI * 2 - Math.PI / 2
+
+          const x = cx + Math.cos(angle) * r
+          const y = cy + Math.sin(angle) * r
+
+          if (i === 0) ctx.moveTo(x, y)
+          else {
+            // Use quadratic curves for organic feel (simplified here by high point count)
+            ctx.lineTo(x, y)
+          }
+        }
+        ctx.closePath()
+
+        ctx.shadowBlur = blur
+        ctx.shadowColor = color
+
+        if (isFill) {
+          ctx.fillStyle = color
+          ctx.fill()
+        } else {
+          ctx.strokeStyle = color
+          ctx.lineWidth = 3
+          ctx.stroke()
+        }
+        ctx.shadowBlur = 0 // reset
       }
+
+      // Draw premium layers
+      drawBlob(20, 'rgba(56, 189, 248, 0.1)', true, 40) // Outer soft glow
+      drawBlob(5, 'rgba(56, 189, 248, 0.4)', false, 20) // Mid neon ring
+      drawBlob(0, 'rgba(14, 165, 233, 0.8)', false, 10) // Inner bright ring
     }
 
     render()
@@ -131,36 +159,9 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
     }
   }, [isOpen, showLyrics, isPlaying, drawVisualizer])
 
-  const handleNext = () => {
-    const { history, setQueue } = useQueueStore.getState()
-    if (track) {
-       useQueueStore.getState().addToHistory(track)
-    }
-    const next = playNext()
-    if (next) {
-       setTrack(next)
-    } else if (track) {
-       const historyTitles = history.map(t => t.title)
-       api.radio(track.artist, historyTitles).then((tracks) => {
-         if (tracks.length > 0) {
-           setTrack(tracks[0])
-           if (tracks.length > 1) {
-             setQueue(tracks.slice(1))
-           }
-         }
-       }).catch(console.error)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (progress > 3) {
-      audioManager.seek(0)
-      setProgress(0)
-      return
-    }
-    const prev = playPrevious()
-    if (prev) setTrack(prev)
-  }
+  // Handlers passed from Player.tsx
+  const handleNext = () => onNext()
+  const handlePrevious = () => onPrevious()
 
   const handleSeek = (value: number) => {
     setProgress(value)
@@ -244,10 +245,16 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   {!showLyrics && (
                     <canvas
                       ref={canvasRef}
-                      width={500}
-                      height={500}
-                      className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
-                      style={{ width: '100%', height: '100%' }}
+                      width={800}
+                      height={800}
+                      className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
+                      style={{ 
+                        width: '180%', 
+                        height: '180%', 
+                        top: '50%', 
+                        left: '50%', 
+                        transform: 'translate(-50%, -50%)' 
+                      }}
                     />
                   )}
                   <AlbumArt
@@ -278,23 +285,47 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   {/* Scrubber */}
                   <div className="flex items-center gap-3 w-full mb-6">
                     <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(progress)}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={duration || 100}
-                      step={0.1}
-                      value={progress}
-                      onChange={(e) => handleSeek(Number(e.target.value))}
-                      onMouseUp={() => {
-                        audioManager.seek(progress)
+                    <div 
+                      className="flex-1 relative group py-3"
+                      onMouseMove={(e) => {
+                        if (!scrubberRef.current || !duration) return
+                        const rect = scrubberRef.current.getBoundingClientRect()
+                        let pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+                        setHoverPos(pos)
+                        setHoverTime((pos / rect.width) * duration)
                       }}
-                      className="flex-1 cursor-pointer nw-slider min-w-0"
-                      style={{
-                        background: `linear-gradient(to right, #38bdf8 ${
-                          duration > 0 ? (progress / duration) * 100 : 0
-                        }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
-                      }}
-                    />
+                      onMouseLeave={() => setHoverTime(null)}
+                    >
+                      <input
+                        ref={scrubberRef}
+                        type="range"
+                        min={0}
+                        max={duration || 100}
+                        step={0.1}
+                        value={progress}
+                        onChange={(e) => handleSeek(Number(e.target.value))}
+                        onMouseDown={() => setIsDragging(true)}
+                        onMouseUp={() => {
+                          setIsDragging(false)
+                          audioManager.seek(progress)
+                        }}
+                        className="w-full cursor-pointer nw-slider h-1.5 group-hover:h-2 transition-[height] duration-200"
+                        style={{
+                          background: `linear-gradient(to right, #38bdf8 ${
+                            duration > 0 ? (progress / duration) * 100 : 0
+                          }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
+                        }}
+                      />
+                      {/* Tooltip */}
+                      {hoverTime !== null && (
+                        <div 
+                          className="absolute -top-6 -translate-x-1/2 bg-nw-black border border-white/10 text-xs text-white px-2 py-1 rounded shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ left: hoverPos }}
+                        >
+                          {formatTime(hoverTime)}
+                        </div>
+                      )}
+                    </div>
                     <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(duration)}</span>
                   </div>
 

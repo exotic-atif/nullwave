@@ -5,6 +5,7 @@ import { formatTime } from '@/lib/utils'
 import { audioManager } from '@/lib/audio'
 import { recordPlayHistory } from '@/lib/supabase'
 import { api, parseLRC } from '@/lib/api'
+import { toast } from 'sonner'
 import type { SyncedLine } from '@/lib/api'
 import {
   Play,
@@ -316,7 +317,18 @@ export function Player() {
 
   const handleLike = () => {
     if (user && currentTrack) {
+      const isCurrentlyLiked = isLiked(currentTrack.id)
       toggleLike(user.id, currentTrack)
+      
+      if (!isCurrentlyLiked) {
+        toast.success('Added to Liked Songs', {
+          description: currentTrack.title
+        })
+      } else {
+        toast('Removed from Liked Songs')
+      }
+    } else {
+      toast.error('Sign in to like songs')
     }
   }
 
@@ -335,6 +347,8 @@ export function Player() {
         duration={duration}
         lyricsData={lyricsData}
         isFetchingLyrics={isFetchingLyrics}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
       />
 
       <AnimatePresence>
@@ -343,7 +357,7 @@ export function Player() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed bottom-[56px] md:bottom-0 left-0 lg:left-[240px] right-0 z-40 bg-nw-surface/80 backdrop-blur-3xl border-t border-nw-border-subtle"
+          className="fixed max-md:bottom-[calc(56px+env(safe-area-inset-bottom))] md:bottom-0 left-0 lg:left-[240px] right-0 z-40 bg-nw-surface/80 backdrop-blur-3xl border-t border-nw-border-subtle"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E")`,
           }}
@@ -396,7 +410,13 @@ export function Player() {
                   onClick={handleLike}
                   className="hidden sm:flex"
                 >
-                  <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+                  <motion.div
+                    whileTap={{ scale: 0.8 }}
+                    animate={liked ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+                  </motion.div>
                 </IconButton>
               </div>
               

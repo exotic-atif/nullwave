@@ -4,6 +4,7 @@ import { usePlayerStore, useQueueStore } from '@/store'
 import { Play, ListPlus, PlayCircle } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ContextMenu } from '../ui/ContextMenu'
 import { useContextMenu } from '@/hooks/useContextMenu'
 
@@ -33,7 +34,10 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
       label: 'Add all to queue',
       icon: <ListPlus size={14} />,
       onClick: () => {
-        if (album.tracks) addMultipleToQueue(album.tracks)
+        if (album.tracks) {
+          addMultipleToQueue(album.tracks)
+          toast.success(`Added ${album.tracks.length} tracks to queue`)
+        }
       },
       disabled: !album.tracks || album.tracks.length === 0,
     },
@@ -47,7 +51,7 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ scale: 1.03, y: -4 }}
           transition={{ delay: index * 0.05, duration: 0.4 }}
-          className="group flex flex-col gap-3 p-3 rounded-xl transition-all duration-300 hover:bg-white/[0.03] cursor-pointer"
+          className="group flex flex-col gap-3 p-3 rounded-xl transition-all duration-300 hover:bg-white/[0.03] cursor-pointer snap-center"
           onContextMenu={openContextMenu}
         >
         {/* Cover */}
