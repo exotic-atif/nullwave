@@ -11,6 +11,7 @@ interface PlayerStore {
   isMuted: boolean
   isShuffled: boolean
   repeatMode: RepeatMode
+  isLoadingStream: boolean
 
   // Actions
   setTrack: (track: Track) => void
@@ -23,6 +24,7 @@ interface PlayerStore {
   setDuration: (duration: number) => void
   toggleShuffle: () => void
   cycleRepeat: () => void
+  setIsLoadingStream: (isLoading: boolean) => void
   reset: () => void
 }
 
@@ -35,11 +37,13 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   isMuted: false,
   isShuffled: true,
   repeatMode: 'off',
+  isLoadingStream: false,
 
   setTrack: (track) =>
     set({
       currentTrack: track,
       isPlaying: true,
+      isLoadingStream: true, // Optimistically show loading state when switching tracks
       progress: 0,
       duration: track.duration,
     }),
@@ -65,10 +69,13 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
       return { repeatMode: modes[(currentIndex + 1) % modes.length] }
     }),
 
+  setIsLoadingStream: (isLoadingStream) => set({ isLoadingStream }),
+
   reset: () =>
     set({
       currentTrack: null,
       isPlaying: false,
+      isLoadingStream: false,
       progress: 0,
       duration: 0,
     }),

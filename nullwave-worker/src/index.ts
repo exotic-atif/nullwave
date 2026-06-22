@@ -319,59 +319,78 @@ async function handleRadio(artistId: string, historyStr: string): Promise<unknow
   }
 
   // Fetch songs by artist and potentially a related genre search
-  const [artistData, hitsData] = await Promise.all([
-    saavnFetch({ __call: 'search.getResults', q: artistId, n: '30', p: '1' }).catch(() => ({ results: [] })),
-    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '30', p: '1' }).catch(() => ({ results: [] }))
+  const [artistData, hitsData, similarData, radioData] = await Promise.all([
+    saavnFetch({ __call: 'search.getResults', q: artistId, n: '15', p: '1' }).catch(() => ({ results: [] })),
+    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] })),
+    saavnFetch({ __call: 'search.getResults', q: `${artistId} similar`, n: '15', p: '1' }).catch(() => ({ results: [] })),
+    saavnFetch({ __call: 'search.getResults', q: `${artistId} radio`, n: '15', p: '1' }).catch(() => ({ results: [] }))
   ])
 
-  const songResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
+  const primaryResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
+  const broaderResults = [...(similarData.results || []), ...(radioData.results || [])] as any[]
   
   // Filter and deduplicate
-  const seenTracks = new Set<string>()
-  const tracks = []
-  
   const badKeywords = ['slowed', 'reverb', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live']
-
-  for (const s of songResults) {
-    const track = mapTrack(s)
-    const titleLower = track.title.toLowerCase()
+  
+  const processTracks = (rawList: any[]) => {
+    const seen = new Set<string>()
+    const valid = []
     
-    // Skip bad versions
-    const isGarbage = badKeywords.some(b => titleLower.includes(b))
-    if (isGarbage) continue
+    for (const s of rawList) {
+      const track = mapTrack(s)
+      const titleLower = track.title.toLowerCase()
+      
+      const isGarbage = badKeywords.some(b => titleLower.includes(b))
+      if (isGarbage) continue
 
-    const baseTitle = getBaseTitle(track.title)
-    
-    // Aggressively skip if it matches any recently played song's base title
-    const isInHistory = historyExclude.some(hx => {
-      if (!baseTitle || !hx) return false
-      return baseTitle === hx || baseTitle.includes(hx) || hx.includes(baseTitle)
-    })
-    
-    if (isInHistory) continue
+      const baseTitle = getBaseTitle(track.title)
+      
+      const isInHistory = historyExclude.some(hx => {
+        if (!baseTitle || !hx) return false
+        return baseTitle === hx || baseTitle.includes(hx) || hx.includes(baseTitle)
+      })
+      if (isInHistory) continue
 
-    // Deduplicate by base title so we don't return 5 versions of another song
-    const key = `${baseTitle}::${track.artist.toLowerCase()}`
-    if (!seenTracks.has(key)) {
-      seenTracks.add(key)
-      tracks.push(track)
+      const key = `${baseTitle}::${track.artist.toLowerCase()}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        valid.push(track)
+      }
     }
+    
+    // Shuffle
+    for (let i = valid.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[valid[i], valid[j]] = [valid[j], valid[i]]
+    }
+    
+    return valid
   }
 
-  // Shuffle the valid tracks
-  for (let i = tracks.length - 1; i > 0; i--) {
+  const primaryTracks = processTracks(primaryResults)
+  const broaderTracks = processTracks(broaderResults)
+
+  // Mix: ~60% primary artist, ~40% broader/similar artists
+  const batch = []
+  const maxTracks = 20
+  const primaryCount = Math.min(primaryTracks.length, Math.floor(maxTracks * 0.6))
+  const broaderCount = Math.min(broaderTracks.length, maxTracks - primaryCount)
+  
+  batch.push(...primaryTracks.slice(0, primaryCount))
+  batch.push(...broaderTracks.slice(0, broaderCount))
+
+  // Final shuffle of the batch
+  for (let i = batch.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+    ;[batch[i], batch[j]] = [batch[j], batch[i]]
   }
-
-  // Pick up to 20 tracks
-  let batch = tracks.slice(0, 20)
   
   if (batch.length === 0) {
     // Ultimate fallback if filtered out everything
-    const randomFallback = songResults[Math.floor(Math.random() * songResults.length)]
+    const allResults = [...primaryResults, ...broaderResults]
+    const randomFallback = allResults[Math.floor(Math.random() * allResults.length)]
     if (!randomFallback) throw new Error('No recommendations found')
-    batch = [mapTrack(randomFallback)]
+    batch.push(mapTrack(randomFallback))
   }
   
   return { tracks: batch }

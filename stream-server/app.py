@@ -102,14 +102,12 @@ def _is_good_match(song_result, target_title, target_artist):
     tgt_title = _normalize_text(_clean(target_title))
     tgt_artist = _normalize_text(_primary_artist(target_artist))
     
-    # Reject instrumentals/karaoke/covers if not requested
+    # Reject bad versions if not requested
     orig_tgt_lower = target_title.lower()
-    if "instrumental" not in orig_tgt_lower and "instrumental" in res_title:
-        return False
-    if "karaoke" not in orig_tgt_lower and "karaoke" in res_title:
-        return False
-    if "cover" not in orig_tgt_lower and "cover" in res_title:
-        return False
+    bad_keywords = ["instrumental", "karaoke", "cover", "remix", "live", "slowed", "reverb", "mashup", "sped"]
+    for word in bad_keywords:
+        if word not in orig_tgt_lower and word in res_title:
+            return False
 
     # Artist must match (partially)
     if tgt_artist:

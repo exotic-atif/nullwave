@@ -31,6 +31,7 @@ export function Player() {
   const {
     currentTrack,
     isPlaying,
+    isLoadingStream,
     volume,
     progress,
     duration,
@@ -46,7 +47,7 @@ export function Player() {
     setTrack,
   } = usePlayerStore()
 
-  const { playNext, playPrevious, addToHistory } = useQueueStore()
+  const { playPrevious, addToHistory } = useQueueStore()
   const user = useAuthStore((s) => s.user)
   const { isLiked, toggle: toggleLike } = useLikedStore()
 
@@ -78,30 +79,7 @@ export function Player() {
         audioManager.seek(0)
         audioManager.play()
       } else {
-        const next = useQueueStore.getState().playNext()
-        if (next) {
-          usePlayerStore.getState().setTrack(next)
-        } else {
-          // Infinite Autoplay: Fetch smart radio queue if queue is empty
-          const current = usePlayerStore.getState().currentTrack
-          if (current) {
-            const historyTitles = useQueueStore.getState().history.map(t => t.title)
-            api.radio(current.artist, historyTitles).then((tracks) => {
-              if (tracks.length > 0) {
-                usePlayerStore.getState().setTrack(tracks[0])
-                if (tracks.length > 1) {
-                  useQueueStore.getState().setQueue(tracks.slice(1))
-                }
-              } else {
-                usePlayerStore.setState({ isPlaying: false, progress: 0 })
-              }
-            }).catch(() => {
-              usePlayerStore.setState({ isPlaying: false, progress: 0 })
-            })
-          } else {
-            usePlayerStore.setState({ isPlaying: false, progress: 0 })
-          }
-        }
+        performNextTrack()
       }
     })
 
@@ -112,6 +90,7 @@ export function Player() {
 
     audioManager.onLoaded(() => {
       setStreamStatus(null)
+      usePlayerStore.getState().setIsLoadingStream(false)
     })
   }, [isDragging])
 
@@ -151,12 +130,21 @@ export function Player() {
 
         if (result.streamUrl) {
           setStreamStatus('Buffering audio...')
-          audioManager.playUrl(result.streamUrl)
+          audioManager.playUrl(result.streamUrl).then(() => {
+            if (!usePlayerStore.getState().isPlaying) {
+              audioManager.pause()
+            }
+          })
         } else if (track.audioUrl) {
           setStreamStatus(result.error ? `${result.error}. Playing preview.` : 'Full stream unavailable. Playing preview.')
-          audioManager.playUrl(track.audioUrl)
+          audioManager.playUrl(track.audioUrl).then(() => {
+            if (!usePlayerStore.getState().isPlaying) {
+              audioManager.pause()
+            }
+          })
         } else {
           setStreamStatus(result.error || 'No audio stream available for this track.')
+          usePlayerStore.getState().setIsLoadingStream(false)
         }
       } catch {
         window.clearTimeout(healthPendingTimer)
@@ -165,9 +153,14 @@ export function Player() {
 
         if (track.audioUrl) {
           setStreamStatus('Stream server unavailable. Playing preview.')
-          audioManager.playUrl(track.audioUrl)
+          audioManager.playUrl(track.audioUrl).then(() => {
+            if (!usePlayerStore.getState().isPlaying) {
+              audioManager.pause()
+            }
+          })
         } else {
           setStreamStatus('Stream server unavailable.')
+          usePlayerStore.getState().setIsLoadingStream(false)
         }
       }
     }
@@ -256,22 +249,7 @@ export function Player() {
         }
       })
       navigator.mediaSession.setActionHandler('nexttrack', () => {
-        const next = useQueueStore.getState().playNext()
-        const current = usePlayerStore.getState().currentTrack
-        if (next) {
-          usePlayerStore.getState().setTrack(next)
-        } else if (current) {
-          // Infinite Autoplay fallback
-          const historyTitles = useQueueStore.getState().history.map(t => t.title)
-          api.radio(current.artist, historyTitles).then((tracks) => {
-            if (tracks.length > 0) {
-              usePlayerStore.getState().setTrack(tracks[0])
-              if (tracks.length > 1) {
-                useQueueStore.getState().setQueue(tracks.slice(1))
-              }
-            }
-          }).catch(console.error)
-        }
+        performNextTrack()
       })
     }
     
@@ -287,26 +265,37 @@ export function Player() {
 
   // ===== HANDLERS =====
 
-  const handleNext = useCallback(() => {
-    if (currentTrack) {
-      addToHistory(currentTrack)
-    }
-    const next = playNext()
+  const performNextTrack = useCallback(() => {
+    const next = useQueueStore.getState().playNext()
+    const current = usePlayerStore.getState().currentTrack
+    if (current) addToHistory(current)
+
     if (next) {
-      setTrack(next)
-    } else if (currentTrack) {
-      // Infinite Autoplay
+      usePlayerStore.getState().setTrack(next)
+    } else if (current) {
+      // Infinite Autoplay fallback using improved supercool API radio
       const historyTitles = useQueueStore.getState().history.map(t => t.title)
-      api.radio(currentTrack.artist, historyTitles).then((tracks) => {
+      
+      // If we are at the end of a queue/playlist, seed the radio
+      api.radio(current.artist, historyTitles).then((tracks) => {
         if (tracks.length > 0) {
-          setTrack(tracks[0])
+          usePlayerStore.getState().setTrack(tracks[0])
           if (tracks.length > 1) {
             useQueueStore.getState().setQueue(tracks.slice(1))
           }
+        } else {
+          usePlayerStore.setState({ isPlaying: false, progress: 0 })
         }
-      }).catch(console.error)
+      }).catch((err) => {
+        console.error('Radio fallback failed:', err)
+        usePlayerStore.setState({ isPlaying: false, progress: 0 })
+      })
     }
-  }, [currentTrack, addToHistory, playNext, setTrack])
+  }, [addToHistory])
+
+  const handleNext = useCallback(() => {
+    performNextTrack()
+  }, [performNextTrack])
 
   const handlePrevious = useCallback(() => {
     if (progress > 3) {
@@ -420,7 +409,9 @@ export function Player() {
                   onClick={togglePlay}
                   className="w-9 h-9 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer"
                 >
-                  {isPlaying ? (
+                  {isLoadingStream ? (
+                    <Loader2 size={18} className="text-nw-black animate-spin" />
+                  ) : isPlaying ? (
                     <Pause size={18} className="text-nw-black" fill="currentColor" />
                   ) : (
                     <Play size={18} className="text-nw-black ml-0.5" fill="currentColor" />
@@ -448,7 +439,9 @@ export function Player() {
                   onClick={togglePlay}
                   className="w-10 h-10 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer"
                 >
-                  {isPlaying ? (
+                  {isLoadingStream ? (
+                    <Loader2 size={18} className="text-nw-black animate-spin" />
+                  ) : isPlaying ? (
                     <Pause size={18} className="text-nw-black" fill="currentColor" />
                   ) : (
                     <Play size={18} className="text-nw-black ml-0.5" fill="currentColor" />

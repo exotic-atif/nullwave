@@ -27,6 +27,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
   
   const {
     isPlaying,
+    isLoadingStream,
     isShuffled,
     repeatMode,
     togglePlay,
@@ -311,7 +312,9 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                       onClick={togglePlay}
                       className="w-16 h-16 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer shadow-lg shadow-nw-accent/20"
                     >
-                      {isPlaying ? (
+                      {isLoadingStream ? (
+                        <Loader2 size={28} className="text-nw-black animate-spin" />
+                      ) : isPlaying ? (
                         <Pause size={28} className="text-nw-black" fill="currentColor" />
                       ) : (
                         <Play size={28} className="text-nw-black ml-1" fill="currentColor" />
