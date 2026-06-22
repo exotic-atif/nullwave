@@ -170,19 +170,25 @@ export function ProfilePictureModal({
                 </div>
 
                 {/* Zoom Controls */}
-                <div className="flex items-center gap-4 px-2">
-                  <ZoomOut size={20} className="text-nw-text-secondary" />
-                  <input
-                    type="range"
-                    value={zoom}
-                    min={1}
-                    max={3}
-                    step={0.1}
-                    aria-label="Zoom"
-                    onChange={(e) => setZoom(Number(e.target.value))}
-                    className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-nw-text [&::-webkit-slider-thumb]:rounded-full"
-                  />
-                  <ZoomIn size={20} className="text-nw-text-secondary" />
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-4 px-2">
+                    <ZoomOut size={20} className="text-nw-text-secondary" />
+                    <input
+                      type="range"
+                      value={zoom}
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      aria-label="Zoom"
+                      onChange={(e) => setZoom(Number(e.target.value))}
+                      className="nw-slider flex-1"
+                    />
+                    <ZoomIn size={20} className="text-nw-text-secondary" />
+                  </div>
+                  <p className="text-center text-xs text-nw-text-tertiary">
+                    <span className="md:hidden">Use your fingers to adjust or scale the picture.</span>
+                    <span className="hidden md:inline">Use your mouse wheel or slider to adjust the picture.</span>
+                  </p>
                 </div>
 
                 {/* Save Button */}

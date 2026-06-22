@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Search, Library, ListMusic, Settings, User, X } from 'lucide-react'
+import { Home, Search, Library, ListMusic, User, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -11,9 +11,7 @@ const navItems = [
   { to: '/you', icon: User, label: 'You' },
 ]
 
-const bottomItems = [
-  { to: '/settings', icon: Settings, label: 'Settings' },
-]
+// bottomItems removed since settings moved to You tab
 
 interface SidebarProps {
   isOpen: boolean
@@ -83,31 +81,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-24 lg:pb-4 mt-auto border-t border-nw-border-subtle pt-4 space-y-0.5">
-        {bottomItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onClose}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group',
-              location.pathname === item.to
-                ? 'bg-white/[0.06] text-nw-text'
-                : 'text-nw-text-secondary hover:text-nw-text hover:bg-white/[0.03]'
-            )}
-          >
-            <item.icon
-              size={18}
-              className={cn(
-                'transition-colors duration-200',
-                location.pathname === item.to
-                  ? 'text-nw-accent'
-                  : 'text-nw-text-tertiary group-hover:text-nw-text-secondary'
-              )}
-            />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+      <div className="px-3 pb-24 md:pb-4 mt-auto border-t border-nw-border-subtle pt-4 space-y-0.5">
 
         {/* Version tag */}
         <div className="px-5 mt-auto pt-4 pb-2 text-center opacity-40 hover:opacity-100 transition-opacity">
@@ -121,7 +95,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[240px] h-full bg-nw-void/80 border-r border-nw-border-subtle flex-shrink-0">
+      <aside className="hidden md:flex flex-col w-[240px] h-full bg-nw-void/80 border-r border-nw-border-subtle flex-shrink-0">
         {sidebarContent}
       </aside>
 
@@ -133,7 +107,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
               onClick={onClose}
             />
             <motion.aside
@@ -141,7 +115,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="lg:hidden fixed left-0 top-0 bottom-0 w-[260px] bg-nw-void z-50 shadow-2xl"
+              className="md:hidden fixed left-0 top-0 bottom-0 w-[260px] bg-nw-void z-50 shadow-2xl"
             >
               {sidebarContent}
             </motion.aside>
