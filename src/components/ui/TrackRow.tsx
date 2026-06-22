@@ -51,12 +51,13 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/search?q=${encodeURIComponent(track.title + ' ' + track.artist)}`
+    const text = `Listen to ${track.title} by ${track.artist} on NullWave!`
     try {
       if (navigator.share) {
-        await navigator.share({ title: `${track.title} — ${track.artist}`, url: shareUrl })
+        await navigator.share({ title: `${track.title} — ${track.artist}`, text, url: shareUrl })
       } else {
-        await navigator.clipboard.writeText(shareUrl)
-        toast.success('Link copied to clipboard')
+        await navigator.clipboard.writeText(`${text}\n${shareUrl}`)
+        toast.success('Link copied to clipboard!')
       }
     } catch {
       // User cancelled share dialog
@@ -177,13 +178,36 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
           </p>
         )}
 
-        {/* Duration + More */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs tabular-nums text-nw-text-tertiary">
+        {/* Duration + Actions */}
+        <div className="flex items-center gap-2 md:gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (user) {
+                toggle(user.id, track)
+                toast.success(liked ? 'Removed from liked' : 'Added to liked songs')
+              } else {
+                toast.error('Please log in to like songs')
+              }
+            }}
+            className={cn(
+              "transition-all duration-200",
+              liked ? "opacity-100" : "opacity-0 group-hover:opacity-100 text-nw-text-secondary hover:text-white"
+            )}
+          >
+            <motion.div
+              whileTap={{ scale: 0.8 }}
+              animate={liked ? { scale: [1, 1.2, 1] } : {}}
+              transition={{ duration: 0.3 }}
+            >
+              <Heart size={16} fill={liked ? '#ec4899' : 'none'} color={liked ? '#ec4899' : 'currentColor'} />
+            </motion.div>
+          </button>
+          <span className="text-xs tabular-nums text-nw-text-tertiary w-8 text-right hidden sm:block">
             {formatDuration(track.duration)}
           </span>
           <button
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-nw-text-secondary hover:text-nw-text"
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-nw-text-secondary hover:text-nw-text p-1"
             onClick={openFromButton}
           >
             <MoreHorizontal size={16} />

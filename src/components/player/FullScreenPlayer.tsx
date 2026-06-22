@@ -1,7 +1,7 @@
 import type { Track } from '@/types'
 import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2 } from 'lucide-react'
+import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2, Heart } from 'lucide-react'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlayerStore } from '@/store'
@@ -19,9 +19,11 @@ interface FullScreenPlayerProps {
   isFetchingLyrics: boolean
   onNext: () => void
   onPrevious: () => void
+  isLiked?: boolean
+  toggleLike?: () => void
 }
 
-export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics, onNext, onPrevious }: FullScreenPlayerProps) {
+export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics, onNext, onPrevious, isLiked, toggleLike }: FullScreenPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
@@ -268,16 +270,37 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10" />
                 </div>
 
-                <div className="mt-8 text-center max-w-[320px]">
-                  <h2 className={`${showLyrics ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'} font-display font-bold text-nw-text truncate transition-all`}>
-                    {track.title}
-                  </h2>
-                  <p className={`${showLyrics ? 'text-sm' : 'text-lg'} text-nw-text-secondary mt-1 truncate transition-all`}>
-                    {track.artist}
-                  </p>
-                  <p className="text-xs text-nw-text-tertiary mt-1 truncate">
-                    {track.album} {track.year ? `• ${track.year}` : ''}
-                  </p>
+                <div className="mt-8 w-full max-w-[320px] flex items-center justify-between">
+                  <div className="text-left flex-1 min-w-0 pr-4">
+                    <h2 className={`${showLyrics ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl'} font-display font-bold text-nw-text truncate transition-all`}>
+                      {track.title}
+                    </h2>
+                    <p className={`${showLyrics ? 'text-sm' : 'text-lg'} text-nw-text-secondary mt-1 truncate transition-all`}>
+                      {track.artist}
+                    </p>
+                    <p className="text-xs text-nw-text-tertiary mt-1 truncate">
+                      {track.album} {track.year ? `• ${track.year}` : ''}
+                    </p>
+                  </div>
+                  {toggleLike && (
+                    <button
+                      onClick={toggleLike}
+                      className="p-3 text-nw-text-tertiary hover:text-white hover:bg-white/5 rounded-full transition-colors group flex-shrink-0"
+                    >
+                      <motion.div
+                        whileTap={{ scale: 0.8 }}
+                        animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Heart 
+                          size={28} 
+                          fill={isLiked ? '#ec4899' : 'none'} 
+                          color={isLiked ? '#ec4899' : 'currentColor'} 
+                          className="transition-transform group-hover:scale-110 group-active:scale-95"
+                        />
+                      </motion.div>
+                    </button>
+                  )}
                 </div>
 
                 {/* Scrubber & Controls (Only show here if NOT in lyrics mode OR on desktop) */}

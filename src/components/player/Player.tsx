@@ -347,8 +347,17 @@ export function Player() {
         duration={duration}
         lyricsData={lyricsData}
         isFetchingLyrics={isFetchingLyrics}
-        onNext={handleNext}
+        onNext={performNextTrack}
         onPrevious={handlePrevious}
+        isLiked={isLiked(currentTrack.id)}
+        toggleLike={() => {
+          if (user) {
+            toggleLike(user.id, currentTrack)
+            toast.success(isLiked(currentTrack.id) ? 'Removed from liked songs' : 'Added to liked songs')
+          } else {
+            toast.error('Please log in to like songs')
+          }
+        }}
       />
 
       <AnimatePresence>
@@ -408,7 +417,7 @@ export function Player() {
                   size="sm"
                   active={liked}
                   onClick={handleLike}
-                  className="hidden sm:flex"
+                  className="flex"
                 >
                   <motion.div
                     whileTap={{ scale: 0.8 }}

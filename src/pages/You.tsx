@@ -47,24 +47,26 @@ export function YouPage() {
 
       // 1. Get Signature from our Cloudflare Worker Backend
       const folder = 'nullwave_pfps'
+      const public_id = user.id
       const workerUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 
       const signRes = await fetch(`${workerUrl}/sign-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder }) // We only need to sign the folder param
+        body: JSON.stringify({ folder, public_id, overwrite: 'true' }) 
       })
 
       if (!signRes.ok) throw new Error('Failed to get signature from backend')
       const { signature, timestamp: backendTimestamp } = await signRes.json()
 
-      // 2. Upload directly to Cloudinary
       const formData = new FormData()
       formData.append('file', file)
       formData.append('api_key', apiKey)
       formData.append('timestamp', backendTimestamp)
       formData.append('signature', signature)
       formData.append('folder', folder)
+      formData.append('public_id', public_id)
+      formData.append('overwrite', 'true')
 
       const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
