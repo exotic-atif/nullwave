@@ -53,7 +53,7 @@ export function YouPage() {
       const signRes = await fetch(`${workerUrl}/sign-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder, public_id, overwrite: 'true' }) 
+        body: JSON.stringify({ folder, public_id, overwrite: 'true', invalidate: 'true' }) 
       })
 
       if (!signRes.ok) throw new Error('Failed to get signature from backend')
@@ -67,6 +67,7 @@ export function YouPage() {
       formData.append('folder', folder)
       formData.append('public_id', public_id)
       formData.append('overwrite', 'true')
+      formData.append('invalidate', 'true')
 
       const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',

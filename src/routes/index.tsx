@@ -11,11 +11,21 @@ import { LoginPage } from '@/pages/Login'
 import { PlaylistDetail } from '@/pages/PlaylistDetail'
 import { ArtistDetailPage } from '@/pages/ArtistDetail'
 import { AlbumDetailPage } from '@/pages/AlbumDetail'
+import { RequestAccessPage } from '@/pages/RequestAccess'
+import { AdminPage } from '@/pages/Admin'
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/req-access',
+    element: <RequestAccessPage />,
+  },
+  {
+    path: '/admin',
+    element: <AdminPage />,
   },
   {
     element: <AuthGuard />,

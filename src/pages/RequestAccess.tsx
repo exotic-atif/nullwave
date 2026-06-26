@@ -42,28 +42,19 @@ export function RequestAccessPage() {
       // Check if email is already registered or already requested
       const normalizedEmail = email.trim().toLowerCase()
 
-      // 1. Check access_requests
-      const { data: existingRequest } = await supabase
-        .from('access_requests')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .maybeSingle()
+      // Secure backend check via RPC (Bypasses RLS safely)
+      const { data: checkResult, error: rpcError } = await supabase
+        .rpc('check_email_available', { check_email: normalizedEmail })
 
-      if (existingRequest) {
-        setError('You\'ve already submitted a request with this email. Hang tight!')
-        setIsSubmitting(false)
-        return
-      }
-
-      // 2. Check users table
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .maybeSingle()
-
-      if (existingUser) {
-        setError('This email is already registered. Try signing in instead.')
+      if (rpcError) {
+        console.warn('Email check RPC failed:', rpcError.message)
+        // If RPC is missing, we rely on the unique constraint fallback in the catch block
+      } else if (checkResult && !checkResult.available) {
+        if (checkResult.reason === 'already_registered') {
+          setError('This email is already registered. Try signing in instead.')
+        } else {
+          setError('You\'ve already submitted a request with this email. Hang tight!')
+        }
         setIsSubmitting(false)
         return
       }

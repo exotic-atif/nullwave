@@ -271,3 +271,56 @@ export async function deletePlaylist(playlistId: string) {
     .eq('id', playlistId)
   if (error) console.error('Failed to delete playlist:', error.message)
 }
+
+// ===== ACCESS REQUESTS =====
+
+export interface AccessRequest {
+  id: string
+  display_name: string
+  email: string
+  avatar_url: string | null
+  fav_artists: string | null
+  fav_songs: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
+export async function submitAccessRequest(data: {
+  display_name: string
+  email: string
+  avatar_url?: string
+  fav_artists?: string
+  fav_songs?: string
+}) {
+  const { error } = await supabase.from('access_requests').insert(data)
+  if (error) throw new Error(error.message)
+}
+
+export async function fetchAccessRequests(): Promise<AccessRequest[]> {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Failed to fetch access requests:', error.message)
+    return []
+  }
+  return (data || []) as AccessRequest[]
+}
+
+export async function updateAccessRequest(id: string, updates: Partial<AccessRequest>) {
+  const { error } = await supabase
+    .from('access_requests')
+    .update(updates)
+    .eq('id', id)
+  if (error) console.error('Failed to update access request:', error.message)
+}
+
+export async function deleteAccessRequest(id: string) {
+  const { error } = await supabase
+    .from('access_requests')
+    .delete()
+    .eq('id', id)
+  if (error) console.error('Failed to delete access request:', error.message)
+}
