@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Radio, Loader2, Upload, CheckCircle2, Sparkles, Music, User, Mail, Heart, X } from 'lucide-react'
 import { submitAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link } from 'react-router-dom'
+import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
 
 export function RequestAccessPage() {
   const [displayName, setDisplayName] = useState('')
@@ -15,19 +16,20 @@ export function RequestAccessPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
 
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 15 * 1024 * 1024) {
-      setError('Image must be under 15MB')
-      return
-    }
+  const handleUploadPfp = async (file: File) => {
     setAvatarFile(file)
     const reader = new FileReader()
     reader.onload = () => setAvatarPreview(reader.result as string)
     reader.readAsDataURL(file)
+    setIsPfpModalOpen(false)
+  }
+
+  const handleDeletePfp = async () => {
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setIsPfpModalOpen(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -229,16 +231,9 @@ export function RequestAccessPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Avatar Upload */}
           <div className="flex flex-col items-center mb-2">
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleAvatarSelect}
-              className="hidden"
-            />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setIsPfpModalOpen(true)}
               className="group relative w-24 h-24 rounded-full overflow-hidden bg-nw-surface/50 border-2 border-dashed border-white/10 hover:border-nw-accent/40 transition-all duration-300"
             >
               {avatarPreview ? (
@@ -249,22 +244,30 @@ export function RequestAccessPage() {
                   </div>
                 </>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1">
-                  <Upload size={20} className="text-nw-muted group-hover:text-nw-accent transition-colors" />
-                  <span className="text-[9px] text-nw-muted group-hover:text-nw-text-tertiary transition-colors uppercase tracking-wider">Photo</span>
+                <div className="flex flex-col items-center justify-center h-full text-nw-text-tertiary group-hover:text-nw-accent transition-colors">
+                  <User size={24} className="mb-1" />
+                  <span className="text-[10px] uppercase tracking-wider font-semibold">Photo</span>
                 </div>
               )}
             </button>
             {avatarFile && (
               <button
                 type="button"
-                onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                onClick={handleDeletePfp}
                 className="mt-2 text-[10px] text-nw-text-tertiary hover:text-nw-danger transition-colors flex items-center gap-1"
               >
                 <X size={10} /> Remove
               </button>
             )}
           </div>
+
+          <ProfilePictureModal
+            isOpen={isPfpModalOpen}
+            onClose={() => setIsPfpModalOpen(false)}
+            currentAvatar={avatarPreview}
+            onUpload={handleUploadPfp}
+            onDelete={handleDeletePfp}
+          />
 
           {/* Display Name */}
           <div>
