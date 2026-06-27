@@ -489,8 +489,15 @@ async function handleHomeFeed(
     if (favSongs.length > 0) {
       const s = favSongs[Math.floor(Math.random() * favSongs.length)]
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: s, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-        reason: `Based on your favorite song: ${s}`
+        promise: saavnFetch({ __call: 'search.getResults', q: s, n: '5', p: '1' })
+          .then(async (res) => {
+             if (res?.results?.[0]?.id) {
+               return await fetchNativeRecommendations(res.results[0].id)
+             }
+             return res.results || []
+          })
+          .catch(() => []),
+        reason: `Because you love ${s}`
       })
     }
     
@@ -512,8 +519,11 @@ async function handleHomeFeed(
         const titleLower = track.title.toLowerCase()
         if (badKeywords.some(b => titleLower.includes(b))) continue
 
-        if (!seenTracks.has(track.id)) {
-          seenTracks.add(track.id)
+        const baseTitle = getBaseTitle(track.title)
+        const dedupKey = `${baseTitle}::${track.artist.toLowerCase()}`
+
+        if (!seenTracks.has(dedupKey)) {
+          seenTracks.add(dedupKey)
           tracks.push(track)
         }
       }
