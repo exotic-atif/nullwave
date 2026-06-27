@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { Track } from '@/types'
 import { AlbumArt } from './AlbumArt'
 import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
-import { Play, MoreHorizontal, ListPlus, Heart, PlayCircle, Plus, Trash2, User, Disc3, Share2 } from 'lucide-react'
+import { Play, MoreHorizontal, ListPlus, Heart, PlayCircle, Plus, Trash2, User, Disc3, Share2, ThumbsDown } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ContextMenu } from './ContextMenu'
 import { useContextMenu } from '@/hooks/useContextMenu'
@@ -25,7 +25,7 @@ interface TrackRowProps {
 export function TrackRow({ track, index, showIndex = false, showAlbum = true, className, playlistId, onRemove, onClick }: TrackRowProps) {
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore()
-  const { addToQueue } = useQueueStore()
+  const { addToQueue, addDislikedTrack } = useQueueStore()
   const user = useAuthStore((s) => s.user)
   const { toggle, isLiked } = useLikedStore()
   const isActive = currentTrack?.id === track.id
@@ -106,6 +106,17 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
       label: 'Share',
       icon: <Share2 size={14} />,
       onClick: handleShare,
+    },
+    {
+      label: 'Not for me',
+      icon: <ThumbsDown size={14} />,
+      onClick: () => {
+        addDislikedTrack(track.id)
+        if (isActive) {
+          usePlayerStore.getState().play() 
+        }
+        toast.success("We won't suggest this song again")
+      },
     },
   ]
 

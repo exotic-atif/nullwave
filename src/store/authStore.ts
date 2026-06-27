@@ -53,6 +53,8 @@ export const useAuthStore = create<AuthStore>()(
               email: u.email || '',
               displayName,
               avatarUrl,
+              favSongs: profile?.fav_songs || '',
+              favArtists: profile?.fav_artists || '',
               role: (profile?.role as any) || 'member',
               createdAt: u.created_at,
             }
@@ -85,6 +87,8 @@ export const useAuthStore = create<AuthStore>()(
                   email: u.email || '',
                   displayName,
                   avatarUrl,
+                  favSongs: profile?.fav_songs || '',
+                  favArtists: profile?.fav_artists || '',
                   role: (profile?.role as any) || 'member',
                   createdAt: u.created_at,
                 },
@@ -132,6 +136,8 @@ export const useAuthStore = create<AuthStore>()(
             email: u.email || '',
             displayName,
             avatarUrl,
+            favSongs: profile?.fav_songs || '',
+            favArtists: profile?.fav_artists || '',
             role: (profile?.role as any) || 'member',
             createdAt: u.created_at,
           }

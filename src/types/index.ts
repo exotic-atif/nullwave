@@ -13,6 +13,7 @@ export interface Track {
   year?: number
   isLiked?: boolean
   spotifyUrl?: string
+  suggestionReason?: string
 }
 
 export interface Album {
@@ -70,6 +71,8 @@ export interface User {
   email: string
   displayName: string
   avatarUrl?: string
+  favSongs?: string
+  favArtists?: string
   role: 'member' | 'contributor' | 'bug_tester' | 'helping_dev' | 'admin'
   createdAt: string
 }

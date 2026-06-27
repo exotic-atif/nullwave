@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut } from 'lucide-react'
-import { updateProfileName, updateProfileAvatar } from '@/lib/supabase'
+import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut, Heart } from 'lucide-react'
+import { updateProfileName, updateProfileAvatar, updateProfileFavs } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
@@ -17,6 +17,11 @@ export function YouPage() {
   const [displayName, setDisplayName] = useState(user?.displayName || '')
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameSuccess, setNameSuccess] = useState(false)
+
+  const [favSongs, setFavSongs] = useState(user?.favSongs || '')
+  const [favArtists, setFavArtists] = useState(user?.favArtists || '')
+  const [isSavingTaste, setIsSavingTaste] = useState(false)
+  const [tasteSuccess, setTasteSuccess] = useState(false)
 
   const [isUploadingPfp, setIsUploadingPfp] = useState(false)
   const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
@@ -132,6 +137,22 @@ export function YouPage() {
       console.error(err)
     } finally {
       setIsSavingName(false)
+    }
+  }
+
+  const handleUpdateTaste = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingTaste(true)
+    setTasteSuccess(false)
+    try {
+      await updateProfileFavs(user.id, favSongs.trim(), favArtists.trim())
+      setUser({ ...user, favSongs: favSongs.trim(), favArtists: favArtists.trim() })
+      setTasteSuccess(true)
+      setTimeout(() => setTasteSuccess(false), 3000)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSavingTaste(false)
     }
   }
 
@@ -277,6 +298,57 @@ export function YouPage() {
               className="px-5 py-2 bg-nw-text text-nw-black text-sm font-semibold rounded-xl hover:bg-nw-text/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSavingName ? 'Saving...' : 'Save Name'}
+            </button>
+          </div>
+        </form>
+      </motion.section>
+
+      {/* Music Taste Settings */}
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="space-y-4"
+      >
+        <h3 className="text-sm font-semibold text-nw-text uppercase tracking-wider flex items-center gap-2">
+          <Heart size={16} className="text-nw-text-tertiary" />
+          Music Taste
+        </h3>
+        <form onSubmit={handleUpdateTaste} className="p-5 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-nw-text-secondary mb-1.5 ml-1">
+              Favorite Artists (Comma Separated)
+            </label>
+            <input
+              type="text"
+              value={favArtists}
+              onChange={(e) => setFavArtists(e.target.value)}
+              placeholder="e.g. The Weeknd, Chase Atlantic, Travis Scott"
+              className="w-full px-4 py-2.5 bg-nw-elevated/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-nw-text-secondary mb-1.5 ml-1">
+              Favorite Songs (Comma Separated)
+            </label>
+            <input
+              type="text"
+              value={favSongs}
+              onChange={(e) => setFavSongs(e.target.value)}
+              placeholder="e.g. Starboy, Swim, goosebumps"
+              className="w-full px-4 py-2.5 bg-nw-elevated/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 transition-colors"
+            />
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <div className="text-xs">
+              {tasteSuccess && <span className="text-nw-success">Updated successfully!</span>}
+            </div>
+            <button
+              type="submit"
+              disabled={isSavingTaste || (favSongs === (user.favSongs || '') && favArtists === (user.favArtists || ''))}
+              className="px-5 py-2 bg-nw-text text-nw-black text-sm font-semibold rounded-xl hover:bg-nw-text/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSavingTaste ? 'Saving...' : 'Save Taste'}
             </button>
           </div>
         </form>

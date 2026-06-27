@@ -18,7 +18,7 @@ export async function upsertProfile(userId: string, username: string, email: str
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('users')
-    .select('username, avatar_url, theme, role')
+    .select('username, avatar_url, theme, role, fav_songs, fav_artists')
     .eq('id', userId)
     .maybeSingle()
   if (error) console.error('Failed to fetch profile:', error.message)
@@ -47,6 +47,14 @@ export async function updateThemePreference(userId: string, theme: string) {
     .update({ theme })
     .eq('id', userId)
   if (error) console.error('Failed to update theme preference:', error.message)
+}
+
+export async function updateProfileFavs(userId: string, favSongs: string, favArtists: string) {
+  const { error } = await supabase
+    .from('users')
+    .update({ fav_songs: favSongs, fav_artists: favArtists })
+    .eq('id', userId)
+  if (error) console.error('Failed to update favorites:', error.message)
 }
 
 // ===== LIKED SONGS =====

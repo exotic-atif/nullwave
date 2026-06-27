@@ -13,13 +13,17 @@ interface QueueStore {
   playNext: () => Track | null
   playPrevious: () => Track | null
   moveInQueue: (fromIndex: number, toIndex: number) => void
+  reorderQueue: (newQueue: Track[]) => void
   addToHistory: (track: Track) => void
   clearHistory: () => void
+  dislikedTracks: string[]
+  addDislikedTrack: (trackId: string) => void
 }
 
 export const useQueueStore = create<QueueStore>((set, get) => ({
   queue: [],
   history: [],
+  dislikedTracks: [],
 
   addToQueue: (track) =>
     set((state) => ({
@@ -67,10 +71,17 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
       return { queue: newQueue }
     }),
 
+  reorderQueue: (newQueue) => set({ queue: newQueue }),
+
   addToHistory: (track) =>
     set((state) => ({
       history: [...state.history.slice(-99), track],
     })),
 
   clearHistory: () => set({ history: [] }),
+
+  addDislikedTrack: (trackId) =>
+    set((state) => ({
+      dislikedTracks: [...state.dislikedTracks, trackId],
+    })),
 }))

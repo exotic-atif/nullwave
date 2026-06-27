@@ -281,6 +281,13 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                     <p className="text-xs text-nw-text-tertiary mt-1 truncate">
                       {track.album} {track.year ? `• ${track.year}` : ''}
                     </p>
+                    {track.suggestionReason && (
+                      <div className="mt-3 px-3 py-1.5 inline-block bg-nw-accent/10 border border-nw-accent/20 rounded-lg">
+                        <p className="text-xs text-nw-accent/90 flex items-center gap-1.5">
+                          ✨ {track.suggestionReason}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   {toggleLike && (
                     <button

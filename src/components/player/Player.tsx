@@ -276,14 +276,20 @@ export function Player() {
     } else if (current) {
       // Infinite Autoplay fallback using improved supercool API radio
       const historyTitles = useQueueStore.getState().history.map(t => t.title)
+      const dislikedTracks = useQueueStore.getState().dislikedTracks
+      const { user } = useAuthStore.getState()
       
       // If we are at the end of a queue/playlist, seed the radio
-      api.radio(current.artist, historyTitles).then((tracks) => {
+      api.radio({
+        artist: current.artist,
+        historyTitles,
+        favArtists: user?.favArtists || '',
+        favSongs: user?.favSongs || '',
+        excludeIds: dislikedTracks
+      }).then((tracks) => {
         if (tracks.length > 0) {
+          // Just play the first one, don't populate the queue to keep it 1 song per session
           usePlayerStore.getState().setTrack(tracks[0])
-          if (tracks.length > 1) {
-            useQueueStore.getState().setQueue(tracks.slice(1))
-          }
         } else {
           usePlayerStore.setState({ isPlaying: false, progress: 0 })
         }

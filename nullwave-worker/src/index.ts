@@ -71,7 +71,7 @@ function getBaseTitle(title: string): string {
   return title.replace(/\[.*?\]|\(.*?\)/g, '').split('-')[0].trim().toLowerCase()
 }
 
-function mapTrack(s: any) {
+function mapTrack(s: any, suggestionReason?: string) {
   return {
     id: s.id || '',
     title: htmlDecode(s.song || s.title || ''),
@@ -84,6 +84,7 @@ function mapTrack(s: any) {
     year: s.year ? parseInt(s.year) : (s.release_date ? parseInt(s.release_date.substring(0, 4)) : 0),
     genre: htmlDecode(s.language || ''),
     spotifyUrl: s.perma_url || '',
+    suggestionReason
   }
 }
 
@@ -309,42 +310,77 @@ async function handleArtist(artistId: string): Promise<unknown> {
   return { artist, tracks }
 }
 
-async function handleRadio(artistId: string, historyStr: string): Promise<unknown> {
+async function handleRadio(
+  artistId: string, 
+  historyStr: string, 
+  favArtistsStr: string, 
+  favSongsStr: string,
+  excludeIdsStr: string
+): Promise<unknown> {
   let historyExclude: string[] = []
+  let excludeIds: string[] = []
   try {
-    const raw = JSON.parse(historyStr)
-    if (Array.isArray(raw)) historyExclude = raw.map(t => getBaseTitle(String(t)))
+    const rawHistory = JSON.parse(historyStr)
+    if (Array.isArray(rawHistory)) historyExclude = rawHistory.map(t => getBaseTitle(String(t)))
+    
+    const rawExclude = JSON.parse(excludeIdsStr)
+    if (Array.isArray(rawExclude)) excludeIds = rawExclude.map(String)
   } catch {
     // Ignore parse errors
   }
 
-  // Fetch songs by artist and potentially a related genre search
-  const [artistData, hitsData, similarData, radioData] = await Promise.all([
-    saavnFetch({ __call: 'search.getResults', q: artistId, n: '15', p: '1' }).catch(() => ({ results: [] })),
-    saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] })),
-    saavnFetch({ __call: 'search.getResults', q: `${artistId} similar`, n: '15', p: '1' }).catch(() => ({ results: [] })),
-    saavnFetch({ __call: 'search.getResults', q: `${artistId} radio`, n: '15', p: '1' }).catch(() => ({ results: [] }))
-  ])
+  const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
+  const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
 
-  const primaryResults = [...(artistData.results || []), ...(hitsData.results || [])] as any[]
-  const broaderResults = [...(similarData.results || []), ...(radioData.results || [])] as any[]
+  // Fetch songs by artist and potentially a related genre search
+  const searches = [
+    { promise: saavnFetch({ __call: 'search.getResults', q: artistId, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Because you listened to ${artistId}` },
+    { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] })), reason: `Popular hits similar to ${artistId}` },
+    { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} similar`, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Similar vibe to ${artistId}` }
+  ]
+
+  // Add random fav artist search if available
+  if (favArtists.length > 0) {
+    const randomFavArtist = favArtists[Math.floor(Math.random() * favArtists.length)]
+    searches.push({ 
+      promise: saavnFetch({ __call: 'search.getResults', q: randomFavArtist, n: '15', p: '1' }).catch(() => ({ results: [] })),
+      reason: `Because you like ${randomFavArtist}` 
+    })
+  }
+
+  // Add random fav song search if available
+  if (favSongs.length > 0) {
+    const randomFavSong = favSongs[Math.floor(Math.random() * favSongs.length)]
+    searches.push({ 
+      promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '10', p: '1' }).catch(() => ({ results: [] })),
+      reason: `Because you like ${randomFavSong}` 
+    })
+  }
+
+  const resultsWithReason = await Promise.all(
+    searches.map(async (s) => {
+      const res = await s.promise
+      return { results: res.results || [], reason: s.reason }
+    })
+  )
   
   // Filter and deduplicate
-  const badKeywords = ['slowed', 'reverb', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live']
+  const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
   
-  const processTracks = (rawList: any[]) => {
-    const seen = new Set<string>()
-    const valid = []
-    
-    for (const s of rawList) {
-      const track = mapTrack(s)
+  const seen = new Set<string>()
+  const validTracks = []
+
+  for (const group of resultsWithReason) {
+    for (const s of group.results) {
+      const track = mapTrack(s, group.reason)
       const titleLower = track.title.toLowerCase()
       
       const isGarbage = badKeywords.some(b => titleLower.includes(b))
       if (isGarbage) continue
 
+      if (excludeIds.includes(track.id)) continue
+
       const baseTitle = getBaseTitle(track.title)
-      
       const isInHistory = historyExclude.some(hx => {
         if (!baseTitle || !hx) return false
         return baseTitle === hx || baseTitle.includes(hx) || hx.includes(baseTitle)
@@ -354,72 +390,92 @@ async function handleRadio(artistId: string, historyStr: string): Promise<unknow
       const key = `${baseTitle}::${track.artist.toLowerCase()}`
       if (!seen.has(key)) {
         seen.add(key)
-        valid.push(track)
+        validTracks.push(track)
       }
     }
-    
-    // Shuffle
-    for (let i = valid.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[valid[i], valid[j]] = [valid[j], valid[i]]
-    }
-    
-    return valid
   }
-
-  const primaryTracks = processTracks(primaryResults)
-  const broaderTracks = processTracks(broaderResults)
-
-  // Mix: ~60% primary artist, ~40% broader/similar artists
-  const batch = []
-  const maxTracks = 20
-  const primaryCount = Math.min(primaryTracks.length, Math.floor(maxTracks * 0.6))
-  const broaderCount = Math.min(broaderTracks.length, maxTracks - primaryCount)
-  
-  batch.push(...primaryTracks.slice(0, primaryCount))
-  batch.push(...broaderTracks.slice(0, broaderCount))
 
   // Final shuffle of the batch
-  for (let i = batch.length - 1; i > 0; i--) {
+  for (let i = validTracks.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[batch[i], batch[j]] = [batch[j], batch[i]]
+    ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
   }
   
-  if (batch.length === 0) {
+  if (validTracks.length === 0) {
     // Ultimate fallback if filtered out everything
-    const allResults = [...primaryResults, ...broaderResults]
-    const randomFallback = allResults[Math.floor(Math.random() * allResults.length)]
+    const randomFallback = resultsWithReason[0].results[0]
     if (!randomFallback) throw new Error('No recommendations found')
-    batch.push(mapTrack(randomFallback))
+    validTracks.push(mapTrack(randomFallback, 'Fallback recommendation'))
   }
   
-  return { tracks: batch }
+  return { tracks: validTracks.slice(0, 40) }
 }
 
-async function handleHomeFeed(recentArtistsStr: string): Promise<unknown> {
+async function handleHomeFeed(recentArtistsStr: string, favArtistsStr: string, favSongsStr: string): Promise<unknown> {
   try {
     const recentArtists = JSON.parse(recentArtistsStr) as string[]
-    if (!recentArtists || recentArtists.length === 0) {
+    const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
+    const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
+    
+    let pool = [...recentArtists]
+    
+    if (pool.length === 0 && favArtists.length === 0 && favSongs.length === 0) {
       return await handleTrending()
     }
 
-    // Pick up to 3 random artists from history to search
-    const shuffledArtists = [...recentArtists].sort(() => 0.5 - Math.random()).slice(0, 3)
-    const fetchPromises = shuffledArtists.map(a => 
-      saavnFetch({ __call: 'search.getResults', q: a, n: '15', p: '1' }).catch(() => ({ results: [] }))
-    )
-    
-    const resultsArray = await Promise.all(fetchPromises)
-    const songResults = resultsArray.flatMap(r => r.results || [])
+    const searches = []
 
+    if (pool.length > 0) {
+      const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 2)
+      shuffled.forEach(a => {
+        searches.push({
+          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '10', p: '1' }).catch(() => ({ results: [] })),
+          reason: `Because you listened to ${a}`
+        })
+      })
+    }
+
+    if (favArtists.length > 0) {
+      const shuffledFavs = [...favArtists].sort(() => 0.5 - Math.random()).slice(0, 2)
+      shuffledFavs.forEach(a => {
+        searches.push({
+          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '10', p: '1' }).catch(() => ({ results: [] })),
+          reason: `Because you like ${a}`
+        })
+      })
+    }
+
+    if (favSongs.length > 0) {
+      const shuffledSongs = [...favSongs].sort(() => 0.5 - Math.random()).slice(0, 1)
+      shuffledSongs.forEach(s => {
+        searches.push({
+          promise: saavnFetch({ __call: 'search.getResults', q: s, n: '10', p: '1' }).catch(() => ({ results: [] })),
+          reason: `Based on your favorite song: ${s}`
+        })
+      })
+    }
+    
+    const resultsWithReason = await Promise.all(
+      searches.map(async (s) => {
+        const res = await s.promise
+        return { results: res.results || [], reason: s.reason }
+      })
+    )
+
+    const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
     const seenTracks = new Set<string>()
     const tracks = []
     
-    for (const s of songResults) {
-      const track = mapTrack(s)
-      if (!seenTracks.has(track.id)) {
-        seenTracks.add(track.id)
-        tracks.push(track)
+    for (const group of resultsWithReason) {
+      for (const s of group.results) {
+        const track = mapTrack(s, group.reason)
+        const titleLower = track.title.toLowerCase()
+        if (badKeywords.some(b => titleLower.includes(b))) continue
+
+        if (!seenTracks.has(track.id)) {
+          seenTracks.add(track.id)
+          tracks.push(track)
+        }
       }
     }
 
@@ -429,7 +485,7 @@ async function handleHomeFeed(recentArtistsStr: string): Promise<unknown> {
       ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
 
-    return { tracks: tracks.slice(0, 25) }
+    return { tracks: tracks.slice(0, 40) }
   } catch {
     return await handleTrending()
   }
@@ -491,14 +547,20 @@ export default {
       if (path === '/radio') {
         const artist = url.searchParams.get('artist')?.trim()
         const historyStr = url.searchParams.get('history')?.trim() || '[]'
+        const favArtistsStr = url.searchParams.get('favArtists')?.trim() || ''
+        const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
+        const excludeIdsStr = url.searchParams.get('excludeIds')?.trim() || '[]'
+
         if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
-        return json(await handleRadio(artist, historyStr), 200, origin, env)
+        return json(await handleRadio(artist, historyStr, favArtistsStr, favSongsStr, excludeIdsStr), 200, origin, env)
       }
 
       // GET /home-feed?history=X
       if (path === '/home-feed') {
         const historyStr = url.searchParams.get('history')?.trim() || '[]'
-        return json(await handleHomeFeed(historyStr), 200, origin, env)
+        const favArtistsStr = url.searchParams.get('favArtists')?.trim() || ''
+        const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
+        return json(await handleHomeFeed(historyStr, favArtistsStr, favSongsStr), 200, origin, env)
       }
 
       // GET /track/:id

@@ -45,7 +45,12 @@ export function HomePage() {
         // deduplicate artists
         artists = [...new Set(artists)].slice(0, 10)
         
-        const result = await api.homeFeed(artists)
+        const result = await api.homeFeed({
+          recentArtists: artists,
+          favArtists: user?.favArtists || '',
+          favSongs: user?.favSongs || '',
+        })
+        
         if (!cancelled) {
           setTracks(result)
           setRecentTracks(recents)

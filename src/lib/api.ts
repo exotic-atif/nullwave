@@ -123,14 +123,26 @@ export const api = {
   },
 
   /** Get personalized home feed */
-  async homeFeed(recentArtists: string[]): Promise<Track[]> {
-    const data = await request<{ tracks: Track[] }>(`/home-feed?history=${encodeURIComponent(JSON.stringify(recentArtists))}`)
+  async homeFeed(params: { recentArtists: string[]; favArtists: string; favSongs: string }): Promise<Track[]> {
+    const query = new URLSearchParams({
+      history: JSON.stringify(params.recentArtists),
+      favArtists: params.favArtists,
+      favSongs: params.favSongs,
+    })
+    const data = await request<{ tracks: Track[] }>(`/home-feed?${query.toString()}`)
     return data.tracks
   },
 
   /** Get a smart infinite radio queue */
-  async radio(artist: string, historyTitles: string[]): Promise<Track[]> {
-    const data = await request<{ tracks: Track[] }>(`/radio?artist=${encodeURIComponent(artist)}&history=${encodeURIComponent(JSON.stringify(historyTitles))}`)
+  async radio(params: { artist: string; historyTitles: string[]; favArtists: string; favSongs: string; excludeIds?: string[] }): Promise<Track[]> {
+    const query = new URLSearchParams({
+      artist: params.artist,
+      history: JSON.stringify(params.historyTitles),
+      favArtists: params.favArtists,
+      favSongs: params.favSongs,
+      excludeIds: JSON.stringify(params.excludeIds || []),
+    })
+    const data = await request<{ tracks: Track[] }>(`/radio?${query.toString()}`)
     return data.tracks
   },
 }

@@ -1,12 +1,12 @@
 import { useQueueStore, usePlayerStore } from '@/store'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
-import { motion } from 'framer-motion'
+import { motion, Reorder } from 'framer-motion'
 import { ListMusic, Play, Trash2 } from 'lucide-react'
 import { AlbumArt } from '@/components/ui/AlbumArt'
 
 export function QueuePage() {
-  const { queue, history, clearQueue, clearHistory } = useQueueStore()
+  const { queue, history, clearQueue, clearHistory, reorderQueue } = useQueueStore()
   const currentTrack = usePlayerStore((s) => s.currentTrack)
 
   return (
@@ -75,11 +75,21 @@ export function QueuePage() {
           }
         />
         {queue.length > 0 ? (
-          <div className="space-y-0.5">
+          <Reorder.Group axis="y" values={queue} onReorder={reorderQueue} className="space-y-0.5">
             {queue.map((track, i) => (
-              <TrackRow key={`${track.id}-${i}`} track={track} index={i + 1} showIndex />
+              <Reorder.Item 
+                key={track.id + '-' + i} 
+                value={track}
+                className="cursor-grab active:cursor-grabbing relative"
+                whileDrag={{ scale: 1.02, zIndex: 10, opacity: 0.9 }}
+              >
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-nw-text-tertiary">
+                   {/* Optional grip handle could go here, but TrackRow handles hover well */}
+                </div>
+                <TrackRow track={track} index={i + 1} showIndex />
+              </Reorder.Item>
             ))}
-          </div>
+          </Reorder.Group>
         ) : (
           <motion.div
             initial={{ opacity: 0 }}
