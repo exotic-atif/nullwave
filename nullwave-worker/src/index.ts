@@ -252,7 +252,7 @@ async function handleTrending(): Promise<unknown> {
     })
 
     const songs = (data.songs || []) as any[]
-    const tracks = songs.slice(0, 25).map(mapTrack)
+    const tracks = songs.slice(0, 25).map((s: any) => mapTrack(s))
 
     // Shuffle for variety
     for (let i = tracks.length - 1; i > 0; i--) {
@@ -356,7 +356,7 @@ async function handleAlbum(albumId: string): Promise<unknown> {
     totalTracks: data.songs ? data.songs.length : 0,
   }
 
-  const tracks = (data.songs || []).map(mapTrack)
+  const tracks = (data.songs || []).map((s: any) => mapTrack(s))
 
   return { album, tracks }
 }
@@ -437,7 +437,7 @@ async function handleRadio(
   const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
 
   // Fetch songs by artist and potentially a related genre search
-  const searches = [
+  const searches: { promise: Promise<any>, reason: string }[] = [
     { promise: saavnFetch({ __call: 'search.getResults', q: artistId, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Because you listened to ${artistId}` },
     { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] })), reason: `Popular hits similar to ${artistId}` },
     { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} similar`, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Similar vibe to ${artistId}` }
@@ -533,7 +533,7 @@ async function handleHomeFeed(
       return await handleTrending()
     }
 
-    const searches = []
+    const searches: { promise: Promise<any>, reason: string }[] = []
 
     if (pool.length > 0) {
       const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 2)
