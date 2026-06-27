@@ -39,7 +39,7 @@ async function saavnFetch(params: Record<string, string>): Promise<any> {
     url.searchParams.set(k, v)
   }
   const res = await fetch(url.toString(), {
-    headers: { 
+    headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       'X-Forwarded-For': '122.160.10.1',
       'X-Real-IP': '122.160.10.1',
@@ -164,7 +164,7 @@ async function handleTrending(): Promise<unknown> {
     // Shuffle for variety
     for (let i = tracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+        ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
 
     return { tracks: tracks.slice(0, 20) }
@@ -290,19 +290,19 @@ async function handleArtist(artistId: string): Promise<unknown> {
 
   const artist = artistResults.length > 0
     ? {
-        id: artistResults[0].artistId || artistResults[0].id || artistId,
-        name: htmlDecode(artistResults[0].name || artistId),
-        imageUrl: getHiResImage(artistResults[0].image || ''),
-        bio: htmlDecode(artistResults[0].description || ''),
-        genres: [],
-      }
+      id: artistResults[0].artistId || artistResults[0].id || artistId,
+      name: htmlDecode(artistResults[0].name || artistId),
+      imageUrl: getHiResImage(artistResults[0].image || ''),
+      bio: htmlDecode(artistResults[0].description || ''),
+      genres: [],
+    }
     : {
-        id: artistId,
-        name: artistId,
-        imageUrl: '',
-        bio: '',
-        genres: [],
-      }
+      id: artistId,
+      name: artistId,
+      imageUrl: '',
+      bio: '',
+      genres: [],
+    }
 
   const seenTracks = new Set<string>()
   const tracks = []
@@ -321,9 +321,9 @@ async function handleArtist(artistId: string): Promise<unknown> {
 }
 
 async function handleRadio(
-  artistId: string, 
-  historyStr: string, 
-  favArtistsStr: string, 
+  artistId: string,
+  historyStr: string,
+  favArtistsStr: string,
   favSongsStr: string,
   excludeIdsStr: string,
   likedTracksStr: string
@@ -333,7 +333,7 @@ async function handleRadio(
   try {
     const rawHistory = JSON.parse(historyStr)
     if (Array.isArray(rawHistory)) historyExclude = rawHistory.map(t => getBaseTitle(String(t)))
-    
+
     const rawExclude = JSON.parse(excludeIdsStr)
     if (Array.isArray(rawExclude)) excludeIds = rawExclude.map(String)
   } catch {
@@ -345,38 +345,38 @@ async function handleRadio(
 
   // Try to find a good seed song for reco.getreco
   let seedSongId = ''
-  
+
   // Try to get a seed song from the artist
   try {
     const topSongRes = await saavnFetch({ __call: 'search.getResults', q: artistId, n: '5', p: '1' })
     if (topSongRes && topSongRes.results && topSongRes.results.length > 0) {
       seedSongId = topSongRes.results[0].id
     }
-  } catch {}
+  } catch { }
 
   const searches: { promise: Promise<any>, reason: string }[] = []
-  
+
   if (seedSongId) {
     searches.push({ promise: saavnFetch({ __call: 'reco.getreco', pid: seedSongId }).catch(() => []), reason: `Recommended based on ${artistId}` })
   }
-  
+
   searches.push({ promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []), reason: `Popular hits from ${artistId}` })
 
   // Add random fav artist search if available
   if (favArtists.length > 0) {
     const randomFavArtist = favArtists[Math.floor(Math.random() * favArtists.length)]
-    searches.push({ 
+    searches.push({
       promise: saavnFetch({ __call: 'search.getResults', q: randomFavArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-      reason: `Because you like ${randomFavArtist}` 
+      reason: `Because you like ${randomFavArtist}`
     })
   }
 
   // Add random fav song search if available
   if (favSongs.length > 0) {
     const randomFavSong = favSongs[Math.floor(Math.random() * favSongs.length)]
-    searches.push({ 
+    searches.push({
       promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-      reason: `Because you like ${randomFavSong}` 
+      reason: `Because you like ${randomFavSong}`
     })
   }
 
@@ -386,10 +386,10 @@ async function handleRadio(
       return { results: Array.isArray(results) ? results : [], reason: s.reason }
     })
   )
-  
+
   // Filter and deduplicate
   const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
-  
+
   const seen = new Set<string>()
   const validTracks = []
 
@@ -398,7 +398,7 @@ async function handleRadio(
       if (!s.id) continue
       const track = mapTrack(s, group.reason)
       const titleLower = track.title.toLowerCase()
-      
+
       const isGarbage = badKeywords.some(b => titleLower.includes(b))
       if (isGarbage) continue
 
@@ -422,31 +422,31 @@ async function handleRadio(
   // Final shuffle of the batch
   for (let i = validTracks.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
+      ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
   }
-  
+
   if (validTracks.length === 0) {
     // Ultimate fallback if filtered out everything
     return { tracks: [] }
   }
-  
+
   return { tracks: validTracks.slice(0, 10) }
 }
 
 async function handleHomeFeed(
-  recentArtistsStr: string, 
+  recentArtistsStr: string,
   favArtistsStr: string,
   favSongsStr: string,
   likedTracksStr: string
 ): Promise<unknown> {
   try {
     let recentArtists: string[] = []
-    try { recentArtists = JSON.parse(recentArtistsStr) } catch {}
-    
+    try { recentArtists = JSON.parse(recentArtistsStr) } catch { }
+
     const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
     const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
     let likedTracks: string[] = []
-    try { likedTracks = JSON.parse(likedTracksStr) } catch {}
+    try { likedTracks = JSON.parse(likedTracksStr) } catch { }
 
     // Build a candidate pool
     const searches: { promise: Promise<any>, reason: string }[] = []
@@ -454,13 +454,13 @@ async function handleHomeFeed(
     // 1. Pick a random liked track as seed
     if (likedTracks.length > 0) {
       const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
-      searches.push({ 
+      searches.push({
         promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '5', p: '1' })
           .then(async (res) => {
-             if (res?.results?.[0]?.id) {
-               return await fetchNativeRecommendations(res.results[0].id)
-             }
-             return res.results || []
+            if (res?.results?.[0]?.id) {
+              return await fetchNativeRecommendations(res.results[0].id)
+            }
+            return res.results || []
           })
           .catch(() => []),
         reason: `Because you liked ${randomLikedTrack}`
@@ -470,12 +470,12 @@ async function handleHomeFeed(
     // 2. Pick a random recent artist
     if (recentArtists.length > 0) {
       const randomRecent = recentArtists[Math.floor(Math.random() * recentArtists.length)]
-      searches.push({ 
-        promise: saavnFetch({ __call: 'search.getResults', q: `${randomRecent} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []), 
-        reason: `Based on your recent listening: ${randomRecent}` 
+      searches.push({
+        promise: saavnFetch({ __call: 'search.getResults', q: `${randomRecent} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        reason: `Based on your recent listening: ${randomRecent}`
       })
     }
-    
+
     // 3. Pick random fav artist
     if (favArtists.length > 0) {
       const a = favArtists[Math.floor(Math.random() * favArtists.length)]
@@ -491,16 +491,16 @@ async function handleHomeFeed(
       searches.push({
         promise: saavnFetch({ __call: 'search.getResults', q: s, n: '5', p: '1' })
           .then(async (res) => {
-             if (res?.results?.[0]?.id) {
-               return await fetchNativeRecommendations(res.results[0].id)
-             }
-             return res.results || []
+            if (res?.results?.[0]?.id) {
+              return await fetchNativeRecommendations(res.results[0].id)
+            }
+            return res.results || []
           })
           .catch(() => []),
         reason: `Because you love ${s}`
       })
     }
-    
+
     const resultsWithReason = await Promise.all(
       searches.map(async (s) => {
         const results = await s.promise
@@ -511,7 +511,7 @@ async function handleHomeFeed(
     const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
     const seenTracks = new Set<string>()
     const tracks = []
-    
+
     for (const group of resultsWithReason) {
       for (const s of group.results) {
         if (!s.id) continue
@@ -532,7 +532,7 @@ async function handleHomeFeed(
     // Shuffle for variety
     for (let i = tracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+        ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
 
     return { tracks: tracks.slice(0, 20) }
@@ -626,34 +626,34 @@ export default {
         if (!env.CLOUDINARY_API_SECRET) {
           return json({ error: 'Missing CLOUDINARY_API_SECRET in worker' }, 500, origin, env)
         }
-        
+
         try {
           const body = await request.json() as Record<string, string>
           const timestamp = Math.round(new Date().getTime() / 1000).toString()
-          
+
           // Generate signature based on params
           // Cloudinary requires alphabetically sorted params joined by '&'
           const paramsToSign = {
             timestamp,
             ...body // Any other params passed from frontend (e.g. folder, public_id)
           }
-          
+
           const sortedKeys = Object.keys(paramsToSign).sort()
           const signString = sortedKeys.map(k => `${k}=${paramsToSign[k as keyof typeof paramsToSign]}`).join('&')
-          
+
           const encoder = new TextEncoder()
           const data = encoder.encode(signString + env.CLOUDINARY_API_SECRET)
           const hashBuffer = await crypto.subtle.digest('SHA-1', data)
           const hashArray = Array.from(new Uint8Array(hashBuffer))
           const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-          
+
           return json({ signature, timestamp }, 200, origin, env)
         } catch (e) {
           return json({ error: 'Invalid JSON payload' }, 400, origin, env)
         }
       }
 
-      // Add POST to method check for /sign-upload
+      // Added POST to method check for /sign-upload
       if (request.method !== 'GET' && path !== '/sign-upload') {
         return json({ error: 'Method not allowed' }, 405, origin, env)
       }

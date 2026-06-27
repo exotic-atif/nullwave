@@ -1,14 +1,34 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useSearchParams } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { MobileNavBar } from './MobileNavBar'
 import { Player } from '../player/Player'
-import { useState } from 'react'
-import { usePlayerStore } from '@/store'
+import { useState, useEffect } from 'react'
+import { usePlayerStore, useQueueStore } from '@/store'
+import { api } from '@/lib/api'
+import { toast } from 'sonner'
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const currentTrack = usePlayerStore((s) => s.currentTrack)
+  const setTrack = usePlayerStore((s) => s.setTrack)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    const playId = searchParams.get('play')
+    if (playId) {
+      searchParams.delete('play')
+      setSearchParams(searchParams, { replace: true })
+
+      api.track(playId).then(track => {
+        useQueueStore.getState().setQueue([track])
+        setTrack(track)
+        toast.success(`Playing shared song: ${track.title}`)
+      }).catch(() => {
+        toast.error("Failed to load shared song")
+      })
+    }
+  }, [searchParams, setSearchParams, setTrack])
 
   return (
     <div className="h-screen flex bg-nw-black overflow-hidden">

@@ -50,8 +50,9 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
   }
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/search?q=${encodeURIComponent(track.title + ' ' + track.artist)}`
-    const text = `Listen to ${track.title} by ${track.artist} on NullWave!`
+    const shareUrl = `${window.location.origin}/?play=${track.id}`
+    const text = `Listen to ${track.title} by ${track.artist} on NullWave`
+    
     try {
       if (navigator.share) {
         await navigator.share({ title: `${track.title} — ${track.artist}`, text, url: shareUrl })
@@ -59,7 +60,7 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
         await navigator.clipboard.writeText(`${text}\n${shareUrl}`)
         toast.success('Link copied to clipboard!')
       }
-    } catch {
+    } catch (error) {
       // User cancelled share dialog
     }
   }
