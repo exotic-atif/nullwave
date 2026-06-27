@@ -255,7 +255,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, duration: 0.4 }}
-                className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full md:w-auto scale-90' : 'w-full scale-100'}`}
+                className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'hidden md:flex w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
                 <div className={`relative ${showLyrics ? 'w-[40vh] h-[40vh]' : 'w-full max-w-[35vh] md:max-w-[45vh] lg:max-w-[50vh] aspect-square'} flex-shrink-0 transition-all duration-500`}>
                   {/* Audio Visualizer Canvas */}
@@ -475,39 +475,44 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                     )}
                   </div>
                   
-                  {/* Mobile Lyrics Playback Controls */}
-                  <div className="md:hidden absolute bottom-8 left-0 right-0 z-50 flex items-center justify-center gap-8 pb-[env(safe-area-inset-bottom)]">
-                    <button onClick={handlePrevious} className="p-3 text-white hover:text-nw-accent transition-colors drop-shadow-lg">
-                      <SkipBack size={28} fill="currentColor" />
-                    </button>
-                    <button
-                      onClick={togglePlay}
-                      className="w-16 h-16 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer shadow-lg shadow-nw-accent/20"
-                    >
-                      {isPlaying ? (
-                        <Pause size={28} className="text-nw-black" fill="currentColor" />
-                      ) : (
-                        <Play size={28} className="text-nw-black ml-1" fill="currentColor" />
-                      )}
-                    </button>
-                    <button onClick={handleNext} className="p-3 text-white hover:text-nw-accent transition-colors drop-shadow-lg">
-                      <SkipForward size={28} fill="currentColor" />
-                    </button>
-                  </div>
+                  {/* Mobile Lyrics Controls have been moved outside the flex container to pin them at the bottom */}
                 </motion.div>
               )}
             </div>
             
-            {/* Mobile Controls when Lyrics are shown (Fixed at bottom) */}
+            {/* Mobile Controls & Track Info when Lyrics are shown (Fixed at bottom) */}
             {showLyrics && (
-               <div className="md:hidden absolute bottom-6 left-0 right-0 px-6 z-50">
-                  <div className="flex items-center justify-between bg-black/40 backdrop-blur-xl p-4 rounded-3xl border border-white/10">
-                     <button onClick={togglePlay} className="p-3 bg-white text-black rounded-full shadow-lg">
-                       {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-                     </button>
-                     <div className="flex gap-4">
-                        <button onClick={handlePrevious} className="p-2 text-white/70 hover:text-white"><SkipBack size={24} fill="currentColor" /></button>
-                        <button onClick={handleNext} className="p-2 text-white/70 hover:text-white"><SkipForward size={24} fill="currentColor" /></button>
+               <div className="md:hidden absolute bottom-6 left-0 right-0 px-6 z-50 pb-[env(safe-area-inset-bottom)]">
+                  <div className="flex flex-col gap-4 bg-black/40 backdrop-blur-2xl p-5 rounded-[2rem] border border-white/10 shadow-2xl">
+                     <div className="flex items-center justify-between">
+                       <div className="min-w-0 pr-4">
+                         <h3 className="font-display font-bold text-lg text-white truncate">{track.title}</h3>
+                         <p className="text-sm text-white/70 truncate">{track.artist}</p>
+                       </div>
+                       <div className="flex items-center gap-1">
+                         {toggleLike && (
+                           <button onClick={toggleLike} className="p-2 text-white/70 hover:text-white transition-colors">
+                             <Heart size={22} fill={isLiked ? '#ec4899' : 'none'} color={isLiked ? '#ec4899' : 'currentColor'} />
+                           </button>
+                         )}
+                         <button onClick={(e) => {
+                             e.stopPropagation()
+                             useQueueStore.getState().addDislikedTrack(track)
+                             onNext()
+                             toast.success("We won't suggest this song again")
+                         }} className="p-2 text-white/70 hover:text-nw-danger transition-colors">
+                           <ThumbsDown size={22} />
+                         </button>
+                       </div>
+                     </div>
+                     <div className="flex items-center justify-between">
+                       <button onClick={togglePlay} className="w-14 h-14 flex items-center justify-center bg-white text-black rounded-full shadow-lg hover:scale-105 active:scale-95 transition-transform">
+                         {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                       </button>
+                       <div className="flex gap-4 items-center">
+                          <button onClick={handlePrevious} className="p-3 text-white/70 hover:text-white transition-colors"><SkipBack size={28} fill="currentColor" /></button>
+                          <button onClick={handleNext} className="p-3 text-white/70 hover:text-white transition-colors"><SkipForward size={28} fill="currentColor" /></button>
+                       </div>
                      </div>
                   </div>
                </div>

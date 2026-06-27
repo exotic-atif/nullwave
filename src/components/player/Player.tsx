@@ -359,14 +359,7 @@ export function Player() {
         onNext={performNextTrack}
         onPrevious={handlePrevious}
         isLiked={isLiked(currentTrack.id)}
-        toggleLike={() => {
-          if (user) {
-            toggleLike(user.id, currentTrack)
-            toast.success(isLiked(currentTrack.id) ? 'Removed from liked songs' : 'Added to liked songs')
-          } else {
-            toast.error('Please log in to like songs')
-          }
-        }}
+        toggleLike={handleLike}
       />
 
       <AnimatePresence>
