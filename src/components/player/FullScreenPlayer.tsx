@@ -1,7 +1,9 @@
 import type { Track } from '@/types'
 import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2, Heart } from 'lucide-react'
+import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2, Heart, ThumbsDown } from 'lucide-react'
+import { toast } from 'sonner'
+import { useQueueStore } from '@/store'
 import { AlbumArt } from '../ui/AlbumArt'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePlayerStore } from '@/store'
@@ -198,6 +200,19 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
               <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-nw-accent-glow/[0.04] blur-[120px]" />
             </div>
 
+            {/* Mobile Lyrics Blurred Background */}
+            {showLyrics && (
+              <div className="absolute inset-0 md:hidden z-0 overflow-hidden bg-nw-black pointer-events-none">
+                <motion.img 
+                  src={track.coverUrl}
+                  className="absolute inset-[-50%] w-[200%] h-[200%] object-cover blur-[60px] opacity-30 mix-blend-screen"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                />
+                <div className="absolute inset-0 bg-nw-black/50" />
+              </div>
+            )}
+
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between px-5 md:px-8 pt-5 pb-3">
               <button
@@ -242,7 +257,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                 transition={{ delay: 0.1, duration: 0.4 }}
                 className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
-                <div className={`relative ${showLyrics ? 'w-[40vh] h-[40vh]' : 'w-[min(100%,50vh)] h-[min(100vw,50vh)] md:w-[50vh] md:h-[50vh]'} flex-shrink-0 transition-all duration-500`}>
+                <div className={`relative ${showLyrics ? 'w-[40vh] h-[40vh]' : 'w-full max-w-[35vh] md:max-w-[45vh] lg:max-w-[50vh] aspect-square'} flex-shrink-0 transition-all duration-500`}>
                   {/* Audio Visualizer Canvas */}
                   {!showLyrics && (
                     <canvas
@@ -289,25 +304,40 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                       </div>
                     )}
                   </div>
-                  {toggleLike && (
-                    <button
-                      onClick={toggleLike}
-                      className="p-3 text-nw-text-tertiary hover:text-white hover:bg-white/5 rounded-full transition-colors group flex-shrink-0"
-                    >
-                      <motion.div
-                        whileTap={{ scale: 0.8 }}
-                        animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
-                        transition={{ duration: 0.3 }}
+                  <div className="flex items-center gap-1">
+                    {toggleLike && (
+                      <button
+                        onClick={toggleLike}
+                        className="p-3 text-nw-text-tertiary hover:text-white hover:bg-white/5 rounded-full transition-colors group flex-shrink-0"
+                        title={isLiked ? "Unlike" : "Like"}
                       >
-                        <Heart 
-                          size={28} 
-                          fill={isLiked ? '#ec4899' : 'none'} 
-                          color={isLiked ? '#ec4899' : 'currentColor'} 
-                          className="transition-transform group-hover:scale-110 group-active:scale-95"
-                        />
-                      </motion.div>
+                        <motion.div
+                          whileTap={{ scale: 0.8 }}
+                          animate={isLiked ? { scale: [1, 1.2, 1] } : {}}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <Heart 
+                            size={28} 
+                            fill={isLiked ? '#ec4899' : 'none'} 
+                            color={isLiked ? '#ec4899' : 'currentColor'} 
+                            className="transition-transform group-hover:scale-110 group-active:scale-95"
+                          />
+                        </motion.div>
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        useQueueStore.getState().addDislikedTrack(track.id)
+                        onNext()
+                        toast.success("We won't suggest this song again")
+                      }}
+                      className="p-3 text-nw-text-tertiary hover:text-nw-danger hover:bg-white/5 rounded-full transition-colors group flex-shrink-0"
+                      title="Not for me"
+                    >
+                      <ThumbsDown size={24} className="transition-transform group-hover:scale-110 group-active:scale-95" />
                     </button>
-                  )}
+                  </div>
                 </div>
 
                 {/* Scrubber & Controls (Only show here if NOT in lyrics mode OR on desktop) */}
@@ -443,6 +473,26 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                         })}
                       </div>
                     )}
+                  </div>
+                  
+                  {/* Mobile Lyrics Playback Controls */}
+                  <div className="md:hidden absolute bottom-8 left-0 right-0 z-50 flex items-center justify-center gap-8 pb-[env(safe-area-inset-bottom)]">
+                    <button onClick={handlePrevious} className="p-3 text-white hover:text-nw-accent transition-colors drop-shadow-lg">
+                      <SkipBack size={28} fill="currentColor" />
+                    </button>
+                    <button
+                      onClick={togglePlay}
+                      className="w-16 h-16 bg-nw-text rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-150 cursor-pointer shadow-lg shadow-nw-accent/20"
+                    >
+                      {isPlaying ? (
+                        <Pause size={28} className="text-nw-black" fill="currentColor" />
+                      ) : (
+                        <Play size={28} className="text-nw-black ml-1" fill="currentColor" />
+                      )}
+                    </button>
+                    <button onClick={handleNext} className="p-3 text-white hover:text-nw-accent transition-colors drop-shadow-lg">
+                      <SkipForward size={28} fill="currentColor" />
+                    </button>
                   </div>
                 </motion.div>
               )}

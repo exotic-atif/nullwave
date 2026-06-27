@@ -111,7 +111,7 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
       label: 'Not for me',
       icon: <ThumbsDown size={14} />,
       onClick: () => {
-        addDislikedTrack(track.id)
+        addDislikedTrack(track)
         if (isActive) {
           usePlayerStore.getState().play() 
         }
@@ -205,6 +205,7 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
               "transition-all duration-200",
               liked ? "opacity-100" : "opacity-0 group-hover:opacity-100 text-nw-text-secondary hover:text-white"
             )}
+            title={liked ? "Unlike" : "Like"}
           >
             <motion.div
               whileTap={{ scale: 0.8 }}
@@ -213,6 +214,21 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
             >
               <Heart size={16} fill={liked ? '#ec4899' : 'none'} color={liked ? '#ec4899' : 'currentColor'} />
             </motion.div>
+          </button>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              addDislikedTrack(track)
+              if (isActive) {
+                usePlayerStore.getState().playNext()
+              }
+              toast.success("We won't suggest this song again")
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-nw-text-secondary hover:text-nw-danger p-1"
+            title="Not for me"
+          >
+            <ThumbsDown size={14} />
           </button>
           <span className="text-xs tabular-nums text-nw-text-tertiary w-8 text-right hidden sm:block">
             {formatDuration(track.duration)}

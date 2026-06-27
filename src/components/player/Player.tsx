@@ -18,6 +18,7 @@ import {
   Repeat,
   Repeat1,
   ListMusic,
+  ThumbsDown,
   Mic2,
   Heart,
   Loader2,
@@ -421,20 +422,35 @@ export function Player() {
                     </p>
                   )}
                 </div>
-                <IconButton
-                  size="sm"
-                  active={liked}
-                  onClick={handleLike}
-                  className="flex"
-                >
-                  <motion.div
-                    whileTap={{ scale: 0.8 }}
-                    animate={liked ? { scale: [1, 1.2, 1] } : {}}
-                    transition={{ duration: 0.3 }}
+                <div className="flex items-center gap-0.5">
+                  <IconButton
+                    size="sm"
+                    active={liked}
+                    onClick={handleLike}
+                    className="flex"
                   >
-                    <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-                  </motion.div>
-                </IconButton>
+                    <motion.div
+                      whileTap={{ scale: 0.8 }}
+                      animate={liked ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+                    </motion.div>
+                  </IconButton>
+                  <IconButton
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      useQueueStore.getState().addDislikedTrack(currentTrack.id)
+                      performNextTrack()
+                      toast.success("We won't suggest this song again")
+                    }}
+                    className="flex hover:!text-nw-danger"
+                    title="Not for me"
+                  >
+                    <ThumbsDown size={14} />
+                  </IconButton>
+                </div>
               </div>
               
               {/* Mobile Play Controls */}

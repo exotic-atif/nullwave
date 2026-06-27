@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut, Heart } from 'lucide-react'
+import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut, Heart, ThumbsDown, X } from 'lucide-react'
 import { updateProfileName, updateProfileAvatar, updateProfileFavs } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
-import { useAuthStore, useThemeStore } from '@/store'
+import { TrackRow } from '@/components/ui/TrackRow'
+import { useAuthStore, useThemeStore, useQueueStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 
 export function YouPage() {
   const { user, setUser, logout } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
+  const { dislikedTracks, removeDislikedTrack } = useQueueStore()
   const navigate = useNavigate()
 
   const [displayName, setDisplayName] = useState(user?.displayName || '')
@@ -354,6 +356,41 @@ export function YouPage() {
         </form>
       </motion.section>
 
+      {/* Disliked Songs */}
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="space-y-4"
+      >
+        <h3 className="text-sm font-semibold text-nw-text uppercase tracking-wider flex items-center gap-2">
+          <ThumbsDown size={16} className="text-nw-text-tertiary" />
+          Disliked Songs
+        </h3>
+        <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-1">
+          {dislikedTracks.length === 0 ? (
+            <p className="text-sm text-nw-text-tertiary text-center py-4">
+              You haven't disliked any songs yet.
+            </p>
+          ) : (
+            <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1 pr-2">
+              {dislikedTracks.map((track) => (
+                <div key={track.id} className="group relative">
+                  <TrackRow track={track} className="pr-12 bg-nw-surface/20" />
+                  <button
+                    onClick={() => removeDislikedTrack(track.id)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-nw-text-tertiary hover:text-white hover:bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
+                    title="Remove from Dislikes"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.section>
+
       {/* Password Settings */}
       <motion.section
         initial={{ opacity: 0, y: 8 }}
@@ -521,7 +558,7 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.2.7</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.2.8</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>

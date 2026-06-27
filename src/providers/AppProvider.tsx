@@ -3,7 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from '@/routes'
 import { useThemeInit } from '@/hooks/useThemeInit'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useAuthStore, useLikedStore } from '@/store'
+import { useAuthStore, useLikedStore, useQueueStore } from '@/store'
 import { Toaster } from 'sonner'
 
 export function AppProvider() {
@@ -13,6 +13,7 @@ export function AppProvider() {
   const init = useAuthStore((s) => s.init)
   const user = useAuthStore((s) => s.user)
   const fetchLiked = useLikedStore((s) => s.fetchLiked)
+  const fetchDislikedTracks = useQueueStore((s) => s.fetchDislikedTracks)
 
   // Restore auth session on mount
   useEffect(() => {
@@ -23,8 +24,9 @@ export function AppProvider() {
   useEffect(() => {
     if (user?.id) {
       fetchLiked(user.id)
+      fetchDislikedTracks(user.id)
     }
-  }, [user?.id, fetchLiked])
+  }, [user?.id, fetchLiked, fetchDislikedTracks])
 
   return (
     <>

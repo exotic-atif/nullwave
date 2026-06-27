@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Clock, Disc3, Heart } from 'lucide-react'
+import { Clock, Disc3, Heart, X } from 'lucide-react'
 import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { TrackRowSkeleton } from '@/components/ui/Skeleton'
-import { useAuthStore, useLikedStore } from '@/store'
+import { useAuthStore, useLikedStore, useQueueStore } from '@/store'
 import { fetchPlayHistory, clearPlayHistory, getUserPlaylists } from '@/lib/supabase'
 import type { Track, Playlist } from '@/types'
 import { motion } from 'framer-motion'
@@ -142,7 +142,19 @@ export function LibraryPage() {
             ) : history.length > 0 ? (
               <div className="space-y-0.5">
                 {history.map((track, i) => (
-                  <TrackRow key={`hist-${track.id}-${i}`} track={track} index={i + 1} showIndex />
+                  <div key={`hist-${track.id}-${i}`} className="group relative">
+                    <TrackRow track={track} index={i + 1} showIndex className="pr-12" />
+                    <button
+                      onClick={() => {
+                        useQueueStore.getState().removeFromHistory(track.id)
+                        setHistory(prev => prev.filter(t => t.id !== track.id))
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-nw-text-tertiary hover:text-white hover:bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
+                      title="Remove from History"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (

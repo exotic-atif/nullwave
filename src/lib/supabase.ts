@@ -181,6 +181,47 @@ export async function clearPlayHistory(userId: string) {
   if (error) console.error('Failed to clear history:', error.message)
 }
 
+export async function removePlayHistoryItem(userId: string, trackId: string) {
+  const { error } = await supabase
+    .from('play_history')
+    .delete()
+    .eq('user_id', userId)
+    .eq('track_id', trackId)
+  if (error) console.error('Failed to remove history item:', error.message)
+}
+
+// ===== DISLIKED SONGS =====
+
+export async function addDislikedSong(userId: string, track: Track) {
+  const { error } = await supabase
+    .from('disliked_songs')
+    .insert({ user_id: userId, track_id: track.id, track_data: track })
+  if (error) console.error('Failed to add disliked song:', error.message)
+}
+
+export async function removeDislikedSong(userId: string, trackId: string) {
+  const { error } = await supabase
+    .from('disliked_songs')
+    .delete()
+    .eq('user_id', userId)
+    .eq('track_id', trackId)
+  if (error) console.error('Failed to remove disliked song:', error.message)
+}
+
+export async function fetchDislikedSongs(userId: string): Promise<Track[]> {
+  const { data, error } = await supabase
+    .from('disliked_songs')
+    .select('track_data')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Failed to fetch disliked songs:', error.message)
+    return []
+  }
+  return data.map(row => row.track_data as Track)
+}
+
 // ===== PLAYLISTS =====
 
 export async function createPlaylist(userId: string, name: string) {

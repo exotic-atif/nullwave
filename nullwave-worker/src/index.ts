@@ -88,107 +88,14 @@ function mapTrack(s: any, suggestionReason?: string) {
   }
 }
 
-// ===== MATHEMATICAL RECOMMENDATION ENGINE =====
-function xmur3(str: string) {
-  let h = 1779033703 ^ str.length;
-  for (let i = 0; i < str.length; i++) {
-    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-    h = h << 13 | h >>> 19;
-  }
-  return function() {
-    h = Math.imul(h ^ (h >>> 16), 2246822507);
-    h = Math.imul(h ^ (h >>> 13), 3266489909);
-    return (h ^= h >>> 16) >>> 0;
-  }
-}
-
-function sfc32(a: number, b: number, c: number, d: number) {
-  return function() {
-    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; 
-    let t = (a + b) | 0;
-    a = b ^ b >>> 9;
-    b = c + (c << 3) | 0;
-    c = (c << 21 | c >>> 11);
-    d = d + 1 | 0;
-    t = t + d | 0;
-    c = c + t | 0;
-    return (t >>> 0) / 4294967296;
-  }
-}
-
-function generateTrackVector(title: string, artist: string): number[] {
-  const seed = xmur3(`${title.toLowerCase().trim()}-${artist.toLowerCase().trim()}`);
-  const rand = sfc32(seed(), seed(), seed(), seed());
-  return [rand(), rand(), rand(), rand(), rand()];
-}
-
-function cosineSimilarity(A: number[], B: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < A.length; i++) {
-    dotProduct += A[i] * B[i];
-    normA += A[i] * A[i];
-    normB += B[i] * B[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-function computeSeedVector(likedTracksStr: string): number[] {
-  let likedTracks: string[] = []
+// ===== NATIVE RECOMMENDATION ENGINE =====
+async function fetchNativeRecommendations(songId: string): Promise<any[]> {
   try {
-    likedTracks = JSON.parse(likedTracksStr)
-  } catch {}
-
-  if (!Array.isArray(likedTracks) || likedTracks.length === 0) {
-    return [0.5, 0.5, 0.5, 0.5, 0.5] // Baseline
+    const res = await saavnFetch({ __call: 'reco.getreco', pid: songId })
+    return Array.isArray(res) ? res : []
+  } catch {
+    return []
   }
-
-  const sums = [0, 0, 0, 0, 0]
-  for (const trackName of likedTracks) {
-    const vec = generateTrackVector(trackName, '')
-    for (let i = 0; i < 5; i++) sums[i] += vec[i]
-  }
-  
-  return sums.map(s => s / likedTracks.length)
-}
-
-function applyRecommendationEngine(tracks: any[], likedTracksStr: string): any[] {
-  const U_v = computeSeedVector(likedTracksStr)
-
-  // Stage 3: Score candidates
-  const scoredTracks = tracks.map(track => {
-    const candidateVec = generateTrackVector(track.title, track.artist)
-    const score = cosineSimilarity(U_v, candidateVec)
-    return { ...track, score }
-  })
-
-  // Stage 4: De-Duplication, Diversity Re-Ranking & Selection
-  scoredTracks.sort((a, b) => b.score - a.score)
-
-  // Diversity filter
-  const topArtists = scoredTracks.slice(0, 5).map(t => t.artist)
-  for (let i = 5; i < scoredTracks.length; i++) {
-    if (topArtists.includes(scoredTracks[i].artist)) {
-      scoredTracks[i].score -= 0.15 // 15% penalty
-    }
-  }
-
-  // Re-sort after penalty
-  scoredTracks.sort((a, b) => b.score - a.score)
-
-  // Top 10 tracks
-  return scoredTracks.slice(0, 10).map(t => {
-    const pct = Math.min(99, Math.max(1, Math.round(t.score * 100)))
-    const { score, ...cleanTrack } = t
-    return {
-      ...cleanTrack,
-      suggestionReason: cleanTrack.suggestionReason 
-        ? `${pct}% Match • ${cleanTrack.suggestionReason}` 
-        : `${pct}% Match to your taste profile`
-    }
-  })
 }
 
 // ===== LRCLIB TYPES =====
@@ -436,18 +343,30 @@ async function handleRadio(
   const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
   const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
 
-  // Fetch songs by artist and potentially a related genre search
-  const searches: { promise: Promise<any>, reason: string }[] = [
-    { promise: saavnFetch({ __call: 'search.getResults', q: artistId, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Because you listened to ${artistId}` },
-    { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '20', p: '1' }).catch(() => ({ results: [] })), reason: `Popular hits similar to ${artistId}` },
-    { promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} similar`, n: '15', p: '1' }).catch(() => ({ results: [] })), reason: `Similar vibe to ${artistId}` }
-  ]
+  // Try to find a good seed song for reco.getreco
+  let seedSongId = ''
+  
+  // Try to get a seed song from the artist
+  try {
+    const topSongRes = await saavnFetch({ __call: 'search.getResults', q: artistId, n: '5', p: '1' })
+    if (topSongRes && topSongRes.results && topSongRes.results.length > 0) {
+      seedSongId = topSongRes.results[0].id
+    }
+  } catch {}
+
+  const searches: { promise: Promise<any>, reason: string }[] = []
+  
+  if (seedSongId) {
+    searches.push({ promise: saavnFetch({ __call: 'reco.getreco', pid: seedSongId }).catch(() => []), reason: `Recommended based on ${artistId}` })
+  }
+  
+  searches.push({ promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []), reason: `Popular hits from ${artistId}` })
 
   // Add random fav artist search if available
   if (favArtists.length > 0) {
     const randomFavArtist = favArtists[Math.floor(Math.random() * favArtists.length)]
     searches.push({ 
-      promise: saavnFetch({ __call: 'search.getResults', q: randomFavArtist, n: '15', p: '1' }).catch(() => ({ results: [] })),
+      promise: saavnFetch({ __call: 'search.getResults', q: randomFavArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
       reason: `Because you like ${randomFavArtist}` 
     })
   }
@@ -456,15 +375,15 @@ async function handleRadio(
   if (favSongs.length > 0) {
     const randomFavSong = favSongs[Math.floor(Math.random() * favSongs.length)]
     searches.push({ 
-      promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '10', p: '1' }).catch(() => ({ results: [] })),
+      promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
       reason: `Because you like ${randomFavSong}` 
     })
   }
 
   const resultsWithReason = await Promise.all(
     searches.map(async (s) => {
-      const res = await s.promise
-      return { results: res.results || [], reason: s.reason }
+      const results = await s.promise
+      return { results: Array.isArray(results) ? results : [], reason: s.reason }
     })
   )
   
@@ -476,6 +395,7 @@ async function handleRadio(
 
   for (const group of resultsWithReason) {
     for (const s of group.results) {
+      if (!s.id) continue
       const track = mapTrack(s, group.reason)
       const titleLower = track.title.toLowerCase()
       
@@ -507,68 +427,77 @@ async function handleRadio(
   
   if (validTracks.length === 0) {
     // Ultimate fallback if filtered out everything
-    const randomFallback = resultsWithReason[0].results[0]
-    if (!randomFallback) throw new Error('No recommendations found')
-    validTracks.push(mapTrack(randomFallback, 'Fallback recommendation'))
+    return { tracks: [] }
   }
   
-  const top10 = applyRecommendationEngine(validTracks, likedTracksStr)
-  return { tracks: top10 }
+  return { tracks: validTracks.slice(0, 10) }
 }
 
 async function handleHomeFeed(
   recentArtistsStr: string, 
-  favArtistsStr: string, 
+  favArtistsStr: string,
   favSongsStr: string,
   likedTracksStr: string
 ): Promise<unknown> {
   try {
-    const recentArtists = JSON.parse(recentArtistsStr) as string[]
+    let recentArtists: string[] = []
+    try { recentArtists = JSON.parse(recentArtistsStr) } catch {}
+    
     const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
     const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
-    
-    let pool = [...recentArtists]
-    
-    if (pool.length === 0 && favArtists.length === 0 && favSongs.length === 0) {
-      return await handleTrending()
-    }
+    let likedTracks: string[] = []
+    try { likedTracks = JSON.parse(likedTracksStr) } catch {}
 
+    // Build a candidate pool
     const searches: { promise: Promise<any>, reason: string }[] = []
 
-    if (pool.length > 0) {
-      const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 2)
-      shuffled.forEach(a => {
-        searches.push({
-          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '10', p: '1' }).catch(() => ({ results: [] })),
-          reason: `Because you listened to ${a}`
-        })
+    // 1. Pick a random liked track as seed
+    if (likedTracks.length > 0) {
+      const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
+      searches.push({ 
+        promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '5', p: '1' })
+          .then(async (res) => {
+             if (res?.results?.[0]?.id) {
+               return await fetchNativeRecommendations(res.results[0].id)
+             }
+             return res.results || []
+          })
+          .catch(() => []),
+        reason: `Because you liked ${randomLikedTrack}`
       })
     }
 
+    // 2. Pick a random recent artist
+    if (recentArtists.length > 0) {
+      const randomRecent = recentArtists[Math.floor(Math.random() * recentArtists.length)]
+      searches.push({ 
+        promise: saavnFetch({ __call: 'search.getResults', q: `${randomRecent} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []), 
+        reason: `Based on your recent listening: ${randomRecent}` 
+      })
+    }
+    
+    // 3. Pick random fav artist
     if (favArtists.length > 0) {
-      const shuffledFavs = [...favArtists].sort(() => 0.5 - Math.random()).slice(0, 2)
-      shuffledFavs.forEach(a => {
-        searches.push({
-          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '10', p: '1' }).catch(() => ({ results: [] })),
-          reason: `Because you like ${a}`
-        })
+      const a = favArtists[Math.floor(Math.random() * favArtists.length)]
+      searches.push({
+        promise: saavnFetch({ __call: 'search.getResults', q: a, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        reason: `Because you like ${a}`
       })
     }
 
+    // 4. Pick random fav song
     if (favSongs.length > 0) {
-      const shuffledSongs = [...favSongs].sort(() => 0.5 - Math.random()).slice(0, 1)
-      shuffledSongs.forEach(s => {
-        searches.push({
-          promise: saavnFetch({ __call: 'search.getResults', q: s, n: '10', p: '1' }).catch(() => ({ results: [] })),
-          reason: `Based on your favorite song: ${s}`
-        })
+      const s = favSongs[Math.floor(Math.random() * favSongs.length)]
+      searches.push({
+        promise: saavnFetch({ __call: 'search.getResults', q: s, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        reason: `Based on your favorite song: ${s}`
       })
     }
     
     const resultsWithReason = await Promise.all(
       searches.map(async (s) => {
-        const res = await s.promise
-        return { results: res.results || [], reason: s.reason }
+        const results = await s.promise
+        return { results: Array.isArray(results) ? results : [], reason: s.reason }
       })
     )
 
@@ -578,6 +507,7 @@ async function handleHomeFeed(
     
     for (const group of resultsWithReason) {
       for (const s of group.results) {
+        if (!s.id) continue
         const track = mapTrack(s, group.reason)
         const titleLower = track.title.toLowerCase()
         if (badKeywords.some(b => titleLower.includes(b))) continue
@@ -589,14 +519,13 @@ async function handleHomeFeed(
       }
     }
 
-    // Shuffle final tracks
+    // Shuffle for variety
     for (let i = tracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
 
-    const top10 = applyRecommendationEngine(tracks, likedTracksStr)
-    return { tracks: top10 }
+    return { tracks: tracks.slice(0, 20) }
   } catch {
     return await handleTrending()
   }
