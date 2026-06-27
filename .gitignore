@@ -14,6 +14,7 @@ dist-ssr
 .env
 .dev.vars
 cookies.txt
+nullwave_recommendation_engine.txt
 
 # Editor directories and files
 .vscode/*

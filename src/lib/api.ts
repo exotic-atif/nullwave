@@ -123,24 +123,26 @@ export const api = {
   },
 
   /** Get personalized home feed */
-  async homeFeed(params: { recentArtists: string[]; favArtists: string; favSongs: string }): Promise<Track[]> {
+  async homeFeed(params: { recentArtists: string[]; favArtists: string; favSongs: string; likedTracks?: string[] }): Promise<Track[]> {
     const query = new URLSearchParams({
       history: JSON.stringify(params.recentArtists),
       favArtists: params.favArtists,
       favSongs: params.favSongs,
+      likedTracks: JSON.stringify(params.likedTracks || []),
     })
     const data = await request<{ tracks: Track[] }>(`/home-feed?${query.toString()}`)
     return data.tracks
   },
 
   /** Get a smart infinite radio queue */
-  async radio(params: { artist: string; historyTitles: string[]; favArtists: string; favSongs: string; excludeIds?: string[] }): Promise<Track[]> {
+  async radio(params: { artist: string; historyTitles: string[]; favArtists: string; favSongs: string; excludeIds?: string[]; likedTracks?: string[] }): Promise<Track[]> {
     const query = new URLSearchParams({
       artist: params.artist,
       history: JSON.stringify(params.historyTitles),
       favArtists: params.favArtists,
       favSongs: params.favSongs,
       excludeIds: JSON.stringify(params.excludeIds || []),
+      likedTracks: JSON.stringify(params.likedTracks || []),
     })
     const data = await request<{ tracks: Track[] }>(`/radio?${query.toString()}`)
     return data.tracks

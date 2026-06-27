@@ -278,6 +278,7 @@ export function Player() {
       const historyTitles = useQueueStore.getState().history.map(t => t.title)
       const dislikedTracks = useQueueStore.getState().dislikedTracks
       const { user } = useAuthStore.getState()
+      const likedTracks = useLikedStore.getState().likedTracks.map(t => t.title)
       
       // If we are at the end of a queue/playlist, seed the radio
       api.radio({
@@ -285,7 +286,8 @@ export function Player() {
         historyTitles,
         favArtists: user?.favArtists || '',
         favSongs: user?.favSongs || '',
-        excludeIds: dislikedTracks
+        excludeIds: dislikedTracks,
+        likedTracks
       }).then((tracks) => {
         if (tracks.length > 0) {
           // Just play the first one, don't populate the queue to keep it 1 song per session

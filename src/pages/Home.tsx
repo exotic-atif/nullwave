@@ -5,12 +5,11 @@ import { ArtistCard } from '@/components/music/ArtistCard'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRowSkeleton, AlbumCardSkeleton, ArtistCardSkeleton } from '@/components/ui/Skeleton'
-import { usePlayerStore, useQueueStore } from '@/store'
+import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
 import { api } from '@/lib/api'
 import type { Track, Album, Artist } from '@/types'
 import { motion } from 'framer-motion'
 import { Play, Sparkles, Search as SearchIcon } from 'lucide-react'
-import { useAuthStore } from '@/store/authStore'
 import { fetchPlayHistory } from '@/lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
@@ -19,6 +18,7 @@ export function HomePage() {
   const addMultipleToQueue = useQueueStore((s) => s.addMultipleToQueue)
   const queueHistory = useQueueStore((s) => s.history)
   const user = useAuthStore((s) => s.user)
+  const likedTracks = useLikedStore((s) => s.likedTracks)
   const navigate = useNavigate()
   
   const [tracks, setTracks] = useState<Track[]>([])
@@ -49,6 +49,7 @@ export function HomePage() {
           recentArtists: artists,
           favArtists: user?.favArtists || '',
           favSongs: user?.favSongs || '',
+          likedTracks: likedTracks.map(t => t.title),
         })
         
         if (!cancelled) {
