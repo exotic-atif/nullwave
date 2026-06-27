@@ -70,8 +70,7 @@ export function HomePage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      navigate('/search')
-      // Hack: we don't have a global search state, so we just navigate. The user will type again. Wait, or we can use localstorage for recent searches. But navigating is fine for now.
+      navigate('/search?q=' + encodeURIComponent(searchQuery.trim()))
     }
   }
 

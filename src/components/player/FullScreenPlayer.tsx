@@ -242,7 +242,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                 transition={{ delay: 0.1, duration: 0.4 }}
                 className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
-                <div className="relative">
+                <div className={`relative ${showLyrics ? 'w-[40vh] h-[40vh]' : 'w-[min(100%,50vh)] h-[min(100vw,50vh)] md:w-[50vh] md:h-[50vh]'} flex-shrink-0 transition-all duration-500`}>
                   {/* Audio Visualizer Canvas */}
                   {!showLyrics && (
                     <canvas
@@ -265,9 +265,9 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                     size="hero"
                     rounded="2xl"
                     showShadow
-                    className={`relative z-10 transition-all duration-500 shadow-2xl shadow-black/50 ${showLyrics ? 'max-w-[40vh] max-h-[40vh]' : 'max-w-[50vh] max-h-[50vh]'} w-full h-auto object-contain aspect-square`}
+                    className="w-full h-full"
                   />
-                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10" />
+                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10 pointer-events-none" />
                 </div>
 
                 <div className="mt-8 w-full max-w-[320px] flex items-center justify-between">
