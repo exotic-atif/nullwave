@@ -277,7 +277,7 @@ export function Player() {
     } else if (current) {
       // Infinite Autoplay fallback using improved supercool API radio
       const historyTitles = useQueueStore.getState().history.map(t => t.title)
-      const dislikedTracks = useQueueStore.getState().dislikedTracks
+      const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
       const { user } = useAuthStore.getState()
       const likedTracks = useLikedStore.getState().likedTracks.map(t => t.title)
       
@@ -441,7 +441,7 @@ export function Player() {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      useQueueStore.getState().addDislikedTrack(currentTrack.id)
+                      useQueueStore.getState().addDislikedTrack(currentTrack)
                       performNextTrack()
                       toast.success("We won't suggest this song again")
                     }}

@@ -221,7 +221,12 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
               e.stopPropagation()
               addDislikedTrack(track)
               if (isActive) {
-                usePlayerStore.getState().playNext()
+                const next = useQueueStore.getState().playNext()
+                if (next) {
+                  usePlayerStore.getState().setTrack(next)
+                } else {
+                  usePlayerStore.setState({ isPlaying: false, progress: 0 })
+                }
               }
               toast.success("We won't suggest this song again")
             }}

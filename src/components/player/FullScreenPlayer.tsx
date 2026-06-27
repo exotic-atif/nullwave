@@ -328,7 +328,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        useQueueStore.getState().addDislikedTrack(track.id)
+                        useQueueStore.getState().addDislikedTrack(track)
                         onNext()
                         toast.success("We won't suggest this song again")
                       }}
