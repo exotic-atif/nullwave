@@ -471,7 +471,14 @@ async function handleHomeFeed(
     if (recentArtists.length > 0) {
       const randomRecent = recentArtists[Math.floor(Math.random() * recentArtists.length)]
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: `${randomRecent} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: randomRecent, n: '5', p: '1' })
+          .then(async (res) => {
+            if (res?.results?.[0]?.id) {
+              return await fetchNativeRecommendations(res.results[0].id)
+            }
+            return res.results || []
+          })
+          .catch(() => []),
         reason: `Based on your recent listening: ${randomRecent}`
       })
     }
@@ -480,7 +487,14 @@ async function handleHomeFeed(
     if (favArtists.length > 0) {
       const a = favArtists[Math.floor(Math.random() * favArtists.length)]
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: a, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: a, n: '5', p: '1' })
+          .then(async (res) => {
+            if (res?.results?.[0]?.id) {
+              return await fetchNativeRecommendations(res.results[0].id)
+            }
+            return res.results || []
+          })
+          .catch(() => []),
         reason: `Because you like ${a}`
       })
     }
@@ -533,6 +547,10 @@ async function handleHomeFeed(
     for (let i = tracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
         ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+    }
+
+    if (tracks.length === 0) {
+      return await handleTrending()
     }
 
     return { tracks: tracks.slice(0, 20) }

@@ -85,7 +85,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Version tag */}
         <div className="px-5 mt-auto pt-4 pb-2 text-center opacity-40 hover:opacity-100 transition-opacity">
-          <p className="text-[10px] text-nw-muted">nullwave Beta 1.2.8</p>
+          <p className="text-[10px] text-nw-muted">nullwave Beta 1.3.1 (Fixes)</p>
           <p className="text-[10px] text-nw-muted/50">invite only</p>
         </div>
       </div>
