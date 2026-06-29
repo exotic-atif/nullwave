@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, encryptShareId } from '@/lib/utils'
 import type { Track } from '@/types'
 import { AlbumArt } from './AlbumArt'
 import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
@@ -50,7 +50,7 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
   }
 
   const handleShare = async () => {
-    const byParam = user?.id ? `&by=${btoa('nw_' + user.id)}` : ''
+    const byParam = user?.id ? `&by=${encryptShareId(user.id)}` : ''
     const shareUrl = `${window.location.origin}/?play=${track.id}${byParam}`
     const text = `Listen to ${track.title} by ${track.artist} on NullWave`
     

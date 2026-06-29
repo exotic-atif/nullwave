@@ -6,6 +6,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+const SHARE_SECRET = "nw_hyper_secure_secret_key_999"
+
+export function encryptShareId(userId: string): string {
+  let result = ''
+  for (let i = 0; i < userId.length; i++) {
+    result += String.fromCharCode(userId.charCodeAt(i) ^ SHARE_SECRET.charCodeAt(i % SHARE_SECRET.length))
+  }
+  // Convert to URL-safe base64
+  return btoa(result).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+export function decryptShareId(hash: string): string | null {
+  try {
+    let base64 = hash.replace(/-/g, '+').replace(/_/g, '/')
+    while (base64.length % 4) base64 += '='
+    const decoded = atob(base64)
+    let result = ''
+    for (let i = 0; i < decoded.length; i++) {
+      result += String.fromCharCode(decoded.charCodeAt(i) ^ SHARE_SECRET.charCodeAt(i % SHARE_SECRET.length))
+    }
+    return result
+  } catch (err) {
+    return null
+  }
+}
+
 /** Format seconds to mm:ss */
 export function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return '0:00'

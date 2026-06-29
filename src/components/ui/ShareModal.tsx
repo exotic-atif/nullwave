@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, X, User } from 'lucide-react'
 import { api } from '@/lib/api'
-import { getProfile } from '@/lib/supabase'
+import { getSenderProfile } from '@/lib/supabase'
+import { decryptShareId } from '@/lib/utils'
 import type { Track } from '@/types'
 import { AlbumArt } from './AlbumArt'
 
@@ -27,10 +28,19 @@ export function ShareModal({ playId, byId, onPlay, onClose }: ShareModalProps) {
           (async () => {
             if (!byId) return null
             try {
+              // Try the new encrypted format first
+              const userId = decryptShareId(byId)
+              if (userId) {
+                const profile = await getSenderProfile(userId)
+                return profile ? { username: profile.username || 'Someone', avatar_url: profile.avatar_url } : null
+              }
+
+              // Fallback for old base64 format (bndf...) just in case someone still has an old link
               const decoded = atob(byId)
               if (decoded.startsWith('nw_')) {
-                const userId = decoded.slice(3)
-                const profile = await getProfile(userId)
+                const oldId = decoded.slice(3)
+                // Old links will still fail RLS unless the RPC is used, so use it here too
+                const profile = await getSenderProfile(oldId)
                 return profile ? { username: profile.username || 'Someone', avatar_url: profile.avatar_url } : null
               }
             } catch (err) {

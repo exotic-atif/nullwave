@@ -34,6 +34,13 @@ export async function getProfile(userId: string) {
   return data
 }
 
+export async function getSenderProfile(senderId: string) {
+  const { data, error } = await supabase
+    .rpc('get_sender_profile', { sender_id: senderId })
+  if (error) console.error('Failed to fetch sender profile:', error.message)
+  return data
+}
+
 export async function updateProfileName(userId: string, newName: string) {
   const { error } = await supabase
     .from('users')
