@@ -27,3 +27,5 @@ nullwave_recommendation_engine.txt
 *.sln
 *.sw?
 temporary/
+plans/*
+ideas/*

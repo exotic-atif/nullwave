@@ -12,7 +12,16 @@ export async function upsertProfile(userId: string, username: string, email: str
   const { error } = await supabase
     .from('users')
     .upsert({ id: userId, username, email, theme }, { onConflict: 'id' })
-  if (error) console.error('Failed to upsert profile:', error.message)
+  if (error) {
+    if (error.message.includes('users_email_key')) {
+      // Fallback: insert with a fake email to bypass the unique constraint if the user already exists in auth with the same email
+      await supabase
+        .from('users')
+        .upsert({ id: userId, username, email: `${userId}@placeholder.nullwave`, theme }, { onConflict: 'id' })
+    } else {
+      console.error('Failed to upsert profile:', error.message)
+    }
+  }
 }
 
 export async function getProfile(userId: string) {

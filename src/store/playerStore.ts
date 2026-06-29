@@ -31,7 +31,7 @@ interface PlayerStore {
 export const usePlayerStore = create<PlayerStore>((set) => ({
   currentTrack: null,
   isPlaying: false,
-  volume: 0.75,
+  volume: 1.0,
   progress: 0,
   duration: 0,
   isMuted: false,
