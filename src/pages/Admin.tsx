@@ -6,10 +6,13 @@ import {
   Search, ChevronDown, Mail, Music, Sparkles, LogOut
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
-import { supabase, fetchAccessRequests, updateAccessRequest, deleteAccessRequest } from '@/lib/supabase'
+import { supabase, fetchAccessRequests, updateAccessRequest, deleteAccessRequest, supabaseUrl, supabaseAnonKey, upsertFullProfile } from '@/lib/supabase'
 import type { AccessRequest } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { getProfile } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { EditRequestModal } from '@/components/admin/EditRequestModal'
+import { AtSign } from 'lucide-react'
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected'
 
@@ -189,6 +192,7 @@ function AdminDashboard() {
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingRequest, setEditingRequest] = useState<AccessRequest | null>(null)
   const { user, logout } = useAuthStore()
 
   const loadRequests = async () => {
@@ -204,6 +208,55 @@ function AdminDashboard() {
     await updateAccessRequest(id, { status })
     setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status } : r))
     toast.success(`Request ${status}`)
+  }
+
+  const handleApproveWithAccount = async (req: AccessRequest, updatedData: Partial<AccessRequest>) => {
+    try {
+      // 1. Create a temporary, non-persisted client so we don't log the admin out
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false }
+      })
+
+      const password = `Nullwave_${req.email}`
+
+      const { data: signUpData, error: signUpError } = await tempClient.auth.signUp({
+        email: req.email,
+        password: password,
+        options: { data: { full_name: updatedData.display_name || req.display_name } }
+      })
+
+      if (signUpError) {
+        // If they already have an account, or some other error
+        if (signUpError.message.includes('User already registered')) {
+          toast.error('User already has an account.')
+        } else {
+          toast.error(`Sign up failed: ${signUpError.message}`)
+          return
+        }
+      }
+
+      // 2. Insert into public.users using the admin's session (which has Elevated access)
+      if (signUpData?.user) {
+        await upsertFullProfile(signUpData.user.id, {
+          username: updatedData.display_name || req.display_name,
+          email: req.email,
+          avatar_url: updatedData.avatar_url || req.avatar_url,
+          fav_artists: updatedData.fav_artists || req.fav_artists,
+          fav_songs: updatedData.fav_songs || req.fav_songs,
+          instagram_id: updatedData.instagram_id || req.instagram_id
+        })
+      }
+
+      // 3. Update the request status and details
+      const fullUpdates = { ...updatedData, status: 'approved' as const }
+      await updateAccessRequest(req.id, fullUpdates)
+      
+      setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, ...fullUpdates } : r))
+      toast.success(`Account created and approved for ${req.email}!`)
+    } catch (err: any) {
+      toast.error('An error occurred during approval.')
+      console.error(err)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -243,24 +296,34 @@ function AdminDashboard() {
 
   const statusBadge = (s: string) => {
     const colors: Record<string, string> = {
-      pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-      approved: 'bg-green-500/10 text-green-400 border-green-500/20',
-      rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+      pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 shadow-[0_0_15px_rgba(234,179,8,0.15)]',
+      approved: 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.15)]',
+      rejected: 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)]',
     }
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${colors[s] || ''}`}>
+      <motion.span 
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${colors[s] || ''}`}
+      >
         {statusIcon(s)} {s}
-      </span>
+      </motion.span>
     )
   }
 
   return (
-    <div className="min-h-screen bg-nw-black">
+    <div className="min-h-screen bg-nw-black relative overflow-hidden">
+      {/* Background ambient effects */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-nw-accent/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-[120px]" />
+      </div>
+
       {/* Top Bar */}
       <div className="sticky top-0 z-20 bg-nw-black/80 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-nw-accent to-purple-600 flex items-center justify-center shadow-lg shadow-nw-accent/20">
               <Radio size={16} className="text-white" />
             </div>
             <div>
@@ -270,91 +333,109 @@ function AdminDashboard() {
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-nw-text-tertiary hover:text-nw-text bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-nw-text-tertiary hover:text-nw-text bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors border border-white/[0.04]"
           >
             <LogOut size={14} /> Logout
           </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative z-10">
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((key) => (
-            <button
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          {(['all', 'pending', 'approved', 'rejected'] as const).map((key, i) => (
+            <motion.button
               key={key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
               onClick={() => setFilter(key)}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden group ${
                 filter === key
-                  ? 'bg-white/[0.06] border-nw-accent/30'
-                  : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]'
+                  ? 'bg-nw-surface/80 border-nw-accent/40 shadow-[0_0_30px_rgba(56,189,248,0.1)]'
+                  : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.06] hover:border-white/[0.1]'
               }`}
             >
-              <div className="flex items-center gap-2 mb-1">
-                {key === 'all' ? <Users size={14} className="text-nw-accent" /> : statusIcon(key)}
-                <span className="text-[10px] uppercase tracking-wider text-nw-text-tertiary font-semibold">{key}</span>
+              {filter === key && (
+                <div className="absolute inset-0 bg-gradient-to-br from-nw-accent/10 to-transparent opacity-50" />
+              )}
+              <div className="relative z-10 flex items-center gap-2 mb-2">
+                {key === 'all' ? <Users size={14} className={filter === key ? 'text-nw-accent' : 'text-nw-muted'} /> : statusIcon(key)}
+                <span className="text-[10px] uppercase tracking-wider text-nw-text-tertiary font-bold">{key}</span>
               </div>
-              <p className="text-2xl font-display font-bold text-nw-text">{counts[key]}</p>
-            </button>
+              <p className={`text-3xl font-display font-bold relative z-10 ${filter === key ? 'text-white' : 'text-nw-text-secondary group-hover:text-nw-text'}`}>{counts[key]}</p>
+            </motion.button>
           ))}
         </div>
 
         {/* Search */}
-        <div className="relative mb-6">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-nw-text-tertiary" />
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="relative mb-8"
+        >
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-nw-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, email, or artists..."
-            className="w-full pl-10 pr-4 py-3 bg-nw-surface/40 border border-white/[0.06] rounded-xl text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/30 transition-all"
+            className="w-full pl-11 pr-4 py-3.5 bg-nw-surface/50 backdrop-blur-md border border-white/[0.06] rounded-2xl text-sm text-nw-text placeholder:text-nw-muted/60 focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent/20 transition-all shadow-inner"
           />
-        </div>
+        </motion.div>
 
         {/* Request List */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 size={24} className="text-nw-accent animate-spin" />
+          <div className="flex items-center justify-center py-32">
+            <Loader2 size={32} className="text-nw-accent animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <Filter size={32} className="text-nw-muted mx-auto mb-3" />
-            <p className="text-nw-text-secondary text-sm">No requests found</p>
-            <p className="text-nw-text-tertiary text-xs mt-1">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-32"
+          >
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center">
+              <Filter size={32} className="text-nw-muted" />
+            </div>
+            <p className="text-nw-text font-medium text-lg">No requests found</p>
+            <p className="text-nw-text-tertiary text-sm mt-2">
               {filter !== 'all' ? 'Try changing the filter.' : 'No access requests yet.'}
             </p>
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-2">
-            <AnimatePresence>
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
               {filtered.map((req, i) => (
                 <motion.div
+                  layout
                   key={req.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ delay: i * 0.02 }}
-                  className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden hover:bg-white/[0.04] transition-colors"
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                  transition={{ delay: Math.min(i * 0.05, 0.5) }}
+                  className={`bg-nw-surface/40 backdrop-blur-sm border ${expandedId === req.id ? 'border-nw-accent/30 shadow-[0_0_20px_rgba(56,189,248,0.05)]' : 'border-white/[0.06] hover:border-white/[0.12]'} rounded-2xl overflow-hidden transition-all duration-300`}
                 >
                   {/* Row */}
                   <button
                     onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
-                    className="w-full flex items-center gap-4 p-4 text-left"
+                    className="w-full flex items-center gap-4 p-4 text-left group"
                   >
                     {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-nw-surface flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-white/[0.04] border border-white/[0.08] flex-shrink-0 group-hover:border-nw-accent/40 transition-colors">
                       {req.avatar_url ? (
                         <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-nw-muted">
-                          <Users size={16} />
+                          <Users size={18} />
                         </div>
                       )}
                     </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-nw-text truncate">{req.display_name}</p>
+                      <p className="text-base font-semibold text-nw-text truncate group-hover:text-nw-accent transition-colors">{req.display_name}</p>
                       <p className="text-xs text-nw-text-tertiary truncate">{req.email}</p>
                     </div>
 
@@ -362,14 +443,16 @@ function AdminDashboard() {
                     <div className="hidden sm:block">{statusBadge(req.status)}</div>
 
                     {/* Date */}
-                    <span className="text-[10px] text-nw-muted tabular-nums hidden md:block">
+                    <span className="text-[10px] text-nw-muted font-medium tabular-nums hidden md:block">
                       {new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
 
-                    <ChevronDown
-                      size={16}
-                      className={`text-nw-muted transition-transform ${expandedId === req.id ? 'rotate-180' : ''}`}
-                    />
+                    <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
+                      <ChevronDown
+                        size={16}
+                        className={`text-nw-muted transition-transform duration-300 ${expandedId === req.id ? 'rotate-180 text-white' : ''}`}
+                      />
+                    </div>
                   </button>
 
                   {/* Expanded Details */}
@@ -379,45 +462,56 @@ function AdminDashboard() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="px-4 pb-4 pt-0 border-t border-white/[0.04]">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                        <div className="px-5 pb-5 pt-2 border-t border-white/[0.04] bg-black/20">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                             {/* Mobile status */}
                             <div className="sm:hidden">{statusBadge(req.status)}</div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-semibold mb-1">
-                                  <Mail size={10} /> Email
+                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
+                                  <Mail size={12} /> Email
                                 </label>
-                                <p className="text-sm text-nw-text-secondary">{req.email}</p>
+                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">{req.email}</p>
                               </div>
                               <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-semibold mb-1">
-                                  <Sparkles size={10} /> Favorite Artists
+                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
+                                  <AtSign size={12} /> Instagram ID
                                 </label>
-                                <p className="text-sm text-nw-text-secondary">
-                                  {req.fav_artists || <span className="text-nw-muted italic">Not provided</span>}
+                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
+                                  {req.instagram_id || <span className="text-nw-muted italic font-normal">Not provided</span>}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-semibold mb-1">
-                                  <Music size={10} /> Favorite Songs
+                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
+                                  <Sparkles size={12} /> Favorite Artists
                                 </label>
-                                <p className="text-sm text-nw-text-secondary">
-                                  {req.fav_songs || <span className="text-nw-muted italic">Not provided</span>}
+                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
+                                  {req.fav_artists || <span className="text-nw-muted italic font-normal">Not provided</span>}
                                 </p>
                               </div>
                               <div>
-                                <label className="text-[10px] uppercase tracking-wider text-nw-muted font-semibold mb-1 block">
-                                  Submitted
+                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
+                                  <Music size={12} /> Favorite Songs
                                 </label>
-                                <p className="text-sm text-nw-text-secondary">
+                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
+                                  {req.fav_songs || <span className="text-nw-muted italic font-normal">Not provided</span>}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-bold mb-1.5 block">
+                                  <Clock size={12} /> Submitted
+                                </label>
+                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
                                   {new Date(req.created_at).toLocaleString()}
                                 </p>
                               </div>
@@ -425,27 +519,27 @@ function AdminDashboard() {
                           </div>
 
                           {/* Actions */}
-                          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-white/[0.04]">
+                          <div className="flex items-center gap-3 mt-6 pt-5 border-t border-white/[0.04]">
                             {req.status !== 'approved' && (
                               <button
-                                onClick={() => handleStatus(req.id, 'approved')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg transition-colors border border-green-500/20"
+                                onClick={() => setEditingRequest(req)}
+                                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-green-500 hover:bg-green-400 text-black rounded-xl transition-all glow-accent"
                               >
-                                <CheckCircle size={14} /> Approve
+                                <CheckCircle size={16} /> Review & Approve
                               </button>
                             )}
                             {req.status !== 'rejected' && (
                               <button
                                 onClick={() => handleStatus(req.id, 'rejected')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors border border-red-500/20"
+                                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition-colors border border-red-500/20"
                               >
-                                <XCircle size={14} /> Reject
+                                <XCircle size={16} /> Reject
                               </button>
                             )}
                             <div className="flex-1" />
                             <button
                               onClick={() => handleDelete(req.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-nw-text-tertiary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-nw-text-tertiary hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
                             >
                               <Trash2 size={14} /> Delete
                             </button>
@@ -460,6 +554,17 @@ function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {editingRequest && (
+        <EditRequestModal
+          isOpen={true}
+          request={editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onApprove={async (updatedData) => {
+            await handleApproveWithAccount(editingRequest, updatedData)
+          }}
+        />
+      )}
     </div>
   )
 }

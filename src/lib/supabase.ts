@@ -1,25 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Track } from '@/types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ===== PROFILES =====
 
-export async function upsertProfile(userId: string, username: string, email: string, theme: string = 'system') {
+export async function upsertFullProfile(userId: string, data: { username: string, email: string, avatar_url?: string | null, fav_artists?: string | null, fav_songs?: string | null, instagram_id?: string | null }) {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, username, email, theme }, { onConflict: 'id' })
+    .upsert({ id: userId, ...data, theme: 'system' }, { onConflict: 'id' })
   if (error) {
     if (error.message.includes('users_email_key')) {
-      // Fallback: insert with a fake email to bypass the unique constraint if the user already exists in auth with the same email
       await supabase
         .from('users')
-        .upsert({ id: userId, username, email: `${userId}@placeholder.nullwave`, theme }, { onConflict: 'id' })
+        .upsert({ id: userId, ...data, email: `${userId}@placeholder.nullwave`, theme: 'system' }, { onConflict: 'id' })
     } else {
-      console.error('Failed to upsert profile:', error.message)
+      console.error('Failed to upsert full profile:', error.message)
     }
   }
 }
@@ -44,33 +43,38 @@ export async function getSenderProfile(senderId: string) {
 export async function updateProfileName(userId: string, newName: string) {
   const { error } = await supabase
     .from('users')
-    .update({ username: newName })
-    .eq('id', userId)
-  if (error) console.error('Failed to update profile name:', error.message)
+    .upsert({ id: userId, username: newName }, { onConflict: 'id' })
+  if (error) {
+    console.error('Failed to update profile name:', error.message)
+    throw error
+  }
 }
 
 export async function updateProfileAvatar(userId: string, avatarUrl: string) {
   const { error } = await supabase
     .from('users')
-    .update({ avatar_url: avatarUrl })
-    .eq('id', userId)
-  if (error) console.error('Failed to update profile avatar:', error.message)
+    .upsert({ id: userId, avatar_url: avatarUrl }, { onConflict: 'id' })
+  if (error) {
+    console.error('Failed to update profile avatar:', error.message)
+    throw error
+  }
 }
 
 export async function updateThemePreference(userId: string, theme: string) {
   const { error } = await supabase
     .from('users')
-    .update({ theme })
-    .eq('id', userId)
+    .upsert({ id: userId, theme }, { onConflict: 'id' })
   if (error) console.error('Failed to update theme preference:', error.message)
 }
 
 export async function updateProfileFavs(userId: string, favSongs: string, favArtists: string) {
   const { error } = await supabase
     .from('users')
-    .update({ fav_songs: favSongs, fav_artists: favArtists })
-    .eq('id', userId)
-  if (error) console.error('Failed to update favorites:', error.message)
+    .upsert({ id: userId, fav_songs: favSongs, fav_artists: favArtists }, { onConflict: 'id' })
+  if (error) {
+    console.error('Failed to update profile favs:', error.message)
+    throw error
+  }
 }
 
 // ===== LIKED SONGS =====
@@ -346,6 +350,7 @@ export interface AccessRequest {
   avatar_url: string | null
   fav_artists: string | null
   fav_songs: string | null
+  instagram_id: string | null
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
@@ -356,6 +361,7 @@ export async function submitAccessRequest(data: {
   avatar_url?: string
   fav_artists?: string
   fav_songs?: string
+  instagram_id?: string
 }) {
   const { error } = await supabase.from('access_requests').insert(data)
   if (error) throw new Error(error.message)

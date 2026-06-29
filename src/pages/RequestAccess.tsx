@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Radio, Loader2, Upload, CheckCircle2, Sparkles, Music, User, Mail, Heart, X } from 'lucide-react'
+import { Radio, Loader2, Upload, CheckCircle2, Sparkles, Music, User, Mail, Heart, X, AtSign } from 'lucide-react'
 import { submitAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link } from 'react-router-dom'
@@ -11,6 +11,7 @@ export function RequestAccessPage() {
   const [email, setEmail] = useState('')
   const [favArtists, setFavArtists] = useState('')
   const [favSongs, setFavSongs] = useState('')
+  const [instagramId, setInstagramId] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -61,24 +62,28 @@ export function RequestAccessPage() {
         return
       }
 
-      let avatarUrl: string | undefined
+      let uploadedUrl = null
 
-      // Upload avatar to Cloudinary if provided
       if (avatarFile) {
-        const uniqueId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        avatarUrl = await uploadToCloudinary(avatarFile, {
-          folder: 'nullwave_requests',
-          public_id: uniqueId,
-          overwrite: false,
-        })
+        try {
+          const uniqueId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+          uploadedUrl = await uploadToCloudinary(avatarFile, {
+            folder: 'nullwave_requests',
+            public_id: uniqueId,
+            overwrite: false,
+          })
+        } catch (err) {
+          console.error('Failed to upload avatar:', err)
+        }
       }
 
       await submitAccessRequest({
         display_name: displayName.trim(),
-        email: email.trim().toLowerCase(),
-        avatar_url: avatarUrl,
+        email: normalizedEmail,
+        avatar_url: uploadedUrl || undefined,
         fav_artists: favArtists.trim() || undefined,
         fav_songs: favSongs.trim() || undefined,
+        instagram_id: instagramId.trim() || undefined
       })
 
       setIsSubmitted(true)
@@ -295,6 +300,21 @@ export function RequestAccessPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
+              className="w-full px-4 py-3 bg-nw-surface/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent-ring transition-all duration-200"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {/* Instagram ID */}
+          <div>
+            <label className="flex items-center gap-1.5 text-xs text-nw-text-tertiary mb-1.5 ml-1">
+              <AtSign size={12} /> Instagram ID <span className="text-[10px] text-nw-muted/60 font-normal">(Optional)</span>
+            </label>
+            <input
+              type="text"
+              value={instagramId}
+              onChange={(e) => setInstagramId(e.target.value)}
+              placeholder="e.g. @thenullwave"
               className="w-full px-4 py-3 bg-nw-surface/50 border border-nw-border-subtle rounded-xl text-sm text-nw-text placeholder:text-nw-muted focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent-ring transition-all duration-200"
               disabled={isSubmitting}
             />
