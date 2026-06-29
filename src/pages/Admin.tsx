@@ -235,9 +235,24 @@ function AdminDashboard() {
         }
       }
 
-      // 2. Insert into public.users using the admin's session (which has Elevated access)
-      if (signUpData?.user) {
-        await upsertFullProfile(signUpData.user.id, {
+      let targetUserId = signUpData?.user?.id
+
+      if (!targetUserId && signUpError?.message.includes('User already registered')) {
+        // Fetch the user ID from public.users by email to update their existing profile
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', req.email)
+          .maybeSingle()
+        
+        if (existingUser) {
+          targetUserId = existingUser.id
+        }
+      }
+
+      // 2. Insert or Update public.users using the admin's session
+      if (targetUserId) {
+        await upsertFullProfile(targetUserId, {
           username: updatedData.display_name || req.display_name,
           email: req.email,
           avatar_url: updatedData.avatar_url || req.avatar_url,
