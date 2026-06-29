@@ -94,20 +94,18 @@ export function ShareModal({ playId, byId, onPlay, onClose }: ShareModalProps) {
           ) : (
             <div className="relative z-10 flex flex-col items-center">
               {/* Sender Info */}
-              {sender || byId === null ? (
-                <div className="flex items-center gap-3 mb-6 bg-black/20 pr-4 pl-1.5 py-1.5 rounded-full border border-white/5 shadow-inner">
-                  {sender?.avatar_url ? (
-                    <img src={sender.avatar_url} alt="Sender" className="w-8 h-8 rounded-full object-cover border border-white/10" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
-                      <User size={14} className="text-nw-muted" />
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-nw-text-secondary">
-                    Shared by <span className="text-nw-text font-semibold">{sender?.username || 'a friend'}</span>
-                  </span>
-                </div>
-              ) : null}
+              <div className="flex items-center gap-3 mb-6 bg-black/20 pr-4 pl-1.5 py-1.5 rounded-full border border-white/5 shadow-inner">
+                {sender?.avatar_url ? (
+                  <img src={sender.avatar_url} alt="Sender" className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+                    <User size={14} className="text-nw-muted" />
+                  </div>
+                )}
+                <span className="text-xs font-medium text-nw-text-secondary">
+                  Shared by <span className="text-nw-text font-semibold">{sender?.username || 'a friend'}</span>
+                </span>
+              </div>
 
               {/* Album Art */}
               <div className="w-48 h-48 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 mb-6 border border-white/10 ring-1 ring-white/5">
