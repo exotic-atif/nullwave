@@ -43,7 +43,8 @@ export async function getSenderProfile(senderId: string) {
 export async function updateProfileName(userId: string, newName: string) {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, username: newName }, { onConflict: 'id' })
+    .update({ username: newName })
+    .eq('id', userId)
   if (error) {
     console.error('Failed to update profile name:', error.message)
     throw error
@@ -53,7 +54,8 @@ export async function updateProfileName(userId: string, newName: string) {
 export async function updateProfileAvatar(userId: string, avatarUrl: string) {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, avatar_url: avatarUrl }, { onConflict: 'id' })
+    .update({ avatar_url: avatarUrl })
+    .eq('id', userId)
   if (error) {
     console.error('Failed to update profile avatar:', error.message)
     throw error
@@ -63,14 +65,16 @@ export async function updateProfileAvatar(userId: string, avatarUrl: string) {
 export async function updateThemePreference(userId: string, theme: string) {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, theme }, { onConflict: 'id' })
+    .update({ theme })
+    .eq('id', userId)
   if (error) console.error('Failed to update theme preference:', error.message)
 }
 
 export async function updateProfileFavs(userId: string, favSongs: string, favArtists: string) {
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, fav_songs: favSongs, fav_artists: favArtists }, { onConflict: 'id' })
+    .update({ fav_songs: favSongs, fav_artists: favArtists })
+    .eq('id', userId)
   if (error) {
     console.error('Failed to update profile favs:', error.message)
     throw error

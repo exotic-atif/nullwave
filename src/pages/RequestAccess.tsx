@@ -19,6 +19,18 @@ export function RequestAccessPage() {
   const [error, setError] = useState('')
   const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
 
+  const handleAvatarUpload = async (file: File) => {
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+    setIsPfpModalOpen(false)
+  }
+
+  const handleAvatarDelete = async () => {
+    setAvatarFile(null)
+    setAvatarPreview(null)
+    setIsPfpModalOpen(false)
+  }
+
   const handleUploadPfp = async (file: File) => {
     setAvatarFile(file)
     const reader = new FileReader()
@@ -195,7 +207,7 @@ export function RequestAccessPage() {
 
   // ===== Form Screen =====
   return (
-    <div className="min-h-screen flex items-center justify-center bg-nw-black relative overflow-hidden py-12 px-4">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-nw-black relative overflow-x-hidden overflow-y-auto py-12 px-4">
       {/* Background effects */}
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-nw-accent/[0.04] blur-[100px]" />
@@ -397,6 +409,15 @@ export function RequestAccessPage() {
           </p>
         </div>
       </motion.div>
+
+      {/* Cropper Modal */}
+      <ProfilePictureModal
+        isOpen={isPfpModalOpen}
+        onClose={() => setIsPfpModalOpen(false)}
+        currentAvatar={avatarPreview}
+        onUpload={handleAvatarUpload}
+        onDelete={handleAvatarDelete}
+      />
     </div>
   )
 }
