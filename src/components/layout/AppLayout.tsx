@@ -5,30 +5,38 @@ import { MobileNavBar } from './MobileNavBar'
 import { Player } from '../player/Player'
 import { useState, useEffect } from 'react'
 import { usePlayerStore, useQueueStore } from '@/store'
-import { api } from '@/lib/api'
 import { toast } from 'sonner'
+import { ShareModal } from '../ui/ShareModal'
+import type { Track } from '@/types'
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const currentTrack = usePlayerStore((s) => s.currentTrack)
   const setTrack = usePlayerStore((s) => s.setTrack)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [shareConfig, setShareConfig] = useState<{ playId: string; byId: string | null } | null>(null)
 
   useEffect(() => {
     const playId = searchParams.get('play')
-    if (playId) {
-      searchParams.delete('play')
-      setSearchParams(searchParams, { replace: true })
-
-      api.track(playId).then(track => {
-        useQueueStore.getState().setQueue([track])
-        setTrack(track)
-        toast.success(`Playing shared song: ${track.title}`)
-      }).catch(() => {
-        toast.error("Failed to load shared song")
-      })
+    const byId = searchParams.get('by')
+    if (playId && !shareConfig) {
+      setShareConfig({ playId, byId })
     }
-  }, [searchParams, setSearchParams, setTrack])
+  }, [searchParams, shareConfig])
+
+  const handleShareClose = () => {
+    setShareConfig(null)
+    searchParams.delete('play')
+    searchParams.delete('by')
+    setSearchParams(searchParams, { replace: true })
+  }
+
+  const handleSharePlay = (track: Track) => {
+    useQueueStore.getState().setQueue([track])
+    setTrack(track)
+    toast.success(`Playing shared song: ${track.title}`)
+    handleShareClose()
+  }
 
   return (
     <div className="h-screen flex bg-nw-black overflow-hidden">
@@ -64,6 +72,16 @@ export function AppLayout() {
 
       {/* Player */}
       <Player />
+
+      {/* Share Modal */}
+      {shareConfig && (
+        <ShareModal
+          playId={shareConfig.playId}
+          byId={shareConfig.byId}
+          onPlay={handleSharePlay}
+          onClose={handleShareClose}
+        />
+      )}
     </div>
   )
 }

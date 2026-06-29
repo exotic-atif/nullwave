@@ -1,9 +1,10 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store'
 import { Loader2 } from 'lucide-react'
 
 export function AuthGuard() {
   const { isAuthenticated, isLoading } = useAuthStore()
+  const location = useLocation()
 
   if (isLoading) {
     return (
@@ -17,7 +18,7 @@ export function AuthGuard() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location.pathname, search: location.search }} replace />
   }
 
   return <Outlet />

@@ -50,7 +50,8 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
   }
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/?play=${track.id}`
+    const byParam = user?.id ? `&by=${btoa('nw_' + user.id)}` : ''
+    const shareUrl = `${window.location.origin}/?play=${track.id}${byParam}`
     const text = `Listen to ${track.title} by ${track.artist} on NullWave`
     
     try {

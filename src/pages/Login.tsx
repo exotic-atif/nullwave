@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthStore } from '@/store'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Radio, Eye, EyeOff, Loader2 } from 'lucide-react'
 
@@ -11,13 +11,17 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const { login, isLoading, isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  
+  const from = location.state?.from || '/'
+  const search = location.state?.search || ''
 
   // If already authenticated, redirect
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true })
+      navigate(from + search, { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, navigate, from, search])
 
   if (isAuthenticated) {
     return null
@@ -34,7 +38,7 @@ export function LoginPage() {
 
     try {
       await login(email, password)
-      navigate('/')
+      navigate(from + search, { replace: true })
     } catch (err) {
       setError((err as Error).message || 'Invalid credentials')
     }
