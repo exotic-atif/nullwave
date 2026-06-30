@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Radio, Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
+import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
 import { submitAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link } from 'react-router-dom'
