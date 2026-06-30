@@ -111,23 +111,14 @@ export function RequestAccessPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center py-12 px-4 bg-nw-black gradient-mesh relative overflow-x-hidden">
+    <div className="h-[100dvh] w-full flex flex-col items-center py-12 px-4 bg-nw-black gradient-mesh relative overflow-x-hidden overflow-y-auto">
 
-
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="relative z-10 w-full max-w-lg mt-auto mb-auto">
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="relative z-10 w-full max-w-lg mt-auto mb-auto shrink-0">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-nw-accent to-purple-600 p-0.5 mb-6 shadow-2xl shadow-nw-accent/30">
-            <div className="w-full h-full bg-nw-bg rounded-[22px] flex items-center justify-center">
-              <Radio size={28} className="text-transparent bg-clip-text bg-gradient-to-br from-nw-accent to-purple-400" style={{ stroke: 'url(#gradient)' }} />
-              <svg width="0" height="0">
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop stopColor="#38bdf8" offset="0%" />
-                  <stop stopColor="#a855f7" offset="100%" />
-                </linearGradient>
-              </svg>
-            </div>
+          <div className="flex items-center gap-3 mb-6">
+            <img src="/favicon.svg" alt="NullWave Logo" className="w-14 h-14" />
           </div>
-          <h1 className="font-display text-4xl font-bold tracking-tight text-white mb-2">Join Nullwave</h1>
+          <h1 className="font-display text-4xl font-bold tracking-tight text-white mb-2">Join NullWave</h1>
           <p className="text-sm text-nw-muted text-center max-w-sm">Request early access to the next generation of music streaming.</p>
         </div>
 

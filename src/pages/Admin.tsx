@@ -78,7 +78,7 @@ function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-nw-black relative overflow-hidden">
+    <div className="h-[100dvh] flex flex-col items-center justify-center py-12 bg-nw-black relative overflow-x-hidden overflow-y-auto">
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-nw-accent/[0.04] blur-[100px]" />
         <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full bg-nw-accent-glow/[0.03] blur-[80px]" />
@@ -87,7 +87,7 @@ function AdminLogin() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 w-full max-w-sm mx-4"
+        className="relative z-10 w-full max-w-sm mx-4 my-auto shrink-0"
       >
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-2xl mb-4">
@@ -329,7 +329,7 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-nw-black relative overflow-x-hidden">
+    <div className="h-[100dvh] bg-nw-black relative overflow-x-hidden overflow-y-auto">
       {/* Background ambient effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-nw-accent/5 rounded-full blur-[120px]" />

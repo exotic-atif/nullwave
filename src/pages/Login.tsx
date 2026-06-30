@@ -45,7 +45,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-nw-black relative overflow-hidden">
+    <div className="h-[100dvh] flex flex-col items-center justify-center py-12 bg-nw-black relative overflow-x-hidden overflow-y-auto">
       {/* Atmospheric background */}
       <div className="absolute inset-0">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-nw-accent/[0.04] blur-[100px]" />
