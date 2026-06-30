@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Save, Key, User as UserIcon, ListMusic, History, Heart, Trash2, Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { X, Key, User as UserIcon, ListMusic, History, Heart, Trash2, Loader2 } from 'lucide-react'
 import { supabase, adminUpdateProfile, adminUpdateAuthCredentials, adminFetchUserLikedSongs, adminDeleteUserLikedSong, adminFetchUserHistory, adminDeleteUserHistoryItem, adminFetchUserPlaylists, adminDeletePlaylist } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
@@ -286,6 +286,7 @@ export function EditUserModal({ user, onClose, onUpdate }: { user: any, onClose:
           setData({ ...data, avatar_url: null })
           setIsPfpModalOpen(false)
         }}
+        currentAvatar={data.avatar_url}
       />
     </div>
   )

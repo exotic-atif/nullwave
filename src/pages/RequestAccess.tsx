@@ -212,6 +212,7 @@ export function RequestAccessPage() {
         onClose={() => setIsPfpModalOpen(false)}
         onUpload={handleUploadPfp}
         onDelete={handleDeletePfp}
+        currentAvatar={avatarPreview}
       />
     </div>
   )
