@@ -92,11 +92,7 @@ export function RequestAccessPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-nw-bg relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-green-500/[0.06] blur-[120px]" />
-          <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full bg-nw-accent/[0.04] blur-[100px]" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-nw-black gradient-mesh relative overflow-hidden">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 text-center max-w-md mx-4 px-8 py-12">
           <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', delay: 0.2, damping: 15 }} className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center">
             <CheckCircle2 size={40} className="text-green-400" />
@@ -115,11 +111,8 @@ export function RequestAccessPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full flex flex-col items-center py-12 px-4 bg-nw-bg relative overflow-x-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-nw-accent/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[120px] translate-y-1/3 -translate-x-1/3" />
-      </div>
+    <div className="min-h-[100dvh] w-full flex flex-col items-center py-12 px-4 bg-nw-black gradient-mesh relative overflow-x-hidden">
+
 
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="relative z-10 w-full max-w-lg mt-auto mb-auto">
         <div className="flex flex-col items-center mb-8">
@@ -138,8 +131,8 @@ export function RequestAccessPage() {
           <p className="text-sm text-nw-muted text-center max-w-sm">Request early access to the next generation of music streaming.</p>
         </div>
 
-        <div className="p-[1px] rounded-3xl bg-gradient-to-b from-white/[0.08] to-transparent shadow-2xl shadow-black/50">
-          <form onSubmit={handleSubmit} className="bg-nw-surface border border-white/[0.04] backdrop-blur-2xl rounded-3xl p-6 sm:p-8 flex flex-col gap-6">
+        <div className="p-[1px] rounded-3xl bg-gradient-to-b from-white/[0.12] to-white/[0.02] shadow-2xl shadow-black/50">
+          <form onSubmit={handleSubmit} className="bg-nw-surface/80 border border-white/[0.04] backdrop-blur-3xl rounded-3xl p-6 sm:p-8 flex flex-col gap-6">
             <div className="flex flex-col items-center mb-2">
               <div className="relative group cursor-pointer" onClick={() => setIsPfpModalOpen(true)}>
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-white/[0.04] border-2 border-white/[0.1] group-hover:border-nw-accent/50 transition-all duration-300 relative shadow-inner flex items-center justify-center">
@@ -172,28 +165,28 @@ export function RequestAccessPage() {
 
             <div className="grid gap-4">
               <div className="relative group">
-                <input type="text" required value={displayName} onChange={e => setDisplayName(e.target.value)} id="name" className="peer w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                <input type="text" required value={displayName} onChange={e => setDisplayName(e.target.value)} id="name" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
                 <label htmlFor="name" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Display Name</label>
               </div>
 
               <div className="relative group">
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} id="email" className="peer w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} id="email" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
                 <label htmlFor="email" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Email Address</label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative group">
-                  <input type="text" value={favArtists} onChange={e => setFavArtists(e.target.value)} id="artists" className="peer w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                  <input type="text" value={favArtists} onChange={e => setFavArtists(e.target.value)} id="artists" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
                   <label htmlFor="artists" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Favorite Artists</label>
                 </div>
                 <div className="relative group">
-                  <input type="text" value={favSongs} onChange={e => setFavSongs(e.target.value)} id="songs" className="peer w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                  <input type="text" value={favSongs} onChange={e => setFavSongs(e.target.value)} id="songs" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
                   <label htmlFor="songs" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Favorite Songs</label>
                 </div>
               </div>
 
               <div className="relative group">
-                <input type="text" value={instagramId} onChange={e => setInstagramId(e.target.value)} id="ig" className="peer w-full bg-white/[0.02] border border-white/[0.04] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                <input type="text" value={instagramId} onChange={e => setInstagramId(e.target.value)} id="ig" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
                 <label htmlFor="ig" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Instagram ID (Optional)</label>
                 <AtSign size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-nw-muted/50" />
               </div>
