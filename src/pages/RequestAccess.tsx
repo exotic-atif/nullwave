@@ -207,7 +207,12 @@ export function RequestAccessPage() {
         </div>
       </motion.div>
 
-      <ProfilePictureModal isOpen={isPfpModalOpen} onClose={() => setIsPfpModalOpen(false)} onUpload={handleUploadPfp} onDelete={handleDeletePfp} currentImage={avatarPreview} />
+      <ProfilePictureModal
+        isOpen={isPfpModalOpen}
+        onClose={() => setIsPfpModalOpen(false)}
+        onUpload={handleUploadPfp}
+        onDelete={handleDeletePfp}
+      />
     </div>
   )
 }
