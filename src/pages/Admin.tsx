@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { supabase, fetchAccessRequests, updateAccessRequest, deleteAccessRequest, supabaseUrl, supabaseAnonKey, upsertFullProfile } from '@/lib/supabase'
-import { uploadToCloudinary } from '@/lib/cloudinary'
 import type { AccessRequest } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { ProfileManagement } from '@/components/admin/ProfileManagement'
