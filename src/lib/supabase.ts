@@ -399,3 +399,292 @@ export async function deleteAccessRequest(id: string) {
     .eq('id', id)
   if (error) console.error('Failed to delete access request:', error.message)
 }
+
+// ===== ADMIN API =====
+
+export async function fetchAllProfiles() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Failed to fetch all profiles:', error.message)
+    return []
+  }
+  return data
+}
+
+export async function adminUpdateProfile(userId: string, updates: any) {
+  const { error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+  if (error) throw new Error(error.message)
+}
+
+export async function adminDeleteProfile(userId: string) {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId)
+  if (error) throw new Error(error.message)
+}
+
+// Pass auth JWT to the worker endpoint
+export async function adminUpdateAuthCredentials(userId: string, jwt: string, password?: string, email?: string) {
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const res = await fetch(`${workerUrl}/admin/update-user`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify({ targetUserId: userId, password, email })
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Failed to update auth credentials via worker')
+  }
+}
+
+export async function adminFetchUserHistory(userId: string) {
+  const { data, error } = await supabase
+    .from('play_history')
+    .select('*')
+    .eq('user_id', userId)
+    .order('played_at', { ascending: false })
+    .limit(100)
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function adminDeleteUserHistoryItem(itemId: string) {
+  const { error } = await supabase.from('play_history').delete().eq('id', itemId)
+  if (error) throw new Error(error.message)
+}
+
+export async function adminFetchUserPlaylists(userId: string) {
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*')
+    .eq('user_id', userId)
+  if (error) {
+    console.error('Failed to fetch playlists:', error.message)
+    return []
+  }
+  return data
+}
+
+export async function addTrackToPlaylist(playlistId: string, track: Track) {
+  const { error } = await supabase.from('playlist_tracks').insert({
+    playlist_id: playlistId,
+    track_id: track.id,
+    track_data: track,
+  })
+
+  if (error) console.error('Failed to add track to playlist:', error.message)
+}
+
+export async function getPlaylistTracks(playlistId: string): Promise<Track[]> {
+  const { data, error } = await supabase
+    .from('playlist_tracks')
+    .select('track_data')
+    .eq('playlist_id', playlistId)
+    .order('added_at', { ascending: true })
+
+  if (error) {
+    console.error('Failed to fetch playlist tracks:', error.message)
+    return []
+  }
+
+  return (data || []).map((row) => row.track_data as Track)
+}
+
+export async function getPlaylistDetails(playlistId: string) {
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*')
+    .eq('id', playlistId)
+    .single()
+
+  if (error) {
+    console.error('Failed to fetch playlist details:', error.message)
+    return null
+  }
+  return data
+}
+
+export async function removeTrackFromPlaylist(playlistId: string, trackId: string) {
+  const { error } = await supabase
+    .from('playlist_tracks')
+    .delete()
+    .eq('playlist_id', playlistId)
+    .eq('track_id', trackId)
+  if (error) console.error('Failed to remove track:', error.message)
+}
+
+export async function renamePlaylist(playlistId: string, newName: string) {
+  const { error } = await supabase
+    .from('playlists')
+    .update({ name: newName })
+    .eq('id', playlistId)
+  if (error) console.error('Failed to rename playlist:', error.message)
+}
+
+export async function deletePlaylist(playlistId: string) {
+  const { error } = await supabase
+    .from('playlists')
+    .delete()
+    .eq('id', playlistId)
+  if (error) console.error('Failed to delete playlist:', error.message)
+}
+
+// ===== ACCESS REQUESTS =====
+
+export interface AccessRequest {
+  id: string
+  display_name: string
+  email: string
+  avatar_url: string | null
+  fav_artists: string | null
+  fav_songs: string | null
+  instagram_id: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
+export async function submitAccessRequest(data: {
+  display_name: string
+  email: string
+  avatar_url?: string
+  fav_artists?: string
+  fav_songs?: string
+  instagram_id?: string
+}) {
+  const { error } = await supabase.from('access_requests').insert(data)
+  if (error) throw new Error(error.message)
+}
+
+export async function fetchAccessRequests(): Promise<AccessRequest[]> {
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Failed to fetch access requests:', error.message)
+    return []
+  }
+  return (data || []) as AccessRequest[]
+}
+
+export async function updateAccessRequest(id: string, updates: Partial<AccessRequest>) {
+  const { error } = await supabase
+    .from('access_requests')
+    .update(updates)
+    .eq('id', id)
+  if (error) console.error('Failed to update access request:', error.message)
+}
+
+export async function deleteAccessRequest(id: string) {
+  const { error } = await supabase
+    .from('access_requests')
+    .delete()
+    .eq('id', id)
+  if (error) console.error('Failed to delete access request:', error.message)
+}
+
+// ===== ADMIN API =====
+
+export async function fetchAllProfiles() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Failed to fetch all profiles:', error.message)
+    return []
+  }
+  return data
+}
+
+export async function adminUpdateProfile(userId: string, updates: any) {
+  const { error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+  if (error) throw new Error(error.message)
+}
+
+export async function adminDeleteProfile(userId: string) {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId)
+  if (error) throw new Error(error.message)
+}
+
+// Pass auth JWT to the worker endpoint
+export async function adminUpdateAuthCredentials(userId: string, jwt: string, password?: string, email?: string) {
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const res = await fetch(`${workerUrl}/admin/update-user`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify({ targetUserId: userId, password, email })
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Failed to update auth credentials via worker')
+  }
+}
+
+export async function adminFetchUserHistory(userId: string) {
+  const { data, error } = await supabase
+    .from('play_history')
+    .select('*')
+    .eq('user_id', userId)
+    .order('played_at', { ascending: false })
+    .limit(100)
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function adminDeleteUserHistoryItem(itemId: string) {
+  const { error } = await supabase.from('play_history').delete().eq('id', itemId)
+  if (error) throw new Error(error.message)
+}
+
+export async function adminFetchUserPlaylists(userId: string) {
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function adminDeletePlaylist(playlistId: string) {
+  const { error } = await supabase.from('playlists').delete().eq('id', playlistId)
+  if (error) throw new Error(error.message)
+}
+
+export async function adminFetchUserLikedSongs(userId: string) {
+  const { data, error } = await supabase
+    .from('liked_tracks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function adminDeleteUserLikedSong(itemId: string) {
+  const { error } = await supabase.from('liked_tracks').delete().eq('id', itemId)
+  if (error) throw new Error(error.message)
+}

@@ -3,6 +3,8 @@
 interface Env {
   ALLOWED_ORIGINS: string
   CLOUDINARY_API_SECRET?: string
+  SUPABASE_URL?: string
+  SUPABASE_SERVICE_ROLE_KEY?: string
 }
 
 // ===== CORS =====
@@ -671,8 +673,76 @@ export default {
         }
       }
 
-      // Added POST to method check for /sign-upload
-      if (request.method !== 'GET' && path !== '/sign-upload') {
+      // POST /admin/update-user
+      if (path === '/admin/update-user' && request.method === 'POST') {
+        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
+        }
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader) {
+          return json({ error: 'Missing Authorization header' }, 401, origin, env)
+        }
+
+        try {
+          const body = await request.json() as any
+          const { targetUserId, password, email } = body
+
+          if (!targetUserId) {
+            return json({ error: 'Missing targetUserId' }, 400, origin, env)
+          }
+
+          // Verify caller JWT
+          const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+            headers: {
+              'Authorization': authHeader,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
+            }
+          })
+          if (!verifyRes.ok) return json({ error: 'Unauthorized JWT' }, 401, origin, env)
+          const callerObj = await verifyRes.json() as any
+          
+          // Verify caller is admin
+          const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
+            }
+          })
+          const roleData = await roleCheckRes.json() as any
+          if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
+            return json({ error: 'Forbidden: Admins only' }, 403, origin, env)
+          }
+
+          // Update target user
+          const updateData: any = {}
+          if (password) updateData.password = password
+          if (email) updateData.email = email
+          if (Object.keys(updateData).length === 0) return json({ success: true }, 200, origin, env)
+
+          const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+          })
+
+          if (!updateRes.ok) {
+            const errBody = await updateRes.text()
+            return json({ error: `Failed to update auth user: ${errBody}` }, 500, origin, env)
+          }
+
+          return json({ success: true }, 200, origin, env)
+        } catch (e: any) {
+          return json({ error: e.message }, 500, origin, env)
+        }
+      }
+
+      // Added POST to method check
+      if (request.method !== 'GET' && path !== '/sign-upload' && path !== '/admin/update-user') {
         return json({ error: 'Method not allowed' }, 405, origin, env)
       }
 

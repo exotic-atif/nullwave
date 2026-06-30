@@ -7,8 +7,10 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { supabase, fetchAccessRequests, updateAccessRequest, deleteAccessRequest, supabaseUrl, supabaseAnonKey, upsertFullProfile } from '@/lib/supabase'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 import type { AccessRequest } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
+import { ProfileManagement } from '@/components/admin/ProfileManagement'
 import { getProfile } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditRequestModal } from '@/components/admin/EditRequestModal'
@@ -187,6 +189,7 @@ function AccessDenied() {
 // ===== ADMIN DASHBOARD =====
 
 function AdminDashboard() {
+  const [activeView, setActiveView] = useState<'requests' | 'profiles'>('requests')
   const [requests, setRequests] = useState<AccessRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<StatusFilter>('all')
@@ -327,7 +330,7 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-nw-black relative overflow-hidden">
+    <div className="min-h-screen bg-nw-black relative overflow-x-hidden">
       {/* Background ambient effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-nw-accent/5 rounded-full blur-[120px]" />
@@ -336,7 +339,7 @@ function AdminDashboard() {
 
       {/* Top Bar */}
       <div className="sticky top-0 z-20 bg-nw-black/80 backdrop-blur-xl border-b border-white/[0.06]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-nw-accent to-purple-600 flex items-center justify-center shadow-lg shadow-nw-accent/20">
               <Radio size={16} className="text-white" />
@@ -346,18 +349,39 @@ function AdminDashboard() {
               <p className="text-[10px] text-nw-muted">{user?.email}</p>
             </div>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-nw-text-tertiary hover:text-nw-text bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors border border-white/[0.04]"
-          >
-            <LogOut size={14} /> Logout
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <div className="flex bg-white/[0.04] p-1 rounded-lg border border-white/[0.06]">
+              <button 
+                onClick={() => setActiveView('requests')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeView === 'requests' ? 'bg-nw-surface text-nw-text shadow-sm' : 'text-nw-muted hover:text-nw-text-secondary'}`}
+              >
+                Requests
+              </button>
+              <button 
+                onClick={() => setActiveView('profiles')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeView === 'profiles' ? 'bg-nw-surface text-nw-text shadow-sm' : 'text-nw-muted hover:text-nw-text-secondary'}`}
+              >
+                Profiles
+              </button>
+            </div>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-nw-text-tertiary hover:text-nw-text bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-colors border border-white/[0.04] ml-2"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 relative z-10">
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {activeView === 'profiles' ? (
+          <ProfileManagement />
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {(['all', 'pending', 'approved', 'rejected'] as const).map((key, i) => (
             <motion.button
               key={key}
@@ -567,6 +591,8 @@ function AdminDashboard() {
               ))}
             </AnimatePresence>
           </div>
+        )}
+        </>
         )}
       </div>
 
