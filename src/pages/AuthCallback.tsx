@@ -11,7 +11,7 @@ export function AuthCallback() {
 
   useEffect(() => {
     let mounted = true
-    let timeoutId: NodeJS.Timeout
+    let timeoutId: ReturnType<typeof setTimeout>
 
     const handleSession = async (session: any) => {
       if (!session?.user) {
