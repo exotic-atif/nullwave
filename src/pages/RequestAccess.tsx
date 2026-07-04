@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
-import { submitAccessRequest, completeAccessRequest, supabase } from '@/lib/supabase'
+import { submitAccessRequest, completeAccessRequest, cancelAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
@@ -268,7 +268,15 @@ export function RequestAccessPage() {
 
             {isCompleteProfile ? (
               <div className="flex items-center gap-3 mt-2">
-                <button type="button" onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} className="flex-1 py-4 bg-white/[0.05] hover:bg-white/[0.1] text-white font-bold rounded-2xl transition-all">Cancel</button>
+                <button type="button" onClick={async () => { 
+                  try {
+                    await cancelAccessRequest(email)
+                  } catch(e) {
+                    console.error('Failed to cancel request:', e)
+                  }
+                  await supabase.auth.signOut()
+                  navigate('/login') 
+                }} className="flex-1 py-4 bg-white/[0.05] hover:bg-white/[0.1] text-white font-bold rounded-2xl transition-all">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className="flex-[2] py-4 bg-gradient-to-r from-nw-accent to-purple-600 hover:from-nw-accent-hover hover:to-purple-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 group">
                   {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <>Submit Request <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>}
                 </button>

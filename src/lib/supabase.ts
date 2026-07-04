@@ -491,6 +491,11 @@ export async function deleteAccessRequest(id: string) {
   if (error) console.error('Failed to delete access request:', error.message)
 }
 
+export async function cancelAccessRequest(email: string) {
+  const { error } = await supabase.rpc('cancel_access_request', { p_email: email })
+  if (error) throw new Error(error.message)
+}
+
 // ===== ADMIN API =====
 
 export async function fetchAllProfiles() {
