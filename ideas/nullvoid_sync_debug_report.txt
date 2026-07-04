@@ -1,0 +1,500 @@
+================================================================================
+  NULLVOID SYNC — DETAILED BUG REPORT & SOLUTIONS
+  Nullwave | exotic-atif/nullwave | src/store/nullVoidStore.ts et al.
+================================================================================
+
+OVERVIEW
+--------
+NullVoid Sync is meant to work like Spotify Connect: one device plays audio
+(the "master") and other devices can control or transfer playback. The
+architecture uses Supabase Realtime presence for device discovery and WebRTC
+data channels for low-latency command/state sync. There are 9 distinct bugs
+ranging from critical blockers to minor regressions.
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #1 — CRITICAL: WebRTC is never initiated to already-present devices
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINES:   toggleMode(), claimMaster(), presence 'join' handler
+
+WHAT'S WRONG:
+  The only place that calls initiateWebRTC() is the presence 'join' handler:
+
+    channel.on('presence', { event: 'join' }, ({ newPresences }) => {
+      if (get().isMaster) {
+        newPresences.forEach((p: any) => {
+          if (p.deviceId !== get().deviceId) {
+            initiateWebRTC(p.deviceId, channel, get, set)
+          }
+        })
+      }
+    })
+
+  The 'join' event only fires when a device NEWLY appears in the presence
+  channel. It does NOT fire for devices already in the channel.
+
+  Scenario that breaks everything:
+    - Device A is online, separate mode.
+    - Device B is online, separate mode.
+    - User toggles NullVoid ON on Device A → A becomes master.
+    - A calls toggleMode(), sets isMaster=true, calls startMasterSync().
+    - NO initiateWebRTC() is ever called for Device B because B didn't
+      "join" after A became master — B was already there.
+    - Result: zero WebRTC data channels exist. broadcastState() iterates an
+      empty _dataChannels map. Nothing is ever sent or received. Both devices
+      are completely isolated.
+
+WHY THE SYNC INTERVAL DOESN'T HELP:
+  startMasterSync() calls broadcastState() every 1 second, which calls
+  sendCommand(). sendCommand() iterates _dataChannels and sends to open
+  channels. If _dataChannels is empty (because initiateWebRTC was never
+  called), it's a silent no-op. No errors, no feedback, just silence.
+
+FIX:
+  In both toggleMode() and claimMaster(), after becoming master, iterate
+  the already-known devices list and call initiateWebRTC() for each:
+
+  // In toggleMode(), inside the `if (becomeMaster)` block:
+  if (becomeMaster) {
+    startMasterSync(get)
+    // Connect to ALL already-present devices, not just future joiners
+    const { devices, deviceId, _channel } = get()
+    if (_channel) {
+      devices.forEach(d => {
+        if (d.deviceId !== deviceId) {
+          initiateWebRTC(d.deviceId, _channel, get, set)
+        }
+      })
+    }
+  }
+
+  // Apply the exact same change in claimMaster() after startMasterSync(get):
+  startMasterSync(get)
+  const { devices, _channel: ch } = get()
+  if (ch) {
+    devices.forEach(d => {
+      if (d.deviceId !== deviceId) {
+        initiateWebRTC(d.deviceId, ch, get, set)
+      }
+    })
+  }
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #2 — CRITICAL: "Play Here" (master transfer) is completely broken
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts  /  src/pages/You.tsx
+LINES:   claimMaster(), You.tsx line ~415
+
+WHAT'S WRONG:
+  When a remote device clicks "Play Here", it calls claimMaster(). This:
+    1. Sets isMaster=true locally on the new master (Device B).
+    2. Broadcasts 'master_claimed' to tell the old master (Device A) to step down.
+    3. Calls startMasterSync(get).
+
+  The old master (Device A) receives 'master_claimed', sets isMaster=false,
+  and clears its sync interval. Now Device A is a remote.
+
+  The problem: WebRTC connections are always initiated FROM the master TO
+  remotes (see initiateWebRTC). The old connections were:
+    A (master) ──data channel──► B (remote)
+
+  After transfer:
+    - B (new master) has NO data channels to anyone. It was a remote and
+      never called initiateWebRTC.
+    - A (new remote) has a data channel it opened TO B, but B's end is the
+      ondatachannel receiver side, registered in B's _dataChannels under
+      A's deviceId.
+    - B's _dataChannels has A's channel (from when A initiated to B), BUT
+      B is now master and should broadcast state — it can do this via that
+      existing channel to A. However, if there were more devices (C, D...),
+      B has no channels to them.
+    - A (now remote) will try to send commands via sendCommand() through
+      its _dataChannels. It has the channel to B. So A→B commands may work
+      in the simple 2-device case, but only by coincidence.
+
+  Additionally, claimMaster() does NOT call initiateWebRTC to establish
+  proper master→remote channels. This means a 3-device scenario is totally
+  broken after any transfer.
+
+FIX:
+  After a master transfer, the new master must re-initiate WebRTC as the
+  offerer (master role) to all other devices. The simplest fix is to close
+  all existing connections first (to avoid duplicate channels) and then
+  re-initiate from scratch:
+
+  claimMaster: () => {
+    const { _channel, deviceId, deviceName, deviceType, mode,
+            _connections, _dataChannels, devices } = get()
+
+    // Close old connections (we were a remote; reset to clean state)
+    _dataChannels.forEach(c => c.close())
+    _connections.forEach(c => c.close())
+    set({ isMaster: true, _connections: new Map(), _dataChannels: new Map() })
+
+    if (_channel && _channel.state === 'joined') {
+      _channel.track({ deviceId, deviceName, deviceType, mode, isMaster: true })
+      _channel.send({
+        type: 'broadcast',
+        event: 'master_claimed',
+        payload: { deviceId }
+      })
+    }
+
+    startMasterSync(get)
+
+    // Re-initiate WebRTC to all existing devices as the new master
+    if (_channel) {
+      devices.forEach(d => {
+        if (d.deviceId !== deviceId) {
+          initiateWebRTC(d.deviceId, _channel, get, set)
+        }
+      })
+    }
+  }
+
+  Also, the old master (upon receiving 'master_claimed') must close its
+  existing connections so the new master's offers don't conflict:
+
+  // In the 'master_claimed' broadcast handler:
+  channel.on('broadcast', { event: 'master_claimed' }, (payload) => {
+    if (payload.payload.deviceId !== get().deviceId && get().isMaster) {
+      const { _connections, _dataChannels } = get()
+      _dataChannels.forEach(c => c.close())
+      _connections.forEach(c => c.close())
+      set({
+        isMaster: false,
+        _connections: new Map(),
+        _dataChannels: new Map()
+      })
+      if (syncInterval) clearInterval(syncInterval)
+      // ... rest of existing code
+    }
+  })
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #3 — CRITICAL: Direct Zustand state mutation in handleCommand()
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINE:    ~305 (inside handleCommand, CLAIM_MASTER branch)
+
+WHAT'S WRONG:
+  if (msg.type === 'CLAIM_MASTER' && msg.payload !== deviceId) {
+    get().isMaster = false   // ← BUG: directly mutates the state object
+    ...
+  }
+
+  Zustand state is meant to be immutable. `get()` returns a snapshot of
+  the state; mutating it directly does NOT update the store, does NOT
+  trigger re-renders, and leads to inconsistency between the UI and the
+  internal state.
+
+  This particular code path is also handling a broadcast that's duplicated
+  by the 'master_claimed' channel event handler — suggesting this CLAIM_MASTER
+  message type may never even be sent (there's no matching sendCommand call
+  for it in the codebase), but the mutation bug would bite if it were used.
+
+FIX:
+  Replace the direct mutation with a proper set() call. Since handleCommand
+  doesn't have access to `set`, use the static setState:
+
+  if (msg.type === 'CLAIM_MASTER' && msg.payload !== deviceId) {
+    useNullVoidStore.setState({ isMaster: false })
+    const channel = useNullVoidStore.getState()._channel
+    if (channel) { /* update presence track */ }
+    if (syncInterval) clearInterval(syncInterval)
+    const player = usePlayerStore.getState()
+    if (player.isPlaying) player.pause()
+    return
+  }
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #4 — MEDIUM: Duplicate set({ devices }) call in presence sync handler
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINES:   ~84–86 (inside the 'sync' presence handler)
+
+WHAT'S WRONG:
+  channel.on('presence', { event: 'sync' }, () => {
+    // ... build `devices` array ...
+    set({ devices })   // ← first call
+    set({ devices })   // ← EXACT DUPLICATE, line added by mistake
+    // ...
+  })
+
+  This causes two re-renders per presence sync event and wastes a React
+  reconciliation cycle. Minor in isolation but compounds over time.
+
+FIX:
+  Delete the second `set({ devices })` line.
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #5 — MEDIUM: mediaSession handlers capture stale isRemote / sendCommand
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/components/player/Player.tsx
+LINE:    ~195–230 (the mediaSession useEffect with [] deps)
+
+WHAT'S WRONG:
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (isRemote) sendCommand({ type: 'CMD_PLAY' })  // stale closure!
+        else usePlayerStore.getState().togglePlay()
+      })
+      // ... same for pause, previoustrack, nexttrack
+    }
+    return () => { /* cleanup */ }
+  }, [])   // ← empty deps array
+
+  Because the deps array is empty, the handlers are registered ONCE at
+  mount and capture the initial values of `isRemote` and `sendCommand`.
+  If the user toggles NullVoid on or off during the session, `isRemote`
+  changes in the store but the registered media session handlers still
+  check the old (stale) value. This means:
+    - Hardware play/pause buttons and notification controls won't route
+      commands correctly after mode changes.
+    - If a user starts in separate mode, toggles to merged (remote), then
+      presses a hardware button, it acts as if still separate.
+
+FIX:
+  Add isRemote and sendCommand to the dependency array, or — better —
+  read from the store at call time instead of via closure:
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => {
+        const { mode, isMaster, sendCommand } = useNullVoidStore.getState()
+        if (mode === 'merged' && !isMaster) sendCommand({ type: 'CMD_PLAY' })
+        else usePlayerStore.getState().togglePlay()
+      })
+      navigator.mediaSession.setActionHandler('pause', () => {
+        const { mode, isMaster, sendCommand } = useNullVoidStore.getState()
+        if (mode === 'merged' && !isMaster) sendCommand({ type: 'CMD_PAUSE' })
+        else usePlayerStore.getState().togglePlay()
+      })
+      // ... same pattern for previoustrack and nexttrack
+    }
+    return () => { /* cleanup */ }
+  }, [])  // Now safe — reads store at call time, no stale closure
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #6 — MEDIUM: Remote device records play history for master's tracks
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/components/player/Player.tsx
+LINES:   ~130–145 (inside the currentTrack useEffect)
+
+WHAT'S WRONG:
+  useEffect(() => {
+    if (!currentTrack) return
+    // ...
+    // Record play history
+    if (user?.id && lastRecordedTrack.current !== track.id) {
+      lastRecordedTrack.current = track.id
+      recordPlayHistory(user.id, track)   // ← fires on REMOTE too
+    }
+  }, [currentTrack?.id])
+
+  When the master broadcasts STATE_SYNC, the remote device's `currentTrack`
+  is updated via usePlayerStore.setState(). This triggers the currentTrack
+  useEffect on the remote. The remote then records a play history entry for
+  a song it is not actually playing — it's just the controller.
+
+  This will pollute recommendation data and play counts for remote users.
+
+FIX:
+  Guard the recordPlayHistory call with an isRemote check:
+
+  // At the top of the effect, read the current sync mode:
+  const { mode, isMaster } = useNullVoidStore.getState()
+  const isCurrentlyRemote = mode === 'merged' && !isMaster
+
+  // Then guard the history recording:
+  if (user?.id && lastRecordedTrack.current !== track.id && !isCurrentlyRemote) {
+    lastRecordedTrack.current = track.id
+    recordPlayHistory(user.id, track)
+  }
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #7 — MEDIUM: Premature auto-fallback to separate mode
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINES:   ~88–97 (inside the presence 'sync' handler)
+
+WHAT'S WRONG:
+  if (get().mode === 'merged') {
+    if (devices.length <= 1) {
+      // Auto-fallback to separate if alone
+      get().toggleMode()
+    }
+    ...
+  }
+
+  This means: the moment a user turns on NullVoid (merged mode) on the FIRST
+  device, the presence sync event fires with devices.length === 1 (only this
+  device so far), and toggleMode() is immediately called — switching BACK to
+  separate mode before the user even has a chance to open a second device.
+
+  The feature essentially self-destructs upon activation on the first device.
+
+FIX:
+  Remove the auto-fallback entirely, OR add a grace period/threshold. The
+  "alone" state is fine — the user should see the "Open NullWave on another
+  device" hint (which already exists in You.tsx) and not be kicked out of
+  merged mode automatically:
+
+  if (get().mode === 'merged') {
+    // REMOVED: auto-fallback when alone. Let user stay in merged mode
+    // and wait for another device to join.
+    if (devices.length > 1) {
+      const hasMaster = devices.some(d => d.isMaster)
+      if (!hasMaster) {
+        const sorted = [...devices].sort((a, b) => a.deviceId.localeCompare(b.deviceId))
+        if (sorted[0].deviceId === get().deviceId) {
+          get().claimMaster()
+        }
+      }
+    }
+  }
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #8 — LOW: Module-level syncInterval causes issues with Vite HMR
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINE:    ~36
+
+WHAT'S WRONG:
+  let syncInterval: ReturnType<typeof setInterval> | null = null
+
+  This is a module-level variable shared across all uses of the store.
+  In Vite's dev mode with Hot Module Replacement, when nullVoidStore.ts
+  is modified, the module re-evaluates. `syncInterval` resets to null
+  but the old interval is still running (the old closure held the real
+  timer ID). You end up with a ghost sync interval that can never be
+  cleared, leading to stale state being broadcast after HMR updates.
+
+  In production this is less of a concern, but it can cause confusing
+  behavior during development.
+
+FIX:
+  Store the interval reference inside the Zustand state itself:
+
+  // Add to NullVoidState interface:
+  _syncInterval: ReturnType<typeof setInterval> | null
+
+  // Initialize in create():
+  _syncInterval: null
+
+  // In startMasterSync, replace the module var:
+  function startMasterSync(get: any, set: any) {
+    const { _syncInterval } = get()
+    if (_syncInterval) clearInterval(_syncInterval)
+    const id = setInterval(() => broadcastState(get), 1000)
+    set({ _syncInterval: id })
+  }
+
+  // In cleanup():
+  cleanup: () => {
+    const { _channel, _connections, _dataChannels, _syncInterval } = get()
+    if (_syncInterval) clearInterval(_syncInterval)
+    // ... rest of cleanup
+    set({ ..., _syncInterval: null })
+  }
+
+  Note: startMasterSync currently only receives `get`. Thread `set` through
+  all call sites (toggleMode, claimMaster, startMasterSync).
+
+
+════════════════════════════════════════════════════════════════════════════════
+BUG #9 — LOW: Master sync broadcasts before any WebRTC channels exist
+════════════════════════════════════════════════════════════════════════════════
+
+FILE:    src/store/nullVoidStore.ts
+LINES:   startMasterSync(), broadcastState()
+
+WHAT'S WRONG:
+  startMasterSync() starts a 1-second interval that calls broadcastState(),
+  which calls sendCommand(), which iterates _dataChannels. In the normal flow,
+  startMasterSync() is called BEFORE initiateWebRTC() connections are
+  established (WebRTC negotiation takes several hundred milliseconds to
+  complete). During this window, every broadcastState() call is a silent
+  no-op (empty _dataChannels).
+
+  This is mostly harmless since the interval keeps running and will eventually
+  hit a window when channels are open, but the first few seconds of sync are
+  guaranteed to be missed. If the WebRTC handshake takes longer than expected
+  (e.g. on mobile or behind NAT), the remote can be stale for 5–10 seconds.
+
+FIX:
+  In setupDataChannel's onopen handler, immediately broadcast state when a
+  new channel opens, so the remote is synced the moment the connection
+  is ready rather than waiting for the next interval tick:
+
+  dc.onopen = () => {
+    const { _dataChannels } = get()
+    _dataChannels.set(senderId, dc)
+    set({ _dataChannels: new Map(_dataChannels) })
+    // Immediately push current state to this new connection
+    if (get().isMaster) {
+      broadcastState(get)
+    }
+  }
+
+
+════════════════════════════════════════════════════════════════════════════════
+SUMMARY TABLE
+════════════════════════════════════════════════════════════════════════════════
+
+  #   Severity  File                    Description
+  ─   ────────  ──────────────────────  ─────────────────────────────────────
+  1   CRITICAL  nullVoidStore.ts        No WebRTC to already-present devices
+                                        → controls have zero effect cross-device
+  2   CRITICAL  nullVoidStore.ts        "Play Here" transfer broken; new master
+                                        has no data channels
+  3   CRITICAL  nullVoidStore.ts        Direct Zustand state mutation bypasses
+                                        reactivity (get().isMaster = false)
+  4   MEDIUM    nullVoidStore.ts        Presence sync fires set({ devices })
+                                        twice (double re-render)
+  5   MEDIUM    Player.tsx              mediaSession handlers capture stale
+                                        isRemote via empty-dep useEffect
+  6   MEDIUM    Player.tsx              Remote device records play history
+                                        for master's tracks
+  7   MEDIUM    nullVoidStore.ts        Auto-fallback kicks user out of merged
+                                        mode immediately upon enabling it
+  8   LOW       nullVoidStore.ts        Module-level syncInterval leaks across
+                                        HMR cycles in dev
+  9   LOW       nullVoidStore.ts        State broadcast starts before WebRTC
+                                        channels are ready (first sync delayed)
+
+════════════════════════════════════════════════════════════════════════════════
+RECOMMENDED FIX ORDER
+════════════════════════════════════════════════════════════════════════════════
+
+  Fix in this order for the fastest path to a working feature:
+
+  1. Bug #7 first — stop the auto-fallback so you can actually stay in
+     merged mode long enough to test.
+  2. Bug #1 — connect to already-present devices in toggleMode/claimMaster.
+  3. Bug #3 — fix the state mutation so demotion actually works.
+  4. Bug #2 — fix master transfer (claimMaster + old master cleanup).
+  5. Bug #9 — immediate sync on channel open (improves responsiveness).
+  6. Bug #5 — fix stale mediaSession handlers.
+  7. Bugs #4, #6, #8 — polish/cleanup pass.
+
+================================================================================
+END OF REPORT
+================================================================================

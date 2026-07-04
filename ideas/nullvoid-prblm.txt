@@ -1,0 +1,89 @@
+# Nullvoid Sync Debug Report & Fix Guide
+## Overview
+Nullvoid Sync aims to provide Spotify-like cross-device control (play/pause, seek, queue management, device switching) using Supabase Realtime (presence) + WebRTC DataChannels.
+
+Files analyzed:
+- src/store/nullVoidStore.ts (core logic)
+- src/store/playerStore.ts & queueStore.ts (state guards)
+- src/components/player/Player.tsx (UI + audio integration)
+- src/components/layout/AppLayout.tsx (init)
+- src/pages/You.tsx (likely device list placeholder)
+
+## Major Issues Identified
+
+### 1. WebRTC Connection & Signaling Fragility
+**Symptoms**: Devices don't see each other reliably; commands fail to propagate; "can't control from B".
+**Root Causes**:
+- `initiateWebRTC` only called from master on join.
+- No symmetric connection from remotes.
+- Silent failures in `handleSignal`, ICE candidates.
+- Single STUN server only.
+
+**Solutions**:
+- Make signaling bidirectional.
+- Add reconnection logic.
+(See code patch below)
+
+### 2. Master/Remote Logic & State Desync
+**Symptoms**: Controls don't work; audio plays on both; no switching.
+**Root Causes**:
+- `isRemote` check incomplete.
+- sendCommand not targeting master properly.
+- Audio engine not fully suppressed on remotes.
+- No device transfer command.
+
+**Solutions**:
+- Enhance `sendCommand` with master targeting.
+- Add `transferToDevice` action.
+
+### 3. Missing Device Switching UI/Logic
+**Symptoms**: "neither i can switch which device to play the song on".
+**Root Causes**:
+- No UI for devices list with "Play here" buttons.
+- No `becomeMaster` force command.
+
+**Solutions**:
+- Add device selector in Player.tsx or You.tsx.
+
+### 4. Other Bugs
+- Duplicate set({devices}) calls.
+- Incomplete cleanup.
+- Progress sync conflicts with audioManager.
+- No volume/lyrics sync.
+
+## Recommended Code Fixes
+
+**In nullVoidStore.ts** (key patches):
+
+```ts
+// Add to interface
+transferToDevice: (targetDeviceId: string) => void,
+
+// In sendCommand - improve targeting
+sendCommand: (cmd: any, targetId?: string) => {
+  const { isMaster, _dataChannels, devices } = get();
+  const masterDevice = devices.find(d => d.isMaster);
+  // ... logic to target correctly
+},
+
+// New action
+transferToDevice: (targetId: string) => {
+  // Send command to current master to hand over
+  // Then claim master locally + start audio
+},
+```
+
+**Player.tsx**:
+- Render device list when merged mode.
+- Buttons calling `useNullVoidStore.getState().transferToDevice(...)`
+
+**Full implementation guidance**: Prioritize WebRTC reliability first, then UI.
+
+## Next Steps
+1. Apply patches.
+2. Test with 2 browser tabs.
+3. Add TURN if needed.
+4. Deploy & monitor console.
+
+Report generated: 2026-06-29
+For questions, provide logs!

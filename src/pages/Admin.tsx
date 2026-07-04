@@ -260,7 +260,8 @@ function AdminDashboard() {
           avatar_url: updatedData.avatar_url || req.avatar_url,
           fav_artists: updatedData.fav_artists || req.fav_artists,
           fav_songs: updatedData.fav_songs || req.fav_songs,
-          instagram_id: updatedData.instagram_id || req.instagram_id
+          instagram_id: updatedData.instagram_id || req.instagram_id,
+          approved: true
         })
       }
 

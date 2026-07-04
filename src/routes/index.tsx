@@ -13,6 +13,7 @@ import { ArtistDetailPage } from '@/pages/ArtistDetail'
 import { AlbumDetailPage } from '@/pages/AlbumDetail'
 import { RequestAccessPage } from '@/pages/RequestAccess'
 import { AdminPage } from '@/pages/Admin'
+import { AuthCallback } from '@/pages/AuthCallback'
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,10 @@ export const router = createBrowserRouter([
   {
     path: '/req-access',
     element: <RequestAccessPage />,
+  },
+  {
+    path: '/auth/callback',
+    element: <AuthCallback />,
   },
   {
     path: '/admin',

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
 import { submitAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
 
 export function RequestAccessPage() {
@@ -18,6 +18,13 @@ export function RequestAccessPage() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
+  const [searchParams] = useSearchParams()
+
+  useState(() => {
+    if (searchParams.get('status') === 'pending') {
+      setIsSubmitted(true)
+    }
+  })
 
   const handleUploadPfp = async (file: File) => {
     setAvatarFile(file)
@@ -98,8 +105,8 @@ export function RequestAccessPage() {
             <CheckCircle2 size={40} className="text-green-400" />
           </motion.div>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-3xl font-display font-bold text-nw-text mb-3">You're on the list!</motion.h1>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="text-nw-text-secondary text-sm leading-relaxed mb-2">Thanks for your interest in <span className="text-nw-accent font-semibold">Nullwave</span>, {displayName}!</motion.p>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="text-nw-text-tertiary text-xs leading-relaxed mb-8">We'll email <span className="text-nw-text-secondary">{email}</span> when access is granted.</motion.p>
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="text-nw-text-secondary text-sm leading-relaxed mb-2">Thanks for your interest in <span className="text-nw-accent font-semibold">Nullwave</span>{displayName ? `, ${displayName}` : ''}!</motion.p>
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="text-nw-text-tertiary text-xs leading-relaxed mb-8">We'll email you when access is granted.</motion.p>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
             <Link to="/login" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white/[0.04] border border-white/[0.1] text-sm text-nw-text hover:bg-white/[0.08] transition-all group">
               Return to Login <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />

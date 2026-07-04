@@ -8,7 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ===== PROFILES =====
 
-export async function upsertFullProfile(userId: string, data: { username: string, email: string, avatar_url?: string | null, fav_artists?: string | null, fav_songs?: string | null, instagram_id?: string | null }) {
+export async function upsertFullProfile(userId: string, data: { username: string, email: string, avatar_url?: string | null, fav_artists?: string | null, fav_songs?: string | null, instagram_id?: string | null, approved?: boolean }) {
   const { error } = await supabase
     .from('users')
     .upsert({ id: userId, ...data, theme: 'system' }, { onConflict: 'id' })
@@ -508,4 +508,20 @@ export async function adminDeleteAuthUser(userId: string, jwt: string) {
     const data = await res.json().catch(() => ({}))
     throw new Error(data.error || 'Failed to delete auth user via worker')
   }
+}
+
+export function isGoogleConnected(user: any): boolean {
+  if (!user || !user.app_metadata || !user.app_metadata.providers) return false;
+  return user.app_metadata.providers.includes('google');
+}
+
+export async function checkUserApproval(userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('approved')
+    .eq('id', userId)
+    .single();
+  
+  if (error || !data) return false;
+  return !!data.approved;
 }
