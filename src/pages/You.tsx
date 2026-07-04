@@ -9,7 +9,7 @@ import { TrackRow } from '@/components/ui/TrackRow'
 import { useAuthStore, useThemeStore, useQueueStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
-import { isGoogleConnected } from '@/lib/supabase'
+import { isGoogleConnected, isXConnected } from '@/lib/supabase'
 
 export function YouPage() {
   const { user, setUser, logout } = useAuthStore()
@@ -21,6 +21,7 @@ export function YouPage() {
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameSuccess, setNameSuccess] = useState(false)
   const [isGoogleLinked, setIsGoogleLinked] = useState(false)
+  const [isXLinked, setIsXLinked] = useState(false)
 
   const [favSongs, setFavSongs] = useState(user?.favSongs || '')
   const [favArtists, setFavArtists] = useState(user?.favArtists || '')
@@ -47,6 +48,7 @@ export function YouPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsGoogleLinked(isGoogleConnected(session?.user))
+      setIsXLinked(isXConnected(session?.user))
     })
   }, [])
 
@@ -587,6 +589,32 @@ export function YouPage() {
                   })
                 }}
                 className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-white text-black hover:bg-gray-200 transition-colors"
+              >
+                LINK ACCOUNT
+              </button>
+            )}
+          </div>
+
+          <div className="border-t border-white/5" />
+
+          <div className="flex justify-between items-center py-2">
+            <div className="flex flex-col">
+              <span className="text-nw-text-secondary text-sm font-medium">X (Twitter) Account</span>
+              <span className="text-nw-text-tertiary text-xs">Used for fast login</span>
+            </div>
+            {isXLinked ? (
+              <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
+                CONNECTED
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  supabase.auth.linkIdentity({
+                    provider: 'x',
+                    options: { redirectTo: `${window.location.origin}/auth/callback` }
+                  })
+                }}
+                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-[#0f1419] text-white border border-nw-border-subtle hover:bg-[#272c30] transition-colors"
               >
                 LINK ACCOUNT
               </button>

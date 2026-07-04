@@ -27,10 +27,13 @@ export function AuthCallback() {
         if (isApproved) {
           // Check for linked identity email mismatches
           const identities = session.user.identities || []
-          const googleIdentity = identities.find(i => i.provider === 'google')
-          if (googleIdentity && googleIdentity.identity_data?.email && googleIdentity.identity_data.email !== session.user.email) {
-            setMessage('Email mismatch. Unlinking Google account...')
-            await supabase.auth.unlinkIdentity(googleIdentity)
+          // Find if any identity has a mismatched email
+          const mismatchedIdentity = identities.find(i => i.identity_data?.email && i.identity_data.email !== session.user.email)
+          
+          if (mismatchedIdentity) {
+            const providerName = mismatchedIdentity.provider === 'x' ? 'X' : mismatchedIdentity.provider.charAt(0).toUpperCase() + mismatchedIdentity.provider.slice(1)
+            setMessage(`Email mismatch. Unlinking ${providerName} account...`)
+            await supabase.auth.unlinkIdentity(mismatchedIdentity)
             // Redirect to You page with error so they know what happened
             navigate('/you?error=email_mismatch', { replace: true })
             return
