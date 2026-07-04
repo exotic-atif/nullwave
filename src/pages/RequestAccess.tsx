@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
 import { submitAccessRequest, completeAccessRequest, supabase } from '@/lib/supabase'
@@ -21,6 +21,7 @@ export function RequestAccessPage() {
   const [isCompleteProfile, setIsCompleteProfile] = useState(false)
   const [googleMsg, setGoogleMsg] = useState('')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     if (searchParams.get('status') === 'pending') {
