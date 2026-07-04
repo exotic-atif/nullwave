@@ -122,16 +122,21 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* Google Data Usage Section (Compliance) */}
-        <section className="py-24 px-6 lg:px-12 max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 mb-6">
-            <Shield size={32} className="text-nw-muted" />
-          </div>
-          <h2 className="text-2xl font-bold mb-4">Data Privacy & Authentication</h2>
-          <p className="text-nw-text-secondary leading-relaxed mb-8">
-            NullWave integrates with Google OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
-          </p>
-          <div className="flex justify-center gap-6">
+        {/* OAuth Data Usage Section (Compliance) */}
+        <section className="py-16 px-6 sm:px-12 relative z-10 max-w-4xl mx-auto">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-black/40 border border-white/5 backdrop-blur-md rounded-3xl p-8 sm:p-12 text-center"
+          >
+            <Shield className="w-12 h-12 text-nw-accent mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-white mb-4">How we use your data</h2>
+            <p className="text-nw-text-secondary leading-relaxed mb-6">
+              NullWave integrates with Google and X (formerly Twitter) OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
+            </p>
+          </motion.div>
+          <div className="flex justify-center gap-6 mt-8">
             <Link to="/privacy" className="text-sm font-medium text-nw-accent hover:underline">Read Privacy Policy</Link>
             <Link to="/terms" className="text-sm font-medium text-nw-accent hover:underline">Read Terms of Service</Link>
           </div>

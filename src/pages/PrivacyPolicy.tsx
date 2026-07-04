@@ -48,34 +48,38 @@ export function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center gap-3 text-blue-400">
-              <Lock size={24} />
-              <h2 className="text-xl font-bold text-white">Google OAuth Data Usage</h2>
+            <div className="flex items-center gap-3 text-nw-accent">
+              <Database size={24} />
+              <h2 className="text-xl font-bold text-white">Google and X (Twitter) OAuth Data Usage</h2>
             </div>
-            <p className="text-nw-text-secondary leading-relaxed">
-              Our application utilizes Google OAuth for secure authentication. When you choose to log in or link your account via Google, we access specific data in accordance with Google's API Services User Data Policy:
-            </p>
-            <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
-              <p className="text-nw-text-secondary text-sm">
-                <strong className="text-white">1. Data Accessed:</strong> We only request the minimum required scopes—specifically your basic profile information (Name and Profile Picture) and your primary email address.
+            <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
+              <p>
+                Our application utilizes Google and X (formerly Twitter) OAuth for secure authentication. When you choose to log in or link your account via these providers, we access specific data in accordance with their respective API Services User Data Policies:
               </p>
-              <p className="text-nw-text-secondary text-sm">
-                <strong className="text-white">2. Data Usage:</strong> Your Google data is strictly used to create your nullwave account identity, verify your email, and personalize your profile. We do not use this data for targeted advertising.
-              </p>
-              <p className="text-nw-text-secondary text-sm">
-                <strong className="text-white">3. Data Storage & Protection:</strong> Your Google data is securely stored in our encrypted database. We do not sell, rent, or trade your Google data to third parties.
-              </p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>
+                  <strong className="text-white">1. Data Collected:</strong> We collect your email address, name (or display name), and profile picture URL. We do not access your contacts, private messages, or any other sensitive information.
+                </li>
+                <li>
+                  <strong className="text-white">2. Data Usage:</strong> Your social data is strictly used to create your nullwave account identity, verify your email, and personalize your profile. We do not use this data for targeted advertising.
+                </li>
+                <li>
+                  <strong className="text-white">3. Data Storage & Protection:</strong> Your data is securely stored in our encrypted database. We do not sell, rent, or trade your data to third parties.
+                </li>
+              </ul>
             </div>
           </section>
 
           <section className="space-y-4">
-            <div className="flex items-center gap-3 text-green-400">
-              <Eye size={24} />
-              <h2 className="text-xl font-bold text-white">Your Rights & Choices</h2>
+            <div className="flex items-center gap-3 text-nw-accent">
+              <Lock size={24} />
+              <h2 className="text-xl font-bold text-white">Your Rights & Control</h2>
             </div>
-            <p className="text-nw-text-secondary leading-relaxed">
-              You have the right to request access to the personal data we hold about you, request corrections, or request deletion of your account. You can completely revoke our access to your Google account at any time through your Google Account Security Settings.
-            </p>
+            <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
+              <p>
+                You have the right to request access to the personal data we hold about you, request corrections, or request deletion of your account. You can completely revoke our access to your connected accounts at any time through your Google or X Account Security Settings.
+              </p>
+            </div>
           </section>
 
           <section className="space-y-4 border-t border-white/10 pt-8">

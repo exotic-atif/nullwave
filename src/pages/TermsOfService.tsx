@@ -39,15 +39,17 @@ export function TermsOfService() {
               <h2 className="text-xl font-bold text-white">User Accounts & Authentication</h2>
             </div>
             <p className="text-nw-text-secondary leading-relaxed">
-              When you create an account with us, whether manually or via third-party authentication like Google OAuth, you guarantee that the information you provide is accurate and current.
+              When you create an account with us, whether manually or via third-party authentication like Google or X OAuth, you guarantee that the information you provide is accurate and current.
             </p>
             <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2">
-              <p className="text-nw-text-secondary text-sm">
-                <strong className="text-white">Account Security:</strong> You are responsible for safeguarding your login credentials and for any activities or actions under your account.
-              </p>
-              <p className="text-nw-text-secondary text-sm">
-                <strong className="text-white">Google Account Integration:</strong> By connecting your Google account, you authorize us to access your basic profile information to establish your nullwave identity.
-              </p>
+              <div className="space-y-4 text-nw-text-secondary">
+                <p>
+                  <strong className="text-white">Account Responsibility:</strong> You are responsible for safeguarding the password or authentication credentials that you use to access the Service.
+                </p>
+                <p>
+                  <strong className="text-white">Social Account Integration:</strong> By connecting your Google or X (formerly Twitter) account, you authorize us to access your basic profile information to establish your nullwave identity.
+                </p>
+              </div>
               <p className="text-nw-text-secondary text-sm">
                 <strong className="text-white">Invite-Only Access:</strong> nullwave operates on an invite-only/approval basis. Creating an account or requesting access does not guarantee immediate entry to the Application.
               </p>
