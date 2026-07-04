@@ -247,18 +247,15 @@ function AdminDashboard() {
 
       let targetUserId = signUpData?.user?.id
 
-      if (!targetUserId && signUpError?.message.includes('User already registered')) {
-        // Fetch the user ID from public.users by email to update their existing profile
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', req.email)
-          .maybeSingle()
-        
-        if (existingUser) {
-          targetUserId = existingUser.id
+        if (!targetUserId && signUpError?.message.includes('User already registered')) {
+          // Fetch the user ID from auth.users via RPC
+          const { data: userId } = await supabase
+            .rpc('get_user_id_by_email', { p_email: req.email })
+          
+          if (userId) {
+            targetUserId = userId
+          }
         }
-      }
 
       // 2. Insert or Update public.users using the admin's session
       if (targetUserId) {

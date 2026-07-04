@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, upsertFullProfile, getProfile } from '@/lib/supabase'
+import { supabase, getProfile } from '@/lib/supabase'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -43,9 +43,6 @@ export const useAuthStore = create<AuthStore>()(
               if (profile.theme && profile.theme !== 'system') {
                 useThemeStore.getState().setTheme(profile.theme as any)
               }
-            } else {
-              // Create profile row for new user
-              await upsertFullProfile(u.id, { username: displayName, email: u.email || '' })
             }
 
             const appUser: User = {
@@ -128,9 +125,6 @@ export const useAuthStore = create<AuthStore>()(
             if (profile.theme && profile.theme !== 'system') {
               useThemeStore.getState().setTheme(profile.theme as any)
             }
-          } else {
-            // Create profile if first login
-            await upsertFullProfile(u.id, { username: displayName, email: u.email || '' })
           }
 
           const appUser: User = {
