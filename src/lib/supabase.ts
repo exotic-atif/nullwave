@@ -9,16 +9,69 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // ===== PROFILES =====
 
 export async function upsertFullProfile(userId: string, data: { username: string, email: string, avatar_url?: string | null, fav_artists?: string | null, fav_songs?: string | null, instagram_id?: string | null, approved?: boolean }) {
+  // First, fetch the existing profile to prevent overwriting user data
+  const existing = await getProfile(userId)
+  
+  const mergedData = {
+    ...data,
+    username: existing?.username || data.username,
+    avatar_url: existing?.avatar_url || data.avatar_url,
+    fav_artists: existing?.fav_artists || data.fav_artists,
+    fav_songs: existing?.fav_songs || data.fav_songs,
+    theme: existing?.theme || 'system',
+    // We only preserve 'approved' if it was already explicitly set true, 
+    // otherwise we might update it depending on the incoming data.
+  }
+
   const { error } = await supabase
     .from('users')
-    .upsert({ id: userId, ...data, theme: 'system' }, { onConflict: 'id' })
+    .upsert({ id: userId, ...mergedData }, { onConflict: 'id' })
+    
   if (error) {
     if (error.message.includes('users_email_key')) {
       await supabase
         .from('users')
-        .upsert({ id: userId, ...data, email: `${userId}@placeholder.nullwave`, theme: 'system' }, { onConflict: 'id' })
+        .upsert({ id: userId, ...mergedData, email: `${userId}@placeholder.nullwave` }, { onConflict: 'id' })
     } else {
       console.error('Failed to upsert full profile:', error.message)
+    }
+  }
+}
+
+/**
+ * Safely merge Google Metadata for an existing or new user.
+ * It will not overwrite existing customizations.
+ */
+export async function mergeGoogleProfile(userId: string, googleMetadata: any) {
+  if (!googleMetadata) return;
+
+  const { full_name, avatar_url, email } = googleMetadata;
+  const existing = await getProfile(userId);
+
+  // Determine what is missing and only update those fields
+  const updates: any = {};
+  
+  if (!existing?.username && full_name) {
+    updates.username = full_name;
+  }
+  
+  if (!existing?.avatar_url && avatar_url) {
+    updates.avatar_url = avatar_url;
+  }
+  
+  // If we found fields that need updating, update them safely
+  if (Object.keys(updates).length > 0) {
+    // Also include email if it wasn't saved properly (though users table enforces it)
+    if (email) updates.email = email;
+    
+    // Perform standard upsert but ONLY with the merged updates so we don't nullify anything
+    const { error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', userId);
+      
+    if (error) {
+      console.error('Failed to merge google profile:', error.message);
     }
   }
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, upsertFullProfile, getProfile } from '@/lib/supabase'
+import { supabase, upsertFullProfile, getProfile, mergeGoogleProfile } from '@/lib/supabase'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -42,6 +42,14 @@ export const useAuthStore = create<AuthStore>()(
               avatarUrl = profile.avatar_url || avatarUrl
               if (profile.theme && profile.theme !== 'system') {
                 useThemeStore.getState().setTheme(profile.theme as any)
+              }
+              
+              if (u.app_metadata?.providers?.includes('google')) {
+                await mergeGoogleProfile(u.id, {
+                  full_name: u.user_metadata?.full_name || u.user_metadata?.name,
+                  avatar_url: u.user_metadata?.avatar_url,
+                  email: u.email
+                })
               }
             } else {
               // Create profile row for new user
