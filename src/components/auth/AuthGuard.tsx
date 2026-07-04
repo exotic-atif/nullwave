@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store'
 import { Loader2 } from 'lucide-react'
 
 export function AuthGuard() {
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { user, isAuthenticated, isLoading } = useAuthStore()
   const location = useLocation()
 
   if (isLoading) {
@@ -19,6 +19,12 @@ export function AuthGuard() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname, search: location.search }} replace />
+  }
+
+  // MAJOR VULNERABILITY FIX: Ensure unapproved users cannot bypass AuthGuard
+  if (user && !user.approved && location.pathname !== '/req-access') {
+    const errorMsg = encodeURIComponent(`You don't have an account with the email ${user.email}. Request Access to use the app instead.`)
+    return <Navigate to={`/req-access?complete_profile=true&error_msg=${errorMsg}`} replace />
   }
 
   return <Outlet />

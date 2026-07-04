@@ -75,6 +75,7 @@ export interface User {
   favArtists?: string
   role: 'member' | 'contributor' | 'bug_tester' | 'helping_dev' | 'admin'
   createdAt: string
+  approved: boolean
 }
 
 export interface AuthState {

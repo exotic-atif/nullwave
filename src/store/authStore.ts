@@ -57,6 +57,7 @@ export const useAuthStore = create<AuthStore>()(
               favArtists: profile?.fav_artists || '',
               role: (profile?.role as any) || 'member',
               createdAt: u.created_at,
+              approved: profile?.approved || false,
             }
             set({ user: appUser, isAuthenticated: true })
           } else {
@@ -140,6 +141,7 @@ export const useAuthStore = create<AuthStore>()(
             favArtists: profile?.fav_artists || '',
             role: (profile?.role as any) || 'member',
             createdAt: u.created_at,
+            approved: profile?.approved || false,
           }
 
           set({ user: appUser, isAuthenticated: true, isLoading: false })
