@@ -183,7 +183,7 @@ export function RequestAccessPage() {
                   </button>
                   <button 
                     type="button" 
-                    onClick={() => supabase.auth.signInWithOAuth({ provider: 'twitter', options: { redirectTo: `${window.location.origin}/auth/callback` } })}
+                    onClick={() => supabase.auth.signInWithOAuth({ provider: 'x', options: { redirectTo: `${window.location.origin}/auth/callback` } })}
                     className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#0f1419] hover:bg-[#272c30] text-white font-semibold rounded-2xl transition-all border border-nw-border-subtle shadow-sm text-sm"
                   >
                     <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
