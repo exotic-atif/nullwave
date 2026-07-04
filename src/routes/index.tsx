@@ -16,8 +16,13 @@ import { AdminPage } from '@/pages/Admin'
 import { AuthCallback } from '@/pages/AuthCallback'
 import { PrivacyPolicy } from '@/pages/PrivacyPolicy'
 import { TermsOfService } from '@/pages/TermsOfService'
+import { LandingPage } from '@/pages/Landing'
 
 export const router = createBrowserRouter([
+  {
+    path: '/landing',
+    element: <LandingPage />,
+  },
   {
     path: '/login',
     element: <LoginPage />,
