@@ -97,8 +97,6 @@ export function RequestAccessPage() {
         } catch (err) {
           console.error('Failed to upload avatar:', err)
         }
-      }
-
       } else if (isCompleteProfile && avatarPreview) {
         // If they didn't upload a new file but we have a preview from Google
         uploadedUrl = avatarPreview
