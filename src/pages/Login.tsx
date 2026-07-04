@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthStore } from '@/store'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Radio, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -192,9 +192,16 @@ export function LoginPage() {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-[11px] text-nw-muted/50 mt-8">
-          Access is restricted. Contact admin for an invite.
-        </p>
+        <div className="text-center mt-8 space-y-2">
+          <p className="text-[11px] text-nw-muted/50">
+            Access is restricted. Contact admin for an invite.
+          </p>
+          <div className="flex justify-center gap-4 text-[10px] text-nw-muted/40 font-medium">
+            <Link to="/privacy" className="hover:text-nw-muted/80 transition-colors">Privacy Policy</Link>
+            <span>&bull;</span>
+            <Link to="/terms" className="hover:text-nw-muted/80 transition-colors">Terms of Service</Link>
+          </div>
+        </div>
       </motion.div>
     </div>
   )

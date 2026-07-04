@@ -14,6 +14,8 @@ import { AlbumDetailPage } from '@/pages/AlbumDetail'
 import { RequestAccessPage } from '@/pages/RequestAccess'
 import { AdminPage } from '@/pages/Admin'
 import { AuthCallback } from '@/pages/AuthCallback'
+import { PrivacyPolicy } from '@/pages/PrivacyPolicy'
+import { TermsOfService } from '@/pages/TermsOfService'
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +25,14 @@ export const router = createBrowserRouter([
   {
     path: '/req-access',
     element: <RequestAccessPage />,
+  },
+  {
+    path: '/privacy',
+    element: <PrivacyPolicy />,
+  },
+  {
+    path: '/terms',
+    element: <TermsOfService />,
   },
   {
     path: '/auth/callback',
