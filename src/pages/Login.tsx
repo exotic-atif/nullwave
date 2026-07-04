@@ -62,7 +62,7 @@ export function LoginPage() {
   const handleTwitterLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'x',
+        provider: 'twitter',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         }
