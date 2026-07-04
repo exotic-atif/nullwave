@@ -1,22 +1,28 @@
 import { motion } from 'framer-motion'
-import { Shield, Lock, Eye, Database } from 'lucide-react'
+import { Shield, Lock, Eye, Database, ArrowLeft } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 export function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-nw-bg text-nw-text font-sans p-6 lg:p-12 pb-24 lg:pb-12 max-w-4xl mx-auto">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-8"
-      >
-        <div className="space-y-4">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-            Privacy Policy
-          </h1>
-          <p className="text-sm text-nw-muted">Last Updated: July 4, 2026</p>
-        </div>
+    <div className="h-screen overflow-y-auto bg-nw-bg text-nw-text font-sans">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-12 pb-24">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-8"
+        >
+          <div className="space-y-4">
+            <Link to="/login" className="inline-flex items-center gap-2 text-nw-muted hover:text-white transition-colors mb-4 text-sm font-medium">
+              <ArrowLeft size={16} />
+              Back to Login
+            </Link>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+              Privacy Policy
+            </h1>
+            <p className="text-sm text-nw-muted">Last Updated: July 4, 2026</p>
+          </div>
 
-        <div className="p-6 md:p-8 rounded-3xl bg-nw-surface border border-nw-border space-y-8">
+          <div className="p-5 sm:p-8 rounded-3xl bg-nw-surface border border-nw-border space-y-8">
           <section className="space-y-4">
             <div className="flex items-center gap-3 text-nw-accent">
               <Shield size={24} />
@@ -84,6 +90,7 @@ export function PrivacyPolicy() {
           </section>
         </div>
       </motion.div>
+      </div>
     </div>
   )
 }
