@@ -432,7 +432,7 @@ export async function adminDeleteProfile(userId: string) {
 }
 
 // Pass auth JWT to the worker endpoint
-export async function adminUpdateAuthCredentials(userId: string, jwt: string, password?: string, email?: string) {
+export async function adminUpdateAuthCredentials(userId: string, jwt: string, password?: string, email?: string, username?: string) {
   const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
   const res = await fetch(`${workerUrl}/admin/update-user`, {
     method: 'POST',
@@ -440,7 +440,7 @@ export async function adminUpdateAuthCredentials(userId: string, jwt: string, pa
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${jwt}`
     },
-    body: JSON.stringify({ targetUserId: userId, password, email })
+    body: JSON.stringify({ targetUserId: userId, password, email, username })
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
@@ -493,4 +493,19 @@ export async function adminFetchUserLikedSongs(userId: string) {
 export async function adminDeleteUserLikedSong(itemId: string) {
   const { error } = await supabase.from('liked_tracks').delete().eq('id', itemId)
   if (error) throw new Error(error.message)
+}
+export async function adminDeleteAuthUser(userId: string, jwt: string) {
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const res = await fetch(`${workerUrl}/admin/delete-user`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify({ targetUserId: userId })
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Failed to delete auth user via worker')
+  }
 }

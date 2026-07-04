@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Users, Search, Edit, Trash2 } from 'lucide-react'
-import { fetchAllProfiles, adminDeleteProfile } from '@/lib/supabase'
+import { fetchAllProfiles, adminDeleteProfile, adminDeleteAuthUser, supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditUserModal } from './EditUserModal'
 import { RoleBadge } from '@/components/ui/RoleBadge'
@@ -23,6 +23,14 @@ export function ProfileManagement() {
   const handleDelete = async (userId: string) => {
     if (!window.confirm('Are you sure you want to permanently delete this user?')) return
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        try {
+          await adminDeleteAuthUser(userId, session.access_token)
+        } catch (e) {
+          console.warn('Auth user delete failed or user not in auth', e)
+        }
+      }
       await adminDeleteProfile(userId)
       setUsers(prev => prev.filter(u => u.id !== userId))
       toast.success('User deleted successfully')

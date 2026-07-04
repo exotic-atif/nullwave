@@ -58,14 +58,15 @@ export function EditUserModal({ user, onClose, onUpdate }: { user: any, onClose:
       })
 
       // 2. Update auth credentials if needed via worker
-      if (newPassword || data.email !== user.email) {
+      if (newPassword || (data.email && data.email !== user.email) || data.username !== user.username) {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) throw new Error('No admin session')
         await adminUpdateAuthCredentials(
           user.id,
           session.access_token,
           newPassword || undefined,
-          data.email !== user.email ? data.email : undefined
+          (data.email && data.email !== user.email) ? data.email : undefined,
+          data.username !== user.username ? data.username : undefined
         )
       }
 

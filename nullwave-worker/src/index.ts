@@ -572,7 +572,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin, env) })
     }
 
-    if (request.method !== 'GET' && request.method !== 'POST') {
+    if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'DELETE') {
       return json({ error: 'Method not allowed' }, 405, origin, env)
     }
 
@@ -686,7 +686,7 @@ export default {
 
         try {
           const body = await request.json() as any
-          const { targetUserId, password, email } = body
+          const { targetUserId, password, email, username } = body
 
           if (!targetUserId) {
             return json({ error: 'Missing targetUserId' }, 400, origin, env)
@@ -718,6 +718,7 @@ export default {
           const updateData: any = {}
           if (password) updateData.password = password
           if (email) updateData.email = email
+          if (username) updateData.user_metadata = { full_name: username }
           if (Object.keys(updateData).length === 0) return json({ success: true }, 200, origin, env)
 
           const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
@@ -741,8 +742,56 @@ export default {
         }
       }
 
-      // Added POST to method check
-      if (request.method !== 'GET' && path !== '/sign-upload' && path !== '/admin/update-user') {
+      // DELETE /admin/delete-user
+      if (path === '/admin/delete-user' && request.method === 'DELETE') {
+        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
+        }
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader) return json({ error: 'Missing Authorization header' }, 401, origin, env)
+
+        try {
+          const body = await request.json() as any
+          const { targetUserId } = body
+          if (!targetUserId) return json({ error: 'Missing targetUserId' }, 400, origin, env)
+
+          // Verify caller JWT & role
+          const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+            headers: { 'Authorization': authHeader, 'apikey': env.SUPABASE_SERVICE_ROLE_KEY }
+          })
+          if (!verifyRes.ok) return json({ error: 'Unauthorized JWT' }, 401, origin, env)
+          const callerObj = await verifyRes.json() as any
+          
+          const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
+            headers: { 'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'apikey': env.SUPABASE_SERVICE_ROLE_KEY }
+          })
+          const roleData = await roleCheckRes.json() as any
+          if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
+            return json({ error: 'Forbidden: Admins only' }, 403, origin, env)
+          }
+
+          const deleteRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
+            }
+          })
+
+          if (!deleteRes.ok) {
+            const errBody = await deleteRes.text()
+            return json({ error: `Failed to delete auth user: ${errBody}` }, 500, origin, env)
+          }
+
+          return json({ success: true }, 200, origin, env)
+        } catch (e: any) {
+          return json({ error: e.message }, 500, origin, env)
+        }
+      }
+
+      // Added POST and DELETE to method check
+      if (request.method !== 'GET' && request.method !== 'DELETE' && path !== '/sign-upload' && path !== '/admin/update-user' && path !== '/admin/delete-user') {
         return json({ error: 'Method not allowed' }, 405, origin, env)
       }
 
