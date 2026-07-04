@@ -424,6 +424,25 @@ export async function submitAccessRequest(data: {
   if (error) throw new Error(error.message)
 }
 
+export async function completeAccessRequest(data: {
+  email: string
+  display_name: string
+  avatar_url?: string
+  fav_artists?: string
+  fav_songs?: string
+  instagram_id?: string
+}) {
+  const { error } = await supabase.rpc('complete_access_request', {
+    p_email: data.email,
+    p_display_name: data.display_name,
+    p_avatar_url: data.avatar_url || null,
+    p_fav_artists: data.fav_artists || null,
+    p_fav_songs: data.fav_songs || null,
+    p_instagram_id: data.instagram_id || null
+  })
+  if (error) throw new Error(error.message)
+}
+
 export async function fetchAccessRequests(): Promise<AccessRequest[]> {
   const { data, error } = await supabase
     .from('access_requests')

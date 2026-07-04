@@ -25,16 +25,26 @@ export function AuthCallback() {
         const isApproved = await checkUserApproval(session.user.id)
 
         if (isApproved) {
+          // Check for linked identity email mismatches
+          const identities = session.user.identities || []
+          const googleIdentity = identities.find(i => i.provider === 'google')
+          if (googleIdentity && googleIdentity.identity_data?.email && googleIdentity.identity_data.email !== session.user.email) {
+            setMessage('Email mismatch. Unlinking Google account...')
+            await supabase.auth.unlinkIdentity(googleIdentity)
+            // Redirect to You page with error so they know what happened
+            navigate('/you?error=email_mismatch', { replace: true })
+            return
+          }
+
           setMessage('Welcome back!')
           // Initialize auth store to update global state and fetch profile
           await init()
           navigate('/', { replace: true })
         } else {
-          // If not approved, sign out so they don't have an active session
-          setMessage('Account pending approval...')
-          await supabase.auth.signOut()
-          // Redirect to request access page with pending state
-          navigate('/req-access?status=pending', { replace: true })
+          // If not approved, redirect to complete profile
+          setMessage('Redirecting to Request Access...')
+          const errorMsg = encodeURIComponent(`You don't have an account with the email ${session.user.email}. Request Access to use the app instead.`)
+          navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
         }
       } catch (err) {
         console.error('Callback error:', err)

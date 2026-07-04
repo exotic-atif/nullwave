@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
-import { submitAccessRequest, supabase } from '@/lib/supabase'
+import { submitAccessRequest, completeAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
 
 export function RequestAccessPage() {
@@ -18,13 +18,32 @@ export function RequestAccessPage() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
-  const [searchParams] = useSearchParams()
+  const [isCompleteProfile, setIsCompleteProfile] = useState(false)
+  const [googleMsg, setGoogleMsg] = useState('')
+  const navigate = useNavigate()
 
-  useState(() => {
+  useEffect(() => {
     if (searchParams.get('status') === 'pending') {
       setIsSubmitted(true)
     }
-  })
+
+    if (searchParams.get('complete_profile') === 'true') {
+      setIsCompleteProfile(true)
+      const errMsg = searchParams.get('error_msg')
+      if (errMsg) setGoogleMsg(errMsg)
+      
+      // Load session info from Google auth
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setEmail(session.user.email || '')
+          setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || '')
+          if (session.user.user_metadata?.avatar_url) {
+            setAvatarPreview(session.user.user_metadata.avatar_url)
+          }
+        }
+      })
+    }
+  }, [searchParams])
 
   const handleUploadPfp = async (file: File) => {
     setAvatarFile(file)
@@ -49,17 +68,21 @@ export function RequestAccessPage() {
     setIsSubmitting(true)
     try {
       const normalizedEmail = email.trim().toLowerCase()
-      const { data: checkResult, error: rpcError } = await supabase
-        .rpc('check_email_available', { check_email: normalizedEmail })
+      
+      // We skip duplicate check if we are completing a profile since the DB row was already created by the trigger
+      if (!isCompleteProfile) {
+        const { data: checkResult, error: rpcError } = await supabase
+          .rpc('check_email_available', { check_email: normalizedEmail })
 
-      if (!rpcError && checkResult && !checkResult.available) {
-        if (checkResult.reason === 'already_registered') {
-          setError('This email is already registered. Try signing in instead.')
-        } else {
-          setError('You\'ve already submitted a request with this email. Hang tight!')
+        if (!rpcError && checkResult && !checkResult.available) {
+          if (checkResult.reason === 'already_registered') {
+            setError('This email is already registered. Try signing in instead.')
+          } else {
+            setError('You\'ve already submitted a request with this email. Hang tight!')
+          }
+          setIsSubmitting(false)
+          return
         }
-        setIsSubmitting(false)
-        return
       }
 
       let uploadedUrl = null
@@ -76,14 +99,31 @@ export function RequestAccessPage() {
         }
       }
 
-      await submitAccessRequest({
-        display_name: displayName.trim(),
-        email: normalizedEmail,
-        avatar_url: uploadedUrl || undefined,
-        fav_artists: favArtists.trim() || undefined,
-        fav_songs: favSongs.trim() || undefined,
-        instagram_id: instagramId.trim() || undefined
-      })
+      } else if (isCompleteProfile && avatarPreview) {
+        // If they didn't upload a new file but we have a preview from Google
+        uploadedUrl = avatarPreview
+      }
+
+      if (isCompleteProfile) {
+        await completeAccessRequest({
+          display_name: displayName.trim(),
+          email: normalizedEmail,
+          avatar_url: uploadedUrl || undefined,
+          fav_artists: favArtists.trim() || undefined,
+          fav_songs: favSongs.trim() || undefined,
+          instagram_id: instagramId.trim() || undefined
+        })
+        await supabase.auth.signOut()
+      } else {
+        await submitAccessRequest({
+          display_name: displayName.trim(),
+          email: normalizedEmail,
+          avatar_url: uploadedUrl || undefined,
+          fav_artists: favArtists.trim() || undefined,
+          fav_songs: favSongs.trim() || undefined,
+          instagram_id: instagramId.trim() || undefined
+        })
+      }
 
       setIsSubmitted(true)
     } catch (err: any) {
@@ -131,6 +171,35 @@ export function RequestAccessPage() {
 
         <div className="p-[1px] rounded-3xl bg-gradient-to-b from-white/[0.12] to-white/[0.02] shadow-2xl shadow-black/50">
           <form onSubmit={handleSubmit} className="bg-nw-surface/80 border border-white/[0.04] backdrop-blur-3xl rounded-3xl p-6 sm:p-8 flex flex-col gap-6">
+            {!isCompleteProfile && (
+              <div className="flex flex-col items-center w-full mb-2">
+                <button 
+                  type="button" 
+                  onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } })}
+                  className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-black font-semibold rounded-2xl transition-all shadow-sm"
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                  </svg>
+                  Continue with Google
+                </button>
+                <div className="relative flex items-center w-full mt-6">
+                  <div className="flex-grow border-t border-white/[0.08]"></div>
+                  <span className="flex-shrink-0 mx-4 text-[10px] text-nw-muted uppercase tracking-widest font-medium">or sign up with email</span>
+                  <div className="flex-grow border-t border-white/[0.08]"></div>
+                </div>
+              </div>
+            )}
+            
+            {googleMsg && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-sm text-amber-400 text-center">
+                {googleMsg}
+              </motion.div>
+            )}
+
             <div className="flex flex-col items-center mb-2">
               <div className="relative group cursor-pointer" onClick={() => setIsPfpModalOpen(true)}>
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-white/[0.04] border-2 border-white/[0.1] group-hover:border-nw-accent/50 transition-all duration-300 relative shadow-inner flex items-center justify-center">
@@ -168,8 +237,16 @@ export function RequestAccessPage() {
               </div>
 
               <div className="relative group">
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} id="email" className="peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all" placeholder=" " />
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} disabled={isCompleteProfile} id="email" className={`peer w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 pt-6 pb-2 ${isCompleteProfile ? 'text-nw-muted cursor-not-allowed' : 'text-white'} text-sm focus:outline-none focus:border-nw-accent/50 focus:bg-nw-accent/5 transition-all`} placeholder=" " />
                 <label htmlFor="email" className="absolute left-4 top-4 text-xs text-nw-muted transition-all peer-focus:-translate-y-2 peer-focus:text-[10px] peer-focus:text-nw-accent peer-[:not(:placeholder-shown)]:-translate-y-2 peer-[:not(:placeholder-shown)]:text-[10px]">Email Address</label>
+                {isCompleteProfile && (
+                  <svg viewBox="0 0 24 24" className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-nw-muted/50" aria-hidden="true">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="currentColor" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="currentColor" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="currentColor" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="currentColor" />
+                  </svg>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -190,9 +267,18 @@ export function RequestAccessPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={isSubmitting} className="w-full py-4 mt-2 bg-gradient-to-r from-nw-accent to-purple-600 hover:from-nw-accent-hover hover:to-purple-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 group">
-              {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <>Request Access <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>}
-            </button>
+            {isCompleteProfile ? (
+              <div className="flex items-center gap-3 mt-2">
+                <button type="button" onClick={async () => { await supabase.auth.signOut(); navigate('/login') }} className="flex-1 py-4 bg-white/[0.05] hover:bg-white/[0.1] text-white font-bold rounded-2xl transition-all">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-[2] py-4 bg-gradient-to-r from-nw-accent to-purple-600 hover:from-nw-accent-hover hover:to-purple-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 group">
+                  {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <>Submit Request <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>}
+                </button>
+              </div>
+            ) : (
+              <button type="submit" disabled={isSubmitting} className="w-full py-4 mt-2 bg-gradient-to-r from-nw-accent to-purple-600 hover:from-nw-accent-hover hover:to-purple-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] flex items-center justify-center gap-2 group">
+                {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <>Request Access <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>}
+              </button>
+            )}
           </form>
         </div>
 
