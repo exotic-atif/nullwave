@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, upsertFullProfile, getProfile, mergeGoogleProfile } from '@/lib/supabase'
+import { supabase, upsertFullProfile, getProfile } from '@/lib/supabase'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -32,7 +32,7 @@ export const useAuthStore = create<AuthStore>()(
 
           if (session?.user) {
             const u = session.user
-            let displayName = u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
+            let displayName = u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
             let avatarUrl = u.user_metadata?.avatar_url
             
             // Try to fetch profile from db
@@ -116,7 +116,7 @@ export const useAuthStore = create<AuthStore>()(
         }
 
           const u = data.user
-          let displayName = u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
+          let displayName = u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
           let avatarUrl = u.user_metadata?.avatar_url
           
           const profile = await getProfile(u.id)

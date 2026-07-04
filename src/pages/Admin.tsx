@@ -12,8 +12,7 @@ import {
   updateAccessRequest, 
   deleteAccessRequest, 
   supabaseUrl, 
-  supabaseAnonKey, 
-  upsertFullProfile,
+  supabaseAnonKey,
   adminForceUpdateProfile 
 } from '@/lib/supabase'
 import type { AccessRequest } from '@/lib/supabase'
