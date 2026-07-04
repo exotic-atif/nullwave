@@ -84,8 +84,8 @@ export function LoginPage() {
         transition={{ duration: 0.5 }}
         className="relative z-10 w-full max-w-sm mx-4"
       >
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-10">
+        {/* Logo and Description */}
+        <div className="flex flex-col items-center mb-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-nw-accent to-nw-accent-glow flex items-center justify-center shadow-2xl shadow-nw-accent-glow/20 mb-4">
             <Radio size={24} className="text-white" />
           </div>
@@ -95,6 +95,16 @@ export function LoginPage() {
           <p className="text-xs text-nw-muted mt-1.5 uppercase tracking-[0.25em]">
             invite only
           </p>
+          
+          <div className="mt-6 space-y-3 px-2">
+            <p className="text-sm text-nw-text-secondary leading-relaxed">
+              NullWave is an exclusive music streaming platform. Discover, curate, and stream your favorite tracks in a premium environment.
+            </p>
+            <div className="text-[11px] text-nw-text-tertiary leading-relaxed bg-nw-surface/50 p-3 rounded-xl border border-nw-border-subtle text-left">
+              <strong className="text-nw-text-secondary block mb-1">Why connect with Google?</strong>
+              We use your Google profile (Name, Email, and Profile Picture) strictly to securely create your NullWave identity, authenticate your session, and verify your invite status.
+            </div>
+          </div>
         </div>
 
         {/* Form */}
