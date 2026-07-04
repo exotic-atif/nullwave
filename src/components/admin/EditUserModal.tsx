@@ -166,16 +166,28 @@ export function EditUserModal({ user, onClose, onUpdate }: { user: any, onClose:
                     className="w-full px-3 py-2 bg-nw-surface/50 border border-white/[0.06] rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/40"
                   />
                 </div>
-                <div>
+                <div className="relative group/role">
                   <label className="block text-xs text-nw-text-tertiary mb-1">Role / Badge</label>
-                  <select
-                    value={data.role || 'member'}
-                    onChange={e => setData({...data, role: e.target.value})}
-                    className="w-full px-3 py-2 bg-nw-surface/50 border border-white/[0.06] rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/40"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="member">Member</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={data.role || 'member'}
+                      onChange={e => setData({...data, role: e.target.value})}
+                      className="w-full px-3 py-2 bg-black/40 border border-white/[0.08] rounded-xl text-sm text-nw-text focus:outline-none focus:border-nw-accent/50 appearance-none cursor-pointer hover:bg-white/[0.02] transition-colors"
+                      style={{
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none'
+                      }}
+                    >
+                      <option value="admin" className="bg-[#121212] text-white py-2">Admin</option>
+                      <option value="helping_dev" className="bg-[#121212] text-white py-2">Helping Dev</option>
+                      <option value="bug_tester" className="bg-[#121212] text-white py-2">Bug Tester</option>
+                      <option value="contributor" className="bg-[#121212] text-white py-2">Contributor</option>
+                      <option value="member" className="bg-[#121212] text-white py-2">Member</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-nw-muted">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-nw-text-tertiary mb-1">Reset Password (Optional)</label>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
-import { submitAccessRequest, completeAccessRequest, cancelAccessRequest, supabase } from '@/lib/supabase'
+import { submitAccessRequest, cancelAccessRequest, supabase } from '@/lib/supabase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
@@ -70,20 +70,17 @@ export function RequestAccessPage() {
     try {
       const normalizedEmail = email.trim().toLowerCase()
       
-      // We skip duplicate check if we are completing a profile since the DB row was already created by the trigger
-      if (!isCompleteProfile) {
-        const { data: checkResult, error: rpcError } = await supabase
-          .rpc('check_email_available', { check_email: normalizedEmail })
+      const { data: checkResult, error: rpcError } = await supabase
+        .rpc('check_email_available', { check_email: normalizedEmail })
 
-        if (!rpcError && checkResult && !checkResult.available) {
-          if (checkResult.reason === 'already_registered') {
-            setError('This email is already registered. Try signing in instead.')
-          } else {
-            setError('You\'ve already submitted a request with this email. Hang tight!')
-          }
-          setIsSubmitting(false)
-          return
+      if (!rpcError && checkResult && !checkResult.available) {
+        if (checkResult.reason === 'already_registered') {
+          setError('This email is already registered. Try signing in instead.')
+        } else {
+          setError('You\'ve already submitted a request! Please be patient or contact the Admin at skjinnatali11@gmail.com or Instagram @exotic_atif.')
         }
+        setIsSubmitting(false)
+        return
       }
 
       let uploadedUrl = null
@@ -103,25 +100,17 @@ export function RequestAccessPage() {
         uploadedUrl = avatarPreview
       }
 
+      await submitAccessRequest({
+        display_name: displayName.trim(),
+        email: normalizedEmail,
+        avatar_url: uploadedUrl || undefined,
+        fav_artists: favArtists.trim() || undefined,
+        fav_songs: favSongs.trim() || undefined,
+        instagram_id: instagramId.trim() || undefined
+      })
+      
       if (isCompleteProfile) {
-        await completeAccessRequest({
-          display_name: displayName.trim(),
-          email: normalizedEmail,
-          avatar_url: uploadedUrl || undefined,
-          fav_artists: favArtists.trim() || undefined,
-          fav_songs: favSongs.trim() || undefined,
-          instagram_id: instagramId.trim() || undefined
-        })
         await supabase.auth.signOut()
-      } else {
-        await submitAccessRequest({
-          display_name: displayName.trim(),
-          email: normalizedEmail,
-          avatar_url: uploadedUrl || undefined,
-          fav_artists: favArtists.trim() || undefined,
-          fav_songs: favSongs.trim() || undefined,
-          instagram_id: instagramId.trim() || undefined
-        })
       }
 
       setIsSubmitted(true)
