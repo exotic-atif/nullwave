@@ -92,6 +92,7 @@ export const useAuthStore = create<AuthStore>()(
                   favArtists: profile?.fav_artists || '',
                   role: (profile?.role as any) || 'member',
                   createdAt: u.created_at,
+                  approved: profile?.approved || false,
                 },
                 isAuthenticated: true,
               })
