@@ -16,7 +16,7 @@ export function RequestAccessPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<React.ReactNode>('')
   const [isPfpModalOpen, setIsPfpModalOpen] = useState(false)
   const [isCompleteProfile, setIsCompleteProfile] = useState(false)
   const [googleMsg, setGoogleMsg] = useState('')
@@ -77,7 +77,13 @@ export function RequestAccessPage() {
         if (checkResult.reason === 'already_registered') {
           setError('This email is already registered. Try signing in instead.')
         } else {
-          setError('You\'ve already submitted a request! Please be patient or contact the Admin at skjinnatali11@gmail.com or Instagram @exotic_atif.')
+          setError(
+            <>
+              You've already submitted a request! Please be patient or contact the Admin at{' '}
+              <a href="mailto:mratif00007@gmail.com" className="text-nw-accent hover:underline font-semibold">mratif00007@gmail.com</a>{' '}
+              or Instagram <a href="https://instagram.com/exotic_atif" target="_blank" rel="noopener noreferrer" className="text-nw-accent hover:underline font-semibold">@exotic_atif</a>.
+            </>
+          )
         }
         setIsSubmitting(false)
         return
