@@ -6,7 +6,16 @@ import {
   Search, ChevronDown, Mail, Music, Sparkles, LogOut
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
-import { supabase, fetchAccessRequests, updateAccessRequest, deleteAccessRequest, supabaseUrl, supabaseAnonKey, upsertFullProfile } from '@/lib/supabase'
+import { 
+  supabase, 
+  fetchAccessRequests, 
+  updateAccessRequest, 
+  deleteAccessRequest, 
+  supabaseUrl, 
+  supabaseAnonKey, 
+  upsertFullProfile,
+  adminForceUpdateProfile 
+} from '@/lib/supabase'
 import type { AccessRequest } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import { ProfileManagement } from '@/components/admin/ProfileManagement'
@@ -254,7 +263,7 @@ function AdminDashboard() {
 
       // 2. Insert or Update public.users using the admin's session
       if (targetUserId) {
-        await upsertFullProfile(targetUserId, {
+        await adminForceUpdateProfile(targetUserId, {
           username: updatedData.display_name || req.display_name,
           email: req.email,
           avatar_url: updatedData.avatar_url || req.avatar_url,

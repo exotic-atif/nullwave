@@ -43,14 +43,6 @@ export const useAuthStore = create<AuthStore>()(
               if (profile.theme && profile.theme !== 'system') {
                 useThemeStore.getState().setTheme(profile.theme as any)
               }
-              
-              if (u.app_metadata?.providers?.includes('google')) {
-                await mergeGoogleProfile(u.id, {
-                  full_name: u.user_metadata?.full_name || u.user_metadata?.name,
-                  avatar_url: u.user_metadata?.avatar_url,
-                  email: u.email
-                })
-              }
             } else {
               // Create profile row for new user
               await upsertFullProfile(u.id, { username: displayName, email: u.email || '' })

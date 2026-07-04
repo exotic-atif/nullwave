@@ -38,6 +38,25 @@ export async function upsertFullProfile(userId: string, data: { username: string
   }
 }
 
+export async function adminForceUpdateProfile(userId: string, data: any) {
+  // Fetch existing just to preserve theme, etc.
+  const existing = await getProfile(userId)
+  
+  const payload = {
+    ...data,
+    theme: existing?.theme || 'system'
+  }
+  
+  const { error } = await supabase
+    .from('users')
+    .upsert({ id: userId, ...payload }, { onConflict: 'id' })
+    
+  if (error) {
+    console.error('Failed to force update profile:', error.message)
+    throw error
+  }
+}
+
 /**
  * Safely merge Google Metadata for an existing or new user.
  * It will not overwrite existing customizations.
