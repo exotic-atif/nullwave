@@ -30,7 +30,7 @@ export function AuthCallback() {
         if (isApproved) {
           // Check for linked identity email mismatches
           const identities = session.user.identities || []
-          const mismatchedIdentity = identities.find(i => i.identity_data?.email && i.identity_data.email !== session.user.email)
+          const mismatchedIdentity = identities.find((i: any) => i.identity_data?.email && i.identity_data.email !== session.user.email)
           
           if (mismatchedIdentity) {
             const providerName = mismatchedIdentity.provider === 'x' ? 'X' : mismatchedIdentity.provider.charAt(0).toUpperCase() + mismatchedIdentity.provider.slice(1)
