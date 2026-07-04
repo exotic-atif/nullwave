@@ -24,7 +24,7 @@ export function LandingPage() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-nw-accent to-nw-accent-glow flex items-center justify-center shadow-lg shadow-nw-accent-glow/20">
             <Radio size={20} className="text-white" />
           </div>
-          <span className="font-display font-bold text-xl tracking-tight">nullwave</span>
+          <span className="font-display font-bold text-xl tracking-tight">Nullwave | By Atif Arman</span>
         </div>
         <div className="flex items-center gap-4">
           <Link to="/login" className="text-sm font-medium text-nw-text-secondary hover:text-white transition-colors">
@@ -141,7 +141,7 @@ export function LandingPage() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/5 py-8 px-6 lg:px-12 text-center">
         <p className="text-xs text-nw-text-tertiary">
-          &copy; {new Date().getFullYear()} nullwave. All rights reserved.
+          &copy; {new Date().getFullYear()} Nullwave | By Atif Arman. All rights reserved.
         </p>
       </footer>
     </div>
