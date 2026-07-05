@@ -59,17 +59,17 @@ export function LoginPage() {
     }
   }
 
-  const handleTwitterLogin = async () => {
+  const handleGithubLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'x',
+        provider: 'github',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         }
       })
       if (error) throw error
     } catch (err) {
-      setError((err as Error).message || 'Failed to initialize X Login')
+      setError((err as Error).message || 'Failed to initialize GitHub Login')
     }
   }
 
@@ -178,7 +178,6 @@ export function LoginPage() {
               'Sign in'
             )}
           </button>
-        </form>
           
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -217,7 +216,7 @@ export function LoginPage() {
               Continue with GitHub
             </button>
           </div>
-        </div>
+        </form>
 
         {/* Footer */}
         <div className="text-center mt-8 space-y-2">
