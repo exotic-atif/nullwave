@@ -17,6 +17,7 @@ import { AuthCallback } from '@/pages/AuthCallback'
 import { PrivacyPolicy } from '@/pages/PrivacyPolicy'
 import { TermsOfService } from '@/pages/TermsOfService'
 import { LandingPage } from '@/pages/Landing'
+import { DataDeletion } from '@/pages/DataDeletion'
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +39,10 @@ export const router = createBrowserRouter([
   {
     path: '/terms',
     element: <TermsOfService />,
+  },
+  {
+    path: '/data-deletion',
+    element: <DataDeletion />,
   },
   {
     path: '/auth/callback',

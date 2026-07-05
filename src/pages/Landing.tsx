@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Radio, Play, Shield, Sparkles, Music, Lock, ChevronRight } from 'lucide-react'
+import { Radio, Play, Shield, Sparkles, Music, Lock, ChevronRight, UserCircle2, Code2, PenTool, ExternalLink } from 'lucide-react'
 
 export function LandingPage() {
   return (
@@ -122,8 +122,71 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* About the Maker Section */}
+        <section className="py-24 px-6 lg:px-12 relative z-10 max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="space-y-6"
+            >
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-white text-xs font-semibold uppercase tracking-wider mb-2">
+                <UserCircle2 size={14} />
+                About the Maker
+              </div>
+              <h2 className="text-3xl md:text-5xl font-display font-bold text-white tracking-tight leading-tight">
+                Crafted by <span className="text-nw-accent">Exotic Atif</span>
+              </h2>
+              <p className="text-lg text-nw-text-secondary leading-relaxed">
+                Hey, I'm Atif Arman, the architect behind <strong className="text-white">TheNullWave</strong> (or just NullWave). Known online as <span className="text-white font-medium italic">exotic atif</span>, I'm driven by a profound love for blending flawless design, powerful logic, and emotional resonance. NullWave was born out of a desire for a purer, uninterrupted musical sanctuary—a space built for audiophiles who refuse to compromise.
+              </p>
+              
+              <div className="flex flex-wrap gap-4 pt-4">
+                <div className="flex items-center gap-2 text-sm text-nw-text-tertiary">
+                  <Code2 size={16} className="text-nw-accent" /> Digital Creation
+                </div>
+                <div className="flex items-center gap-2 text-sm text-nw-text-tertiary">
+                  <PenTool size={16} className="text-purple-400" /> Visual Storytelling
+                </div>
+              </div>
+
+              <div className="pt-6 flex items-center gap-4">
+                <a 
+                  href="https://exoticatif.likesyou.org/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-full hover:bg-gray-200 transition-colors"
+                >
+                  Visit My Portfolio <ExternalLink size={16} />
+                </a>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="relative aspect-square md:aspect-[4/3] rounded-3xl overflow-hidden group border border-white/10"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-nw-accent/20 to-purple-500/20 mix-blend-overlay z-10" />
+              <div className="absolute inset-0 bg-[#121212] flex items-center justify-center p-12">
+                <div className="w-full h-full border border-white/5 rounded-2xl flex flex-col items-center justify-center text-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
+                  <Radio size={80} className="text-nw-text-secondary/20 absolute -right-4 -bottom-4 z-0 rotate-12" />
+                  <div className="relative z-20">
+                    <UserCircle2 size={64} className="text-nw-accent mb-4 mx-auto" />
+                    <h3 className="text-2xl font-bold text-white mb-2">Exotic Atif</h3>
+                    <p className="text-nw-text-secondary max-w-[200px] mx-auto text-sm">Building the future of music streaming with NullWave.</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
         {/* OAuth Data Usage Section (Compliance) */}
-        <section className="py-16 px-6 sm:px-12 relative z-10 max-w-4xl mx-auto">
+        <section className="py-16 px-6 sm:px-12 relative z-10 max-w-4xl mx-auto border-t border-white/5">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -133,7 +196,7 @@ export function LandingPage() {
             <Shield className="w-12 h-12 text-nw-accent mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-white mb-4">How we use your data</h2>
             <p className="text-nw-text-secondary leading-relaxed mb-6">
-              NullWave integrates with Google and GitHub OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
+              NullWave integrates with Google, GitHub, and Threads OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
             </p>
           </motion.div>
           <div className="flex justify-center gap-6 mt-8">

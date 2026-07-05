@@ -29,7 +29,7 @@ export function PrivacyPolicy() {
               <h2 className="text-xl font-bold text-white">Introduction</h2>
             </div>
             <p className="text-nw-text-secondary leading-relaxed">
-              Welcome to nullwave ("we," "our," or "us"). We are committed to protecting your personal information and your right to privacy. This Privacy Policy applies to all information collected through our application, website, and related services (collectively, the "Services").
+              Welcome to NullWave ("we," "our," or "us"). We are committed to protecting your personal information and your right to privacy. This Privacy Policy applies to all information collected through our application, website, and related services (collectively, the "Services").
             </p>
           </section>
 
@@ -50,11 +50,11 @@ export function PrivacyPolicy() {
           <section className="space-y-4">
             <div className="flex items-center gap-3 text-nw-accent">
               <Database size={24} />
-              <h2 className="text-xl font-bold text-white">Google and GitHub OAuth Data Usage</h2>
+              <h2 className="text-xl font-bold text-white">Google, GitHub, and Threads OAuth Data Usage</h2>
             </div>
             <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
               <p>
-                Our application utilizes Google and GitHub OAuth for secure authentication. When you choose to log in or link your account via these providers, we access specific data in accordance with their respective API Services User Data Policies:
+                Our application utilizes Google, GitHub, and Threads (Meta) OAuth for secure authentication and identity linking. When you choose to log in or link your account via these providers, we access specific data in accordance with their respective API Services User Data Policies:
               </p>
               <ul className="list-disc pl-5 space-y-2">
                 <li>
@@ -73,11 +73,14 @@ export function PrivacyPolicy() {
           <section className="space-y-4">
             <div className="flex items-center gap-3 text-nw-accent">
               <Lock size={24} />
-              <h2 className="text-xl font-bold text-white">Your Rights & Control</h2>
+              <h2 className="text-xl font-bold text-white">Your Rights & Data Deletion</h2>
             </div>
             <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
               <p>
-                You have the right to request access to the personal data we hold about you, request corrections, or request deletion of your account. You can completely revoke our access to your connected accounts at any time through your Google or GitHub Account Security Settings.
+                You have the right to request access to the personal data we hold about you, request corrections, or request complete deletion of your account and data. You can revoke our access to your connected accounts at any time through your respective Google, GitHub, or Threads Account Security Settings.
+              </p>
+              <p>
+                <strong className="text-white">Account Unlinking & Deletion Requests:</strong> If you wish to unlink a specific third-party account (like Threads) or request full deletion of all your data stored on NullWave, please visit our <Link to="/data-deletion" className="text-nw-accent hover:underline">Data Deletion</Link> page or email us directly with your registered email and username.
               </p>
             </div>
           </section>
