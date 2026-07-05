@@ -24,10 +24,10 @@ export function LoginPage() {
       navigate(from + search, { replace: true })
     }
     
-    // Check for URL errors (e.g. from threads)
+    // Check for URL errors (e.g. from facebook)
     const urlError = searchParams.get('error')
-    if (urlError === 'threads_unlinked') {
-      setError('Please create an account or log in with Google/GitHub first to link your Threads account.')
+    if (urlError === 'facebook_unlinked') {
+      setError('Please create an account or log in with Google/GitHub first to link your Facebook account.')
     } else if (urlError) {
       setError(decodeURIComponent(urlError))
     }
@@ -82,8 +82,8 @@ export function LoginPage() {
     }
   }
 
-  const handleThreadsLogin = async () => {
-    setError('Please create an account or log in with Google/GitHub first to link your Threads account.')
+  const handleFacebookLogin = async () => {
+    setError('Please create an account or log in with Google/GitHub first to link your Facebook account.')
   }
 
   return (
@@ -230,14 +230,14 @@ export function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={handleThreadsLogin}
+              onClick={handleFacebookLogin}
               disabled={isLoading}
-              className="w-full py-3 bg-black text-white text-sm font-semibold rounded-xl hover:bg-neutral-900 border border-nw-border-subtle disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer shadow-lg"
+              className="w-full py-3 bg-[#1877F2] text-white text-sm font-semibold rounded-xl hover:bg-[#166FE5] border border-nw-border-subtle disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer shadow-lg"
             >
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
-                <path d="M12.0001 0.499878C5.6486 0.499878 0.500122 5.64835 0.500122 11.9999C0.500122 18.3514 5.6486 23.4999 12.0001 23.4999C15.5414 23.4999 18.7061 21.9 20.8523 19.3175L18.6657 17.2024C17.0694 19.102 14.6738 20.3015 12.0001 20.3015C7.41584 20.3015 3.69854 16.5842 3.69854 11.9999C3.69854 7.4156 7.41584 3.6983 12.0001 3.6983C15.8643 3.6983 19.1124 6.33596 20.0094 9.94827H12.0001V12.7844H20.2505C20.2869 12.5273 20.306 12.2655 20.306 11.9999C20.306 6.36836 16.2917 1.68412 11.0068 0.697416C11.3323 0.567605 11.6631 0.531276 12.0001 0.499878Z" />
+              <svg viewBox="0 0 36 36" className="w-5 h-5" fill="currentColor">
+                <path d="M15 35.8C6.5 34.3 0 26.9 0 18 0 8.1 8.1 0 18 0s18 8.1 18 18c0 8.9-6.5 16.3-15 17.8l-1-8h3l1-4h-4v-2c0-1.2.6-2 2-2h2V9.8c-1-.2-2-.3-3-.3-3.6 0-6 2.2-6 6.3v2.2h-3v4h3v8h-3z" />
               </svg>
-              Continue with Threads
+              Continue with Facebook
             </button>
           </div>
         </form>

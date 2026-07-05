@@ -31,13 +31,13 @@ export function DataDeletion() {
             </div>
             <div>
               <h1 className="text-3xl font-display font-bold text-white mb-1">Data Deletion Request</h1>
-              <p className="text-sm text-nw-text-tertiary">Threads API & Account Unlinking</p>
+              <p className="text-sm text-nw-text-tertiary">Facebook API & Account Unlinking</p>
             </div>
           </div>
 
           <div className="space-y-6 text-nw-text-secondary leading-relaxed text-sm">
             <p>
-              At <strong className="text-white">NullWave</strong>, we take your privacy and data sovereignty seriously. If you have linked your Threads or other third-party accounts, you have the right to request the unlinking of these accounts and the deletion of your associated data at any time.
+              At <strong className="text-white">NullWave</strong>, we take your privacy and data sovereignty seriously. If you have linked your Facebook or other third-party accounts, you have the right to request the unlinking of these accounts and the deletion of your associated data at any time.
             </p>
 
             <div className="bg-white/[0.03] border border-white/[0.05] rounded-2xl p-6">
@@ -46,7 +46,7 @@ export function DataDeletion() {
                 How to request deletion
               </h3>
               <p className="mb-4">
-                To request the deletion of your NullWave account data, or to unlink your Threads profile, please send an email to our support and development team.
+                To request the deletion of your NullWave account data, or to unlink your Facebook profile, please send an email to our support and development team.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center p-4 bg-black/40 rounded-xl border border-white/5">
@@ -64,7 +64,7 @@ export function DataDeletion() {
               <h4 className="text-white font-medium">Please include the following in your email:</h4>
               <ul className="list-disc list-inside space-y-1.5 text-nw-text-tertiary ml-2">
                 <li>Your registered NullWave email address.</li>
-                <li>Your Threads username (if requesting Threads unlinking).</li>
+                <li>Your Facebook username (if requesting Facebook unlinking).</li>
                 <li>Whether you want a complete account deletion or just third-party unlinking.</li>
               </ul>
             </div>

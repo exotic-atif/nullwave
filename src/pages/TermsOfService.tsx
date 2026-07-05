@@ -39,7 +39,7 @@ export function TermsOfService() {
               <h2 className="text-xl font-bold text-white">User Accounts & Authentication</h2>
             </div>
             <p className="text-nw-text-secondary leading-relaxed">
-              When you create an account with us, whether manually or via third-party authentication like Google, GitHub, or Threads OAuth, you guarantee that the information you provide is accurate and current.
+              When you create an account with us, whether manually or via third-party authentication like Google, GitHub, or Facebook OAuth, you guarantee that the information you provide is accurate and current.
             </p>
             <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2">
               <div className="space-y-4 text-nw-text-secondary">
@@ -47,7 +47,7 @@ export function TermsOfService() {
                   <strong className="text-white">Account Responsibility:</strong> You are responsible for safeguarding the password or authentication credentials that you use to access the Service.
                 </p>
                 <p>
-                  <strong className="text-white">Social Account Integration:</strong> By connecting your Google, GitHub, or Threads account, you authorize us to access your basic profile information to establish your NullWave identity.
+                  <strong className="text-white">Social Account Integration:</strong> By connecting your Google, GitHub, or Facebook account, you authorize us to access your basic profile information to establish your NullWave identity.
                 </p>
                 <p>
                   <strong className="text-white">Account Unlinking & Deletion:</strong> You have the right to request the unlinking of third-party accounts or the complete deletion of your data by contacting us via email at our provided support address.

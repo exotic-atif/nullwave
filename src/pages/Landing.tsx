@@ -196,7 +196,7 @@ export function LandingPage() {
             <Shield className="w-12 h-12 text-nw-accent mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-white mb-4">How we use your data</h2>
             <p className="text-nw-text-secondary leading-relaxed mb-6">
-              NullWave integrates with Google, GitHub, and Threads OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
+              NullWave integrates with Google, GitHub, and Facebook OAuth to provide a secure, seamless login experience. We only request access to your basic profile (Name and Profile Picture) and Email address. This data is strictly used to create your secure NullWave identity and verify your invite status. We never sell or share your data with third parties.
             </p>
           </motion.div>
           <div className="flex justify-center gap-6 mt-8">
