@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 export const config = {
   runtime: 'edge',
 }
@@ -62,7 +64,6 @@ export default async function handler(req: Request) {
       return Response.redirect(`${baseUrl}/you?error=server_configuration_error`)
     }
 
-    const { createClient } = await import('@supabase/supabase-js')
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
