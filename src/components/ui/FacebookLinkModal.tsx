@@ -14,10 +14,10 @@ interface FacebookLinkModalProps {
 
 export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: FacebookLinkModalProps) {
   const { user } = useAuthStore()
-  
+
   const [iconState, setIconState] = useState<'link' | 'check' | 'cross'>('link')
   const [isProcessing, setIsProcessing] = useState(false)
-  
+
   // Exit animation state
   const [isExiting, setIsExiting] = useState(false)
 
@@ -32,20 +32,20 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
       setIconState('link')
       setIsProcessing(false)
       setIsExiting(false)
-      
+
       // Fetch fresh auth user to get the true identities and FB data
       supabase.auth.getUser().then(({ data: { user: authUser } }) => {
         if (authUser) {
           const email = authUser.email || user?.email || ''
           setUserEmail(email)
-          
+
           const fbIdentity = authUser.identities?.find(i => i.provider === 'facebook')
           let name = 'your account'
           let pfp = null
 
           if (fbIdentity) {
             name = fbIdentity.identity_data?.full_name || fbIdentity.identity_data?.name || authUser.user_metadata?.full_name || name
-            
+
             // Use Graph API to reliably fetch the large profile picture using the Facebook user ID
             if (fbIdentity.id) {
               pfp = `https://graph.facebook.com/${fbIdentity.id}/picture?type=large`
@@ -53,7 +53,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
               pfp = fbIdentity.identity_data?.picture || fbIdentity.identity_data?.avatar_url || authUser.user_metadata?.avatar_url || null
             }
           }
-          
+
           setFbName(name)
           setFbPfp(pfp)
           setMessage(`Are you sure you want to connect your NullWave account associated with ${email} to your Facebook profile ${name}?`)
@@ -65,9 +65,9 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
   const handleNahBro = async () => {
     setIsProcessing(true)
     setIconState('cross')
-    setMessage('Facebook linking cancelled by user 😔')
+    setMessage('Facebook linking cancelled by user!')
     await onCancel()
-    
+
     // Wait for the animation to play out nicely
     setTimeout(() => {
       setIsExiting(true) // Trigger scale down
@@ -80,9 +80,9 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
   const handleHellYeah = () => {
     setIsProcessing(true)
     setIconState('check')
-    setMessage('Linking successful! Welcome aboard 🚀')
+    setMessage('Linking successful! Welcome aboard!')
     onConfirm()
-    
+
     setTimeout(() => {
       setIsExiting(true) // Trigger scale down
       setTimeout(() => {
@@ -102,7 +102,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
             transition={{ duration: 0.3 }}
             className="absolute inset-0 bg-black/70 backdrop-blur-xl"
           />
-          
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -115,7 +115,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
 
             <div className="px-8 py-10">
               <div className="flex flex-col items-center text-center">
-                
+
                 {/* Title */}
                 <h2 className="text-2xl font-black tracking-tight text-white mb-10">
                   Link your Facebook account?
@@ -123,9 +123,9 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
 
                 {/* Connection Animation Container */}
                 <div className="relative flex items-center justify-center w-full h-28 mb-10">
-                  
+
                   {/* NullWave Avatar */}
-                  <motion.div 
+                  <motion.div
                     animate={iconState !== 'link' ? { x: -40, opacity: 0.2, filter: 'blur(4px)' } : { x: -80, opacity: 1, filter: 'blur(0px)' }}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className="absolute z-10"
@@ -146,7 +146,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                   </motion.div>
 
                   {/* Central Icon */}
-                  <motion.div 
+                  <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: iconState !== 'link' ? 1.3 : 1, rotate: iconState === 'check' ? [0, -10, 0] : 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -158,18 +158,18 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                   </motion.div>
 
                   {/* Facebook Avatar */}
-                  <motion.div 
+                  <motion.div
                     animate={iconState !== 'link' ? { x: 40, opacity: 0.2, filter: 'blur(4px)' } : { x: 80, opacity: 1, filter: 'blur(0px)' }}
                     transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className="absolute z-10"
                   >
                     <div className="relative w-[5.5rem] h-[5.5rem] rounded-full border-[3px] border-[#0c0c0c] overflow-hidden bg-white shadow-2xl ring-1 ring-white/10">
                       {fbPfp ? (
-                        <img 
-                          src={fbPfp} 
-                          alt="Facebook avatar" 
-                          className="w-full h-full object-cover" 
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                        <img
+                          src={fbPfp}
+                          alt="Facebook avatar"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-[#1877F2] text-white">
@@ -182,11 +182,11 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                       <FaFacebook size={16} />
                     </div>
                   </motion.div>
-                  
+
                 </div>
 
                 <AnimatePresence mode="wait">
-                  <motion.div 
+                  <motion.div
                     key={message}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
