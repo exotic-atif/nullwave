@@ -165,17 +165,17 @@ export function SettingsPage() {
         <div className="p-4 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.3.31</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.3.32</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-nw-accent/20 text-nw-accent">
-              INVITE ONLY
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-nw-accent/10 text-nw-accent border border-nw-accent/20">
+              Invite Only
             </span>
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-nw-text-secondary text-sm">Build</span>
-            <span className="text-nw-text tabular-nums text-sm">2026.07.04</span>
+            <span className="text-nw-text tabular-nums text-sm">2026.07.05</span>
           </div>
         </div>
       </motion.section>
