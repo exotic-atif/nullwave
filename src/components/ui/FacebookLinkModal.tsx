@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, X, Loader2, ArrowRight } from 'lucide-react'
+import { Link2, X, Check } from 'lucide-react'
+import { FaFacebook } from 'react-icons/fa'
 import { useAuthStore } from '@/store'
 
 interface FacebookLinkModalProps {
@@ -12,33 +13,46 @@ interface FacebookLinkModalProps {
 
 export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: FacebookLinkModalProps) {
   const { user } = useAuthStore()
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [isUnlinking, setIsUnlinking] = useState(false)
+  
+  // State for the central icon: 'link' | 'check' | 'cross'
+  const [iconState, setIconState] = useState<'link' | 'check' | 'cross'>('link')
+  // State for the message
+  const [message, setMessage] = useState('Do you want to link this Facebook account?')
+  // Loading state
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // Use facebook name if available, otherwise just use the NullWave display name
   const fbName = (user as any)?.user_metadata?.facebook_name || (user as any)?.user_metadata?.full_name || user?.displayName
   const fbPfp = (user as any)?.user_metadata?.facebook_pfp || (user as any)?.user_metadata?.avatar_url
 
+  // Reset state when opened
   useEffect(() => {
     if (isOpen) {
-      setIsAnimating(true)
-      // Simulate connection delay for UI effect
-      const timer = setTimeout(() => {
-        setIsAnimating(false)
-        setShowSuccess(true)
-      }, 1500)
-      return () => clearTimeout(timer)
-    } else {
-      setShowSuccess(false)
-      setIsAnimating(false)
-      setIsUnlinking(false)
+      setIconState('link')
+      setMessage(`Connect ${fbName} to NullWave?`)
+      setIsProcessing(false)
     }
-  }, [isOpen])
+  }, [isOpen, fbName])
 
-  const handleUnlink = async () => {
-    setIsUnlinking(true)
+  const handleNahBro = async () => {
+    setIsProcessing(true)
+    setIconState('cross')
+    setMessage('Facebook linking cancelled by user')
     await onCancel()
+    // Delay closing so they can see the message and icon
+    setTimeout(() => {
+      onClose()
+    }, 1500)
+  }
+
+  const handleHellYeah = () => {
+    setIsProcessing(true)
+    setIconState('check')
+    setMessage('Linking successful')
+    onConfirm()
+    setTimeout(() => {
+      onClose()
+    }, 1500)
   }
 
   return (
@@ -58,113 +72,77 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="relative w-full max-w-sm overflow-hidden bg-nw-surface border border-nw-border rounded-3xl shadow-2xl"
           >
-            {/* Top decorative gradient - Facebook Blue */}
+            {/* Top decorative gradient */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#1877F2] to-transparent opacity-50" />
-
-            <button
-              onClick={onClose}
-              disabled={isAnimating || isUnlinking}
-              className="absolute top-4 right-4 p-2 text-nw-text-tertiary hover:text-white rounded-full hover:bg-white/5 transition-colors disabled:opacity-50"
-            >
-              <X size={18} />
-            </button>
 
             <div className="p-8">
               <div className="flex flex-col items-center text-center">
                 
                 {/* Connection Animation Container */}
                 <div className="relative flex items-center justify-center w-full h-24 mb-6">
-                  {/* NullWave Avatar */}
-                  <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: isAnimating ? -30 : -40, opacity: 1 }}
-                    className="absolute z-10 w-16 h-16 rounded-full border-2 border-nw-surface overflow-hidden bg-nw-elevated flex items-center justify-center"
-                  >
-                    {user?.avatarUrl ? (
-                      <img src={user.avatarUrl} alt="Your NullWave avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xl font-bold text-nw-text-secondary">
-                        {user?.displayName?.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </motion.div>
-
-                  {/* Connecting Line */}
-                  <div className="absolute w-24 h-[2px] bg-nw-border overflow-hidden">
-                    {isAnimating && (
-                      <motion.div
-                        initial={{ x: '-100%' }}
-                        animate={{ x: '100%' }}
-                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                        className="w-full h-full bg-gradient-to-r from-transparent via-[#1877F2] to-transparent"
-                      />
-                    )}
+                  
+                  {/* NullWave Avatar with Badge */}
+                  <div className="absolute left-1/2 -translate-x-[72px] z-10">
+                    <div className="relative w-16 h-16 rounded-full border-2 border-nw-surface overflow-hidden bg-nw-elevated shadow-lg">
+                      {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="NullWave avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-nw-accent text-white font-bold text-xl">
+                          {user?.displayName?.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    {/* NullWave Badge */}
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-nw-accent border-2 border-nw-surface flex items-center justify-center shadow-sm">
+                      <span className="text-[10px] font-black text-white">N</span>
+                    </div>
                   </div>
 
-                  {/* Facebook Avatar */}
-                  <motion.div
-                    initial={{ x: 20, opacity: 0 }}
-                    animate={{ x: isAnimating ? 30 : 40, opacity: 1 }}
-                    className="absolute z-10 w-16 h-16 rounded-full border-2 border-nw-surface overflow-hidden bg-white flex items-center justify-center shadow-lg"
-                  >
-                    {fbPfp ? (
-                      <img src={fbPfp} alt="Facebook avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <svg viewBox="0 0 36 36" className="w-8 h-8 text-[#1877F2]" fill="currentColor">
-                        <path d="M15 35.8C6.5 34.3 0 26.9 0 18 0 8.1 8.1 0 18 0s18 8.1 18 18c0 8.9-6.5 16.3-15 17.8l-1-8h3l1-4h-4v-2c0-1.2.6-2 2-2h2V9.8c-1-.2-2-.3-3-.3-3.6 0-6 2.2-6 6.3v2.2h-3v4h3v8h-3z" />
-                      </svg>
-                    )}
-                  </motion.div>
+                  {/* Central Icon */}
+                  <div className="absolute z-20 flex items-center justify-center w-10 h-10 rounded-full bg-nw-surface border-2 border-nw-border shadow-sm">
+                    {iconState === 'link' && <Link2 size={18} className="text-nw-text-secondary" />}
+                    {iconState === 'check' && <Check size={18} className="text-green-500" />}
+                    {iconState === 'cross' && <X size={18} className="text-red-500" />}
+                  </div>
 
-                  {/* Success Checkmark */}
-                  <AnimatePresence>
-                    {showSuccess && (
-                      <motion.div
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="absolute z-20 w-8 h-8 rounded-full bg-[#1877F2] flex items-center justify-center shadow-lg border-2 border-nw-surface"
-                      >
-                        <Check size={16} className="text-white" strokeWidth={3} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* Facebook Avatar with Badge */}
+                  <div className="absolute right-1/2 translate-x-[72px] z-10">
+                    <div className="relative w-16 h-16 rounded-full border-2 border-nw-surface overflow-hidden bg-white shadow-lg">
+                      {fbPfp ? (
+                        <img src={fbPfp} alt="Facebook avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-[#1877F2] text-white">
+                          <FaFacebook size={32} />
+                        </div>
+                      )}
+                    </div>
+                    {/* Facebook Badge */}
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#1877F2] border-2 border-nw-surface flex items-center justify-center shadow-sm text-white">
+                      <FaFacebook size={12} />
+                    </div>
+                  </div>
+                  
                 </div>
 
-                <h3 className="text-xl font-bold text-nw-text mb-2">
-                  {isAnimating ? 'Connecting Facebook...' : 'Facebook Linked!'}
+                <h3 className="text-lg font-bold text-nw-text mb-2 px-2">
+                  {message}
                 </h3>
-                
-                <p className="text-sm text-nw-text-secondary mb-8">
-                  {isAnimating 
-                    ? 'Securely linking your Facebook identity...'
-                    : `Your NullWave account is now connected to ${fbName}. You can use Facebook to log in faster next time.`}
-                </p>
 
-                <div className="flex flex-col w-full gap-3">
+                <div className="flex w-full gap-3 mt-6">
                   <button
-                    onClick={onConfirm}
-                    disabled={isAnimating}
-                    className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                    onClick={handleNahBro}
+                    disabled={isProcessing}
+                    className="flex-1 py-3 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl border border-red-500/20 transition-colors disabled:opacity-50"
                   >
-                    {isAnimating ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <>
-                        Done
-                        <ArrowRight size={18} />
-                      </>
-                    )}
+                    Nah Bro!
                   </button>
-                  
-                  {!isAnimating && (
-                    <button
-                      onClick={handleUnlink}
-                      disabled={isUnlinking}
-                      className="text-sm font-medium text-nw-text-tertiary hover:text-nw-danger transition-colors py-2"
-                    >
-                      {isUnlinking ? 'Unlinking...' : 'Undo'}
-                    </button>
-                  )}
+                  <button
+                    onClick={handleHellYeah}
+                    disabled={isProcessing}
+                    className="flex-1 py-3 px-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    Hell Yeahh!
+                  </button>
                 </div>
 
               </div>
