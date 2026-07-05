@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { isGoogleConnected, isGithubConnected, isFacebookConnected } from '@/lib/supabase'
 import { FacebookLinkModal } from '@/components/ui/FacebookLinkModal'
 import { FaGoogle, FaGithub, FaFacebook } from 'react-icons/fa'
+import { toast } from 'sonner'
 
 export function YouPage() {
   const { user, setUser, logout } = useAuthStore()
@@ -591,12 +592,19 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { session } } = await supabase.auth.getSession()
-                    if (session?.user?.identities) {
-                      const identity = session.user.identities.find(i => i.provider === 'google')
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user?.identities) {
+                      const identity = user.identities.find(i => i.provider === 'google')
                       if (identity) {
-                        await supabase.auth.unlinkIdentity(identity)
-                        setIsGoogleLinked(false)
+                        const { error } = await supabase.auth.unlinkIdentity(identity)
+                        if (error) {
+                          toast.error(error.message)
+                        } else {
+                          setIsGoogleLinked(false)
+                          toast.success('Google account unlinked successfully!')
+                        }
+                      } else {
+                        toast.error('Identity not found.')
                       }
                     }
                   }}
@@ -639,12 +647,19 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { session } } = await supabase.auth.getSession()
-                    if (session?.user?.identities) {
-                      const identity = session.user.identities.find(i => i.provider === 'github')
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user?.identities) {
+                      const identity = user.identities.find(i => i.provider === 'github')
                       if (identity) {
-                        await supabase.auth.unlinkIdentity(identity)
-                        setIsGithubLinked(false)
+                        const { error } = await supabase.auth.unlinkIdentity(identity)
+                        if (error) {
+                          toast.error(error.message)
+                        } else {
+                          setIsGithubLinked(false)
+                          toast.success('GitHub account unlinked successfully!')
+                        }
+                      } else {
+                        toast.error('Identity not found.')
                       }
                     }
                   }}
@@ -687,12 +702,19 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { session } } = await supabase.auth.getSession()
-                    if (session?.user?.identities) {
-                      const identity = session.user.identities.find(i => i.provider === 'facebook')
+                    const { data: { user } } = await supabase.auth.getUser()
+                    if (user?.identities) {
+                      const identity = user.identities.find(i => i.provider === 'facebook')
                       if (identity) {
-                        await supabase.auth.unlinkIdentity(identity)
-                        setIsFacebookLinked(false)
+                        const { error } = await supabase.auth.unlinkIdentity(identity)
+                        if (error) {
+                          toast.error(error.message)
+                        } else {
+                          setIsFacebookLinked(false)
+                          toast.success('Facebook account unlinked successfully!')
+                        }
+                      } else {
+                        toast.error('Identity not found.')
                       }
                     }
                   }}
