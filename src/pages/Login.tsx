@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { useAuthStore } from '@/store'
 import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Radio, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export function LoginPage() {
