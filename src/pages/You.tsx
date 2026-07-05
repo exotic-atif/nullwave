@@ -701,7 +701,6 @@ export function YouPage() {
       <ThreadsLinkModal
         isOpen={isThreadsModalOpen}
         email={threadsEmail}
-        isLinked={isThreadsLinked}
         onConfirm={() => {
           setIsThreadsModalOpen(false)
           searchParams.delete('confirm_threads')
