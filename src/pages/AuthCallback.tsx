@@ -44,11 +44,8 @@ export function AuthCallback() {
         }
 
         // If they logged in via Facebook but it's not linked, they won't have an email on their session user
-        if (!session.user.email) {
-          await supabase.auth.signOut()
-          if (mounted) navigate('/login?error=facebook_unlinked', { replace: true })
-          return
-        }
+        // OR they might have an email but they are still a new unapproved user.
+        // We handle this below after checking isApproved.
 
         // Check if user is approved in our public.users table
         const isApproved = await checkUserApproval(session.user.id)
@@ -72,8 +69,16 @@ export function AuthCallback() {
           await init()
           if (mounted) navigate('/', { replace: true })
         } else {
+          // Prevent new signups via Facebook entirely
+          const isFacebookProvider = session.user.app_metadata?.provider === 'facebook'
+          if (isFacebookProvider) {
+            await supabase.auth.signOut()
+            if (mounted) navigate('/login?error=facebook_unlinked', { replace: true })
+            return
+          }
+
           setMessage('Redirecting to Request Access...')
-          const errorMsg = encodeURIComponent(`You don't have an account with the email ${session.user.email}. Request Access to use the app instead.`)
+          const errorMsg = encodeURIComponent(`You don't have an account with the email ${session.user.email || 'provided'}. Request Access to use the app instead.`)
           if (mounted) navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
         }
       } catch (err) {

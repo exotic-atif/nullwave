@@ -83,7 +83,18 @@ export function LoginPage() {
   }
 
   const handleFacebookLogin = async () => {
-    setError('Please create an account or log in with Google/GitHub first to link your Facebook account.')
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'public_profile,email'
+        }
+      })
+      if (error) throw error
+    } catch (err) {
+      setError((err as Error).message || 'Failed to initialize Facebook Login')
+    }
   }
 
   return (
@@ -113,11 +124,11 @@ export function LoginPage() {
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-nw-accent to-nw-accent-glow flex items-center justify-center shadow-2xl shadow-nw-accent-glow/20 mb-4">
-            <Radio size={24} className="text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0c0c0c] to-nw-surface flex items-center justify-center shadow-2xl shadow-nw-accent-glow/10 border border-white/5 mb-4 p-3">
+            <img src="/favicon.svg" alt="NullWave" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-nw-text">
-            nullwave
+            NullWave
           </h1>
           <p className="text-xs text-nw-muted mt-1.5 uppercase tracking-[0.25em]">
             invite only

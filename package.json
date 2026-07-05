@@ -1,7 +1,7 @@
 {
   "name": "nullwave",
   "private": true,
-  "version": "1.3.39-beta",
+  "version": "1.3.40-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",
