@@ -58,7 +58,6 @@ export function YouPage() {
         setIsGoogleLinked(isGoogleConnected(freshUser))
         setIsGithubLinked(isGithubConnected(freshUser))
         setIsFacebookLinked(isFacebookConnected(freshUser))
-        setUser(freshUser)
       }
     }
     checkLinkedAccounts()
@@ -603,14 +602,12 @@ export function YouPage() {
                         if (error) {
                           toast.error(error.message)
                         } else {
-                          const { data: { session } } = await supabase.auth.refreshSession()
-                          if (session?.user) setUser(session.user)
+                          await supabase.auth.refreshSession()
                           setIsGoogleLinked(false)
                           toast.success('Google account unlinked successfully!')
                         }
                       } else {
-                        const { data: { session } } = await supabase.auth.refreshSession()
-                        if (session?.user) setUser(session.user)
+                        await supabase.auth.refreshSession()
                         setIsGoogleLinked(false)
                         toast.success('Google account was already unlinked.')
                       }
@@ -663,14 +660,12 @@ export function YouPage() {
                         if (error) {
                           toast.error(error.message)
                         } else {
-                          const { data: { session } } = await supabase.auth.refreshSession()
-                          if (session?.user) setUser(session.user)
+                          await supabase.auth.refreshSession()
                           setIsGithubLinked(false)
                           toast.success('GitHub account unlinked successfully!')
                         }
                       } else {
-                        const { data: { session } } = await supabase.auth.refreshSession()
-                        if (session?.user) setUser(session.user)
+                        await supabase.auth.refreshSession()
                         setIsGithubLinked(false)
                         toast.success('GitHub account was already unlinked.')
                       }
@@ -723,14 +718,12 @@ export function YouPage() {
                         if (error) {
                           toast.error(error.message)
                         } else {
-                          const { data: { session } } = await supabase.auth.refreshSession()
-                          if (session?.user) setUser(session.user)
+                          await supabase.auth.refreshSession()
                           setIsFacebookLinked(false)
                           toast.success('Facebook account unlinked successfully!')
                         }
                       } else {
-                        const { data: { session } } = await supabase.auth.refreshSession()
-                        if (session?.user) setUser(session.user)
+                        await supabase.auth.refreshSession()
                         setIsFacebookLinked(false)
                         toast.success('Facebook account was already unlinked.')
                       }
