@@ -576,8 +576,8 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white border border-white/10">
-                <FaGoogle size={18} />
+              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
+                <FaGoogle size={20} />
               </div>
               <div className="flex flex-col">
                 <span className="text-nw-text-secondary text-sm font-medium">Google Account</span>
@@ -624,7 +624,7 @@ export function YouPage() {
 
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#24292e] flex items-center justify-center text-white border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
                 <FaGithub size={20} />
               </div>
               <div className="flex flex-col">
@@ -672,7 +672,7 @@ export function YouPage() {
 
           <div className="flex justify-between items-center py-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center text-white border border-[#1877F2]/50">
+              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
                 <FaFacebook size={20} />
               </div>
               <div className="flex flex-col">
@@ -708,7 +708,7 @@ export function YouPage() {
                     provider: 'facebook',
                     options: { 
                       redirectTo: `${window.location.origin}/you?confirm_facebook=true`,
-                      scopes: 'public_profile' 
+                      scopes: 'public_profile,email' 
                     }
                   })
                 }}
@@ -736,7 +736,7 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.3.34</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.3.35</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
