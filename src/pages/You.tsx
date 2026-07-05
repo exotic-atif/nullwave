@@ -26,7 +26,7 @@ export function YouPage() {
   const [isThreadsLinked, setIsThreadsLinked] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const [isThreadsModalOpen, setIsThreadsModalOpen] = useState(searchParams.get('confirm_threads') === 'true')
-  const [threadsEmail, setThreadsEmail] = useState(user?.email || '')
+  const threadsEmail = user?.email || ''
 
   const [favSongs, setFavSongs] = useState(user?.favSongs || '')
   const [favArtists, setFavArtists] = useState(user?.favArtists || '')

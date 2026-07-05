@@ -7,9 +7,10 @@ interface ThreadsLinkModalProps {
   onConfirm: () => void
   onCancel: () => void
   email: string
+  isLinked: boolean
 }
 
-export function ThreadsLinkModal({ isOpen, onClose, onConfirm, onCancel, email }: ThreadsLinkModalProps) {
+export function ThreadsLinkModal({ isOpen, onClose, onConfirm, onCancel, email, isLinked }: ThreadsLinkModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
