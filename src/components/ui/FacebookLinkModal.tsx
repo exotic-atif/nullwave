@@ -124,17 +124,12 @@ export function FacebookLinkModal({
               authUser.user_metadata?.full_name ||
               name
 
-            // Use Graph API for a reliable large profile picture
-            if (fbIdentity.id) {
-              pfp = `https://graph.facebook.com/${fbIdentity.id}/picture?width=800&height=800&redirect=true`
-            } else {
-              pfp =
-                fbIdentity.identity_data?.picture ||
-                fbIdentity.identity_data?.avatar_url ||
-                authUser.user_metadata?.picture ||
-                authUser.user_metadata?.avatar_url ||
-                null
-            }
+            pfp =
+              fbIdentity.identity_data?.picture ||
+              fbIdentity.identity_data?.avatar_url ||
+              authUser.user_metadata?.picture ||
+              authUser.user_metadata?.avatar_url ||
+              null
           }
 
           setFbName(name)
