@@ -611,9 +611,9 @@ export function isGoogleConnected(user: any): boolean {
   return user.app_metadata.providers.includes('google');
 }
 
-export function isXConnected(user: any): boolean {
+export function isGithubConnected(user: any): boolean {
   if (!user || !user.app_metadata || !user.app_metadata.providers) return false;
-  return user.app_metadata.providers.includes('x') || user.app_metadata.providers.includes('twitter');
+  return user.app_metadata.providers.includes('github');
 }
 
 export async function checkUserApproval(userId: string): Promise<boolean> {

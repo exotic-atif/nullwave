@@ -50,11 +50,11 @@ export function PrivacyPolicy() {
           <section className="space-y-4">
             <div className="flex items-center gap-3 text-nw-accent">
               <Database size={24} />
-              <h2 className="text-xl font-bold text-white">Google and X (Twitter) OAuth Data Usage</h2>
+              <h2 className="text-xl font-bold text-white">Google and GitHub OAuth Data Usage</h2>
             </div>
             <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
               <p>
-                Our application utilizes Google and X (formerly Twitter) OAuth for secure authentication. When you choose to log in or link your account via these providers, we access specific data in accordance with their respective API Services User Data Policies:
+                Our application utilizes Google and GitHub OAuth for secure authentication. When you choose to log in or link your account via these providers, we access specific data in accordance with their respective API Services User Data Policies:
               </p>
               <ul className="list-disc pl-5 space-y-2">
                 <li>
@@ -77,7 +77,7 @@ export function PrivacyPolicy() {
             </div>
             <div className="text-nw-text-secondary leading-relaxed space-y-4 ml-9">
               <p>
-                You have the right to request access to the personal data we hold about you, request corrections, or request deletion of your account. You can completely revoke our access to your connected accounts at any time through your Google or X Account Security Settings.
+                You have the right to request access to the personal data we hold about you, request corrections, or request deletion of your account. You can completely revoke our access to your connected accounts at any time through your Google or GitHub Account Security Settings.
               </p>
             </div>
           </section>

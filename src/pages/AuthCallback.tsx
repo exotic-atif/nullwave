@@ -47,7 +47,7 @@ export function AuthCallback() {
           const mismatchedIdentity = identities.find((i: any) => i.identity_data?.email && i.identity_data.email !== session.user.email)
           
           if (mismatchedIdentity) {
-            const providerName = mismatchedIdentity.provider === 'x' ? 'X' : mismatchedIdentity.provider.charAt(0).toUpperCase() + mismatchedIdentity.provider.slice(1)
+            const providerName = mismatchedIdentity.provider.charAt(0).toUpperCase() + mismatchedIdentity.provider.slice(1)
             setMessage(`Email mismatch. Unlinking ${providerName} account...`)
             await supabase.auth.unlinkIdentity(mismatchedIdentity)
             if (mounted) navigate('/you?error=email_mismatch', { replace: true })
@@ -88,7 +88,7 @@ export function AuthCallback() {
       }
     })
 
-    // Listen for auth state changes (crucial for PKCE flows like X/Twitter where code is exchanged async)
+    // Listen for auth state changes (crucial for PKCE flows like GitHub where code is exchanged async)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         if (timeoutId) clearTimeout(timeoutId)
