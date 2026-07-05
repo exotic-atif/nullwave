@@ -728,7 +728,7 @@ export function YouPage() {
             setIsThreadsLinked(false)
             // Update auth store user to reflect changes instantly
             const { data: { user } } = await supabase.auth.getUser()
-            if (user) setUser(user)
+            if (user) setUser(user as any)
           }
           setIsThreadsModalOpen(false)
           searchParams.delete('confirm_threads')
