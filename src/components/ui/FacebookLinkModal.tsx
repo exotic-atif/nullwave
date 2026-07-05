@@ -45,16 +45,12 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
 
           if (fbIdentity) {
             name = fbIdentity.identity_data?.full_name || fbIdentity.identity_data?.name || authUser.user_metadata?.full_name || name
-            pfp = fbIdentity.identity_data?.picture || fbIdentity.identity_data?.avatar_url || authUser.user_metadata?.avatar_url || null
             
-            // Try to request a larger PFP if it's a FB url
-            if (pfp && (pfp.includes('facebook.com') || pfp.includes('fbsbx.com'))) {
-              if (pfp.includes('?')) {
-                pfp = pfp.replace(/width=\d+/, 'width=800').replace(/height=\d+/, 'height=800')
-                if (!pfp.includes('width=')) pfp += '&width=800&height=800'
-              } else {
-                pfp += '?width=800&height=800'
-              }
+            // Use Graph API to reliably fetch the large profile picture using the Facebook user ID
+            if (fbIdentity.id) {
+              pfp = `https://graph.facebook.com/${fbIdentity.id}/picture?type=large`
+            } else {
+              pfp = fbIdentity.identity_data?.picture || fbIdentity.identity_data?.avatar_url || authUser.user_metadata?.avatar_url || null
             }
           }
           
@@ -169,7 +165,12 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                   >
                     <div className="relative w-[5.5rem] h-[5.5rem] rounded-full border-[3px] border-[#0c0c0c] overflow-hidden bg-white shadow-2xl ring-1 ring-white/10">
                       {fbPfp ? (
-                        <img src={fbPfp} alt="Facebook avatar" className="w-full h-full object-cover" />
+                        <img 
+                          src={fbPfp} 
+                          alt="Facebook avatar" 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-[#1877F2] text-white">
                           <FaFacebook size={48} />
@@ -208,7 +209,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                   <button
                     onClick={handleNahBro}
                     disabled={isProcessing}
-                    className="relative flex-1 py-4 px-4 bg-[#1a1a1a] hover:bg-nw-danger/15 text-nw-danger font-black uppercase tracking-widest text-sm rounded-2xl border border-nw-danger/20 transition-all duration-300 disabled:opacity-50 disabled:scale-95 group overflow-hidden"
+                    className="relative flex-1 py-4 px-4 bg-[#1a1a1a] hover:bg-nw-danger/15 text-nw-danger font-black uppercase tracking-widest text-sm rounded-2xl border border-nw-danger/20 transition-all duration-300 disabled:opacity-50 group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-nw-danger/0 via-nw-danger/10 to-nw-danger/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                     Nah Bro!
@@ -216,7 +217,7 @@ export function FacebookLinkModal({ isOpen, onClose, onConfirm, onCancel }: Face
                   <button
                     onClick={handleHellYeah}
                     disabled={isProcessing}
-                    className="relative flex-1 py-4 px-4 bg-nw-accent hover:bg-nw-accent/90 text-[#000] font-black uppercase tracking-widest text-sm rounded-2xl shadow-[0_0_20px_rgba(29,185,84,0.3)] hover:shadow-[0_0_30px_rgba(29,185,84,0.5)] transition-all duration-300 disabled:opacity-50 disabled:scale-95 group overflow-hidden"
+                    className="relative flex-1 py-4 px-4 bg-[#3b82f6] hover:bg-[#3b82f6]/90 text-[#000] font-black uppercase tracking-widest text-sm rounded-2xl shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all duration-300 disabled:opacity-50 group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                     Hell Yeahh!
