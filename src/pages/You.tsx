@@ -53,10 +53,13 @@ export function YouPage() {
 
   useEffect(() => {
     const checkLinkedAccounts = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsGoogleLinked(isGoogleConnected(session?.user))
-      setIsGithubLinked(isGithubConnected(session?.user))
-      setIsFacebookLinked(isFacebookConnected(session?.user))
+      const { data: { user: freshUser } } = await supabase.auth.getUser()
+      if (freshUser) {
+        setIsGoogleLinked(isGoogleConnected(freshUser))
+        setIsGithubLinked(isGithubConnected(freshUser))
+        setIsFacebookLinked(isFacebookConnected(freshUser))
+        setUser(freshUser)
+      }
     }
     checkLinkedAccounts()
   }, [])
@@ -592,19 +595,24 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user?.identities) {
-                      const identity = user.identities.find(i => i.provider === 'google')
+                    const { data: { user: freshUser } } = await supabase.auth.getUser()
+                    if (freshUser?.identities) {
+                      const identity = freshUser.identities.find(i => i.provider === 'google')
                       if (identity) {
                         const { error } = await supabase.auth.unlinkIdentity(identity)
                         if (error) {
                           toast.error(error.message)
                         } else {
+                          const { data: { session } } = await supabase.auth.refreshSession()
+                          if (session?.user) setUser(session.user)
                           setIsGoogleLinked(false)
                           toast.success('Google account unlinked successfully!')
                         }
                       } else {
-                        toast.error('Identity not found.')
+                        const { data: { session } } = await supabase.auth.refreshSession()
+                        if (session?.user) setUser(session.user)
+                        setIsGoogleLinked(false)
+                        toast.success('Google account was already unlinked.')
                       }
                     }
                   }}
@@ -647,19 +655,24 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user?.identities) {
-                      const identity = user.identities.find(i => i.provider === 'github')
+                    const { data: { user: freshUser } } = await supabase.auth.getUser()
+                    if (freshUser?.identities) {
+                      const identity = freshUser.identities.find(i => i.provider === 'github')
                       if (identity) {
                         const { error } = await supabase.auth.unlinkIdentity(identity)
                         if (error) {
                           toast.error(error.message)
                         } else {
+                          const { data: { session } } = await supabase.auth.refreshSession()
+                          if (session?.user) setUser(session.user)
                           setIsGithubLinked(false)
                           toast.success('GitHub account unlinked successfully!')
                         }
                       } else {
-                        toast.error('Identity not found.')
+                        const { data: { session } } = await supabase.auth.refreshSession()
+                        if (session?.user) setUser(session.user)
+                        setIsGithubLinked(false)
+                        toast.success('GitHub account was already unlinked.')
                       }
                     }
                   }}
@@ -702,19 +715,24 @@ export function YouPage() {
                 </span>
                 <button
                   onClick={async () => {
-                    const { data: { user } } = await supabase.auth.getUser()
-                    if (user?.identities) {
-                      const identity = user.identities.find(i => i.provider === 'facebook')
+                    const { data: { user: freshUser } } = await supabase.auth.getUser()
+                    if (freshUser?.identities) {
+                      const identity = freshUser.identities.find(i => i.provider === 'facebook')
                       if (identity) {
                         const { error } = await supabase.auth.unlinkIdentity(identity)
                         if (error) {
                           toast.error(error.message)
                         } else {
+                          const { data: { session } } = await supabase.auth.refreshSession()
+                          if (session?.user) setUser(session.user)
                           setIsFacebookLinked(false)
                           toast.success('Facebook account unlinked successfully!')
                         }
                       } else {
-                        toast.error('Identity not found.')
+                        const { data: { session } } = await supabase.auth.refreshSession()
+                        if (session?.user) setUser(session.user)
+                        setIsFacebookLinked(false)
+                        toast.success('Facebook account was already unlinked.')
                       }
                     }
                   }}
