@@ -74,8 +74,12 @@ export function RequestAccessPage() {
         .rpc('check_email_available', { check_email: normalizedEmail })
 
       if (!rpcError && checkResult && !checkResult.available) {
-        if (checkResult.reason === 'already_registered') {
+        if (isCompleteProfile && checkResult.reason === 'already_registered') {
+          // It's expected they are in auth.users because they just signed in via OAuth. Let them proceed.
+        } else if (checkResult.reason === 'already_registered') {
           setError('This email is already registered. Try signing in instead.')
+          setIsSubmitting(false)
+          return
         } else {
           setError(
             <>
@@ -84,9 +88,9 @@ export function RequestAccessPage() {
               or Instagram <a href="https://instagram.com/exotic_atif" target="_blank" rel="noopener noreferrer" className="text-nw-accent hover:underline font-semibold">@exotic_atif</a>.
             </>
           )
+          setIsSubmitting(false)
+          return
         }
-        setIsSubmitting(false)
-        return
       }
 
       let uploadedUrl = null
@@ -165,6 +169,20 @@ export function RequestAccessPage() {
 
         <div className="p-[1px] rounded-3xl bg-gradient-to-b from-white/[0.12] to-white/[0.02] shadow-2xl shadow-black/50">
           <form onSubmit={handleSubmit} className="bg-nw-surface/80 border border-white/[0.04] backdrop-blur-3xl rounded-3xl p-6 sm:p-8 flex flex-col gap-6">
+            {isCompleteProfile && (
+              <div className="bg-nw-surface/50 border border-white/[0.1] p-4 rounded-xl mb-6">
+                <h3 className="text-sm font-semibold text-nw-text mb-2 flex items-center gap-2">
+                  <User size={16} className="text-nw-accent" />
+                  Complete Your Profile
+                </h3>
+                <p className="text-xs text-nw-text-secondary leading-relaxed">
+                  We need a bit more info to submit your access request. 
+                  <br/><br/>
+                  <strong className="text-nw-accent/90">Note:</strong> If you already have an approved account with this email, 
+                  please click Cancel below, log in with your original method (e.g. Email & Password), and link this account from Settings instead.
+                </p>
+              </div>
+            )}
             {!isCompleteProfile && (
               <div className="flex flex-col items-center w-full mb-2">
                 <div className="w-full flex flex-col gap-3">
