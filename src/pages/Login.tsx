@@ -85,7 +85,7 @@ export function LoginPage() {
   const handleThreadsLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'threads' as any,
+        provider: 'custom:threads' as any,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         }
