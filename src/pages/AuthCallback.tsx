@@ -36,6 +36,20 @@ export function AuthCallback() {
         // Clear any timeout since we got a session
         if (timeoutId) clearTimeout(timeoutId)
 
+        // Check if this was a Threads linking callback
+        const searchParams = new URLSearchParams(window.location.search)
+        if (searchParams.get('linking') === 'threads') {
+          if (mounted) navigate('/you?confirm_threads=true', { replace: true })
+          return
+        }
+
+        // If they logged in via Threads but it's not linked, they won't have an email on their session user
+        if (!session.user.email) {
+          await supabase.auth.signOut()
+          if (mounted) navigate('/login?error=threads_unlinked', { replace: true })
+          return
+        }
+
         // Check if user is approved in our public.users table
         const isApproved = await checkUserApproval(session.user.id)
 

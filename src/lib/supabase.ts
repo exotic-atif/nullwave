@@ -616,6 +616,11 @@ export function isGithubConnected(user: any): boolean {
   return user.app_metadata.providers.includes('github');
 }
 
+export function isThreadsConnected(user: any): boolean {
+  if (!user || !user.app_metadata || !user.app_metadata.providers) return false;
+  return user.app_metadata.providers.includes('threads');
+}
+
 export async function checkUserApproval(userId: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('users')
