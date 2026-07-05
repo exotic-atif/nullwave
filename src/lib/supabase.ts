@@ -616,11 +616,9 @@ export function isGithubConnected(user: any): boolean {
   return user.app_metadata.providers.includes('github');
 }
 
-export function isThreadsConnected(user: any): boolean {
-  if (!user) return false;
-  if (user.user_metadata?.threads_username) return true;
-  if (user.app_metadata?.providers?.includes('threads')) return true;
-  return false;
+export function isFacebookConnected(user: any): boolean {
+  if (!user || !user.app_metadata || !user.app_metadata.providers) return false;
+  return user.app_metadata.providers.includes('facebook');
 }
 
 export async function checkUserApproval(userId: string): Promise<boolean> {

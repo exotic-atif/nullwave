@@ -9,8 +9,8 @@ import { TrackRow } from '@/components/ui/TrackRow'
 import { useAuthStore, useThemeStore, useQueueStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { isGoogleConnected, isGithubConnected, isThreadsConnected } from '@/lib/supabase'
-import { ThreadsLinkModal } from '@/components/ui/ThreadsLinkModal'
+import { isGoogleConnected, isGithubConnected, isFacebookConnected } from '@/lib/supabase'
+import { FacebookLinkModal } from '@/components/ui/FacebookLinkModal'
 
 export function YouPage() {
   const { user, setUser, logout } = useAuthStore()
@@ -23,10 +23,9 @@ export function YouPage() {
   const [nameSuccess, setNameSuccess] = useState(false)
   const [isGoogleLinked, setIsGoogleLinked] = useState(false)
   const [isGithubLinked, setIsGithubLinked] = useState(false)
-  const [isThreadsLinked, setIsThreadsLinked] = useState(false)
+  const [isFacebookLinked, setIsFacebookLinked] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [isThreadsModalOpen, setIsThreadsModalOpen] = useState(searchParams.get('confirm_threads') === 'true')
-  const threadsEmail = user?.email || ''
+  const [isFacebookModalOpen, setIsFacebookModalOpen] = useState(searchParams.get('confirm_facebook') === 'true')
 
   const [favSongs, setFavSongs] = useState(user?.favSongs || '')
   const [favArtists, setFavArtists] = useState(user?.favArtists || '')
@@ -55,7 +54,7 @@ export function YouPage() {
       const { data: { session } } = await supabase.auth.getSession()
       setIsGoogleLinked(isGoogleConnected(session?.user))
       setIsGithubLinked(isGithubConnected(session?.user))
-      setIsThreadsLinked(isThreadsConnected(session?.user))
+      setIsFacebookLinked(isFacebookConnected(session?.user))
     }
     checkLinkedAccounts()
   }, [])
@@ -633,21 +632,26 @@ export function YouPage() {
 
           <div className="flex justify-between items-center py-2">
             <div className="flex flex-col">
-              <span className="text-nw-text-secondary text-sm font-medium">Threads Account</span>
+              <span className="text-nw-text-secondary text-sm font-medium">Facebook Account</span>
               <span className="text-nw-text-tertiary text-xs">Used for fast login</span>
             </div>
-            {isThreadsLinked ? (
+            {isFacebookLinked ? (
               <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
                 CONNECTED
               </span>
             ) : (
               <button
                 onClick={() => {
-                  const clientId = import.meta.env.VITE_THREADS_APP_ID || ''
-                  const redirectUri = `${window.location.origin}/api/threads/callback`
-                  window.location.href = `https://threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=threads_basic&response_type=code&state=${user.id}`
+                  supabase.auth.linkIdentity({
+                    provider: 'facebook',
+                    options: { 
+                      redirectTo: `${window.location.origin}/you?confirm_facebook=true`,
+                      // Not requesting email scope as per user request
+                      scopes: 'public_profile' 
+                    }
+                  })
                 }}
-                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-black text-white border border-nw-border-subtle hover:bg-neutral-900 transition-colors"
+                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-[#1877F2] text-white border border-[#1877F2] hover:bg-[#166FE5] transition-colors"
               >
                 LINK ACCOUNT
               </button>
@@ -697,12 +701,11 @@ export function YouPage() {
         </button>
       </motion.section>
 
-      <ThreadsLinkModal
-        isOpen={isThreadsModalOpen}
-        email={threadsEmail}
+      <FacebookLinkModal
+        isOpen={isFacebookModalOpen}
         onConfirm={() => {
-          setIsThreadsModalOpen(false)
-          searchParams.delete('confirm_threads')
+          setIsFacebookModalOpen(false)
+          searchParams.delete('confirm_facebook')
           setSearchParams(searchParams, { replace: true })
         }}
         onCancel={async () => {
@@ -710,33 +713,32 @@ export function YouPage() {
           const { data: { session } } = await supabase.auth.getSession()
           if (session?.user) {
             if (session.user.identities) {
-              const threadsIdentity = session.user.identities.find(i => i.provider === 'threads')
-              if (threadsIdentity) {
-                await supabase.auth.unlinkIdentity(threadsIdentity)
+              const fbIdentity = session.user.identities.find(i => i.provider === 'facebook')
+              if (fbIdentity) {
+                await supabase.auth.unlinkIdentity(fbIdentity)
               }
             }
-            if (session.user.user_metadata?.threads_username) {
+            if (session.user.user_metadata?.facebook_id) {
               await supabase.auth.updateUser({
                 data: {
-                  threads_id: null,
-                  threads_username: null,
-                  threads_pfp: null,
-                  threads_name: null
+                  facebook_id: null,
+                  facebook_name: null,
+                  facebook_pfp: null
                 }
               })
             }
-            setIsThreadsLinked(false)
+            setIsFacebookLinked(false)
             // Update auth store user to reflect changes instantly
             const { data: { user } } = await supabase.auth.getUser()
             if (user) setUser(user as any)
           }
-          setIsThreadsModalOpen(false)
-          searchParams.delete('confirm_threads')
+          setIsFacebookModalOpen(false)
+          searchParams.delete('confirm_facebook')
           setSearchParams(searchParams, { replace: true })
         }}
         onClose={() => {
-          setIsThreadsModalOpen(false)
-          searchParams.delete('confirm_threads')
+          setIsFacebookModalOpen(false)
+          searchParams.delete('confirm_facebook')
           setSearchParams(searchParams, { replace: true })
         }}
       />
