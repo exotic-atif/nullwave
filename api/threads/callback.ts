@@ -42,7 +42,7 @@ export default async function handler(req: Request) {
 
     const { access_token } = tokenData
 
-    const profileRes = await fetch('https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url', {
+    const profileRes = await fetch(`https://graph.threads.net/v1.0/me?fields=id,username,name,threads_profile_picture_url&access_token=${access_token}`, {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
