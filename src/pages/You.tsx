@@ -769,7 +769,7 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.3.38</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.3.39</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
@@ -798,9 +798,7 @@ export function YouPage() {
       <FacebookLinkModal
         isOpen={isFacebookModalOpen}
         onConfirm={() => {
-          setIsFacebookModalOpen(false)
-          searchParams.delete('confirm_facebook')
-          setSearchParams(searchParams, { replace: true })
+          // Do not close here, let the modal's internal animation finish and call onClose
         }}
         onCancel={async () => {
           // unlink identity
@@ -826,9 +824,7 @@ export function YouPage() {
             const { data: { user } } = await supabase.auth.getUser()
             if (user) setUser(user as any)
           }
-          setIsFacebookModalOpen(false)
-          searchParams.delete('confirm_facebook')
-          setSearchParams(searchParams, { replace: true })
+          // Do not close here, let the modal's internal animation finish and call onClose
         }}
         onClose={() => {
           setIsFacebookModalOpen(false)
