@@ -617,8 +617,10 @@ export function isGithubConnected(user: any): boolean {
 }
 
 export function isThreadsConnected(user: any): boolean {
-  if (!user || !user.app_metadata || !user.app_metadata.providers) return false;
-  return user.app_metadata.providers.includes('threads');
+  if (!user) return false;
+  if (user.user_metadata?.threads_username) return true;
+  if (user.app_metadata?.providers?.includes('threads')) return true;
+  return false;
 }
 
 export async function checkUserApproval(userId: string): Promise<boolean> {

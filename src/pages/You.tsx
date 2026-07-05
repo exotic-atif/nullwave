@@ -643,10 +643,9 @@ export function YouPage() {
             ) : (
               <button
                 onClick={() => {
-                  supabase.auth.linkIdentity({
-                    provider: 'threads' as any,
-                    options: { redirectTo: `${window.location.origin}/auth/callback?linking=threads` }
-                  })
+                  const clientId = import.meta.env.VITE_THREADS_APP_ID || ''
+                  const redirectUri = `${window.location.origin}/api/threads/callback`
+                  window.location.href = `https://threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=threads_basic&response_type=code&state=${user.id}`
                 }}
                 className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-black text-white border border-nw-border-subtle hover:bg-neutral-900 transition-colors"
               >
@@ -709,12 +708,27 @@ export function YouPage() {
         onCancel={async () => {
           // unlink identity
           const { data: { session } } = await supabase.auth.getSession()
-          if (session?.user?.identities) {
-            const threadsIdentity = session.user.identities.find(i => i.provider === 'threads')
-            if (threadsIdentity) {
-              await supabase.auth.unlinkIdentity(threadsIdentity)
-              setIsThreadsLinked(false)
+          if (session?.user) {
+            if (session.user.identities) {
+              const threadsIdentity = session.user.identities.find(i => i.provider === 'threads')
+              if (threadsIdentity) {
+                await supabase.auth.unlinkIdentity(threadsIdentity)
+              }
             }
+            if (session.user.user_metadata?.threads_username) {
+              await supabase.auth.updateUser({
+                data: {
+                  threads_id: null,
+                  threads_username: null,
+                  threads_pfp: null,
+                  threads_name: null
+                }
+              })
+            }
+            setIsThreadsLinked(false)
+            // Update auth store user to reflect changes instantly
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) setUser(user)
           }
           setIsThreadsModalOpen(false)
           searchParams.delete('confirm_threads')

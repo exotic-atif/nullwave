@@ -83,17 +83,7 @@ export function LoginPage() {
   }
 
   const handleThreadsLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'custom:threads' as any,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        }
-      })
-      if (error) throw error
-    } catch (err) {
-      setError((err as Error).message || 'Failed to initialize Threads Login')
-    }
+    setError('Please create an account or log in with Google/GitHub first to link your Threads account.')
   }
 
   return (
