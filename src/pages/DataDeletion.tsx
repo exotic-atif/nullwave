@@ -4,8 +4,8 @@ import { ArrowLeft, Trash2, Mail, ShieldAlert } from 'lucide-react'
 
 export function DataDeletion() {
   return (
-    <div className="min-h-screen bg-nw-black text-white relative overflow-hidden flex flex-col items-center justify-center p-6">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-nw-accent/20 via-nw-black to-nw-black pointer-events-none opacity-50" />
+    <div className="min-h-[100dvh] bg-nw-black text-white relative overflow-x-hidden overflow-y-auto flex flex-col items-center justify-center p-4 sm:p-6 py-12">
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-nw-accent/20 via-nw-black to-nw-black pointer-events-none opacity-50" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
