@@ -544,6 +544,36 @@ export async function adminUpdateAuthCredentials(userId: string, jwt: string, pa
   }
 }
 
+export async function adminApproveAccessRequest(
+  jwt: string,
+  request: AccessRequest,
+  updates: Partial<AccessRequest>
+) {
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const res = await fetch(`${workerUrl}/admin/approve-access-request`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${jwt}`
+    },
+    body: JSON.stringify({
+      requestId: request.id,
+      email: request.email,
+      displayName: updates.display_name || request.display_name,
+      avatarUrl: updates.avatar_url ?? request.avatar_url,
+      favArtists: updates.fav_artists ?? request.fav_artists,
+      favSongs: updates.fav_songs ?? request.fav_songs,
+      instagramId: updates.instagram_id ?? request.instagram_id,
+    })
+  })
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to approve access request')
+  }
+  return data as { success: boolean; userId: string; request: AccessRequest }
+}
+
 export async function adminFetchUserHistory(userId: string) {
   const { data, error } = await supabase
     .from('play_history')

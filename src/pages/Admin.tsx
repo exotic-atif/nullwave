@@ -11,12 +11,9 @@ import {
   fetchAccessRequests, 
   updateAccessRequest, 
   deleteAccessRequest, 
-  supabaseUrl, 
-  supabaseAnonKey,
-  adminForceUpdateProfile 
+  adminApproveAccessRequest 
 } from '@/lib/supabase'
 import type { AccessRequest } from '@/lib/supabase'
-import { createClient } from '@supabase/supabase-js'
 import { ProfileManagement } from '@/components/admin/ProfileManagement'
 import { getProfile } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -222,69 +219,20 @@ function AdminDashboard() {
 
   const handleApproveWithAccount = async (req: AccessRequest, updatedData: Partial<AccessRequest>) => {
     try {
-      // 1. Create a temporary, non-persisted client so we don't log the admin out
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { persistSession: false }
-      })
-
-      const password = `Nullwave_${req.email}`
-
-      const { data: signUpData, error: signUpError } = await tempClient.auth.signUp({
-        email: req.email,
-        password: password,
-        options: { data: { full_name: updatedData.display_name || req.display_name } }
-      })
-
-      if (signUpError) {
-        // If they already have an account, or some other error
-        if (signUpError.message.includes('User already registered')) {
-          toast.error('User already has an account.')
-        } else {
-          toast.error(`Sign up failed: ${signUpError.message}`)
-          return
-        }
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        toast.error('Admin session expired. Please sign in again.')
+        return
       }
 
-      let targetUserId = signUpData?.user?.id
-
-        if (!targetUserId && signUpError?.message.includes('User already registered')) {
-          // Fetch the user ID from auth.users via RPC
-          const { data: userId, error: rpcError } = await supabase
-            .rpc('get_user_id_by_email', { p_email: req.email })
-          
-          if (userId) {
-            targetUserId = userId
-          } else {
-            console.error('RPC get_user_id_by_email failed:', rpcError)
-          }
-        }
-
-      if (!targetUserId) {
-        toast.error('FATAL: Could not find user ID in auth.users. The get_user_id_by_email RPC failed. Please fix the RPC in Supabase SQL editor.', { duration: 10000 })
-        return // Abort early so we don\\'t falsely mark as approved
-      }
-
-      // 2. Insert or Update public.users using the admin's session
-      if (targetUserId) {
-        await adminForceUpdateProfile(targetUserId, {
-          username: updatedData.display_name || req.display_name,
-          email: req.email,
-          avatar_url: updatedData.avatar_url || req.avatar_url,
-          fav_artists: updatedData.fav_artists || req.fav_artists,
-          fav_songs: updatedData.fav_songs || req.fav_songs,
-          instagram_id: updatedData.instagram_id || req.instagram_id,
-          approved: true
-        })
-      }
-
-      // 3. Update the request status and details
-      const fullUpdates = { ...updatedData, status: 'approved' as const }
-      await updateAccessRequest(req.id, fullUpdates)
+      const result = await adminApproveAccessRequest(session.access_token, req, updatedData)
+      const fullUpdates = result.request || { ...req, ...updatedData, status: 'approved' as const }
       
       setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, ...fullUpdates } : r))
-      toast.success(`Account created and approved for ${req.email}!`)
+      setEditingRequest(null)
+      toast.success(`Access approved for ${req.email}. Google login will work now.`)
     } catch (err: any) {
-      toast.error('An error occurred during approval.')
+      toast.error(err.message || 'An error occurred during approval.')
       console.error(err)
     }
   }

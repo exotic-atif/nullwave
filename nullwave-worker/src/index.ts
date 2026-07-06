@@ -14,8 +14,8 @@ function corsHeaders(origin: string, env: Env): Record<string, string> {
   const isAllowed = allowed.includes('*') || allowed.includes(origin)
   return {
     'Access-Control-Allow-Origin': isAllowed ? origin : allowed[0],
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   }
 }
@@ -28,6 +28,60 @@ function json(data: unknown, status: number, origin: string, env: Env): Response
       ...corsHeaders(origin, env),
     },
   })
+}
+
+async function verifyAdmin(authHeader: string | null, env: Env) {
+  if (!authHeader) {
+    return { error: 'Missing Authorization header', status: 401 }
+  }
+
+  const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      'Authorization': authHeader,
+      'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
+    },
+  })
+  if (!verifyRes.ok) return { error: 'Unauthorized JWT', status: 401 }
+
+  const callerObj = await verifyRes.json() as any
+  const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
+    headers: {
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
+    },
+  })
+  const roleData = await roleCheckRes.json() as any
+  if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
+    return { error: 'Forbidden: Admins only', status: 403 }
+  }
+
+  return { caller: callerObj }
+}
+
+async function findAuthUserByEmail(email: string, env: Env): Promise<any | null> {
+  const wanted = email.trim().toLowerCase()
+
+  for (let page = 1; page <= 20; page += 1) {
+    const res = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=1000`, {
+      headers: {
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
+      },
+    })
+
+    if (!res.ok) {
+      const errBody = await res.text()
+      throw new Error(`Failed to list auth users: ${errBody}`)
+    }
+
+    const body = await res.json() as any
+    const users = Array.isArray(body) ? body : body.users || []
+    const found = users.find((u: any) => String(u.email || '').toLowerCase() === wanted)
+    if (found) return found
+    if (users.length < 1000) return null
+  }
+
+  return null
 }
 
 // ===== JIOSAAVN HELPERS =====
@@ -742,6 +796,152 @@ export default {
         }
       }
 
+      // POST /admin/approve-access-request
+      if (path === '/admin/approve-access-request' && request.method === 'POST') {
+        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
+        }
+
+        try {
+          const adminCheck = await verifyAdmin(request.headers.get('Authorization'), env)
+          if ('error' in adminCheck) return json({ error: adminCheck.error }, adminCheck.status || 500, origin, env)
+
+          const body = await request.json() as any
+          const { requestId, email, displayName, avatarUrl, favArtists, favSongs, instagramId } = body
+          const normalizedEmail = String(email || '').trim().toLowerCase()
+
+          if (!requestId) return json({ error: 'Missing requestId' }, 400, origin, env)
+          if (!normalizedEmail || !normalizedEmail.includes('@')) return json({ error: 'Missing valid email' }, 400, origin, env)
+
+          let authUser = await findAuthUserByEmail(normalizedEmail, env)
+
+          if (!authUser) {
+            const createRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: normalizedEmail,
+                password: `Nullwave_${normalizedEmail}`,
+                email_confirm: true,
+                user_metadata: { full_name: displayName || normalizedEmail.split('@')[0] },
+              }),
+            })
+
+            if (!createRes.ok) {
+              const errBody = await createRes.text()
+              if (!errBody.toLowerCase().includes('already')) {
+                return json({ error: `Failed to create auth user: ${errBody}` }, 500, origin, env)
+              }
+              authUser = await findAuthUserByEmail(normalizedEmail, env)
+            } else {
+              authUser = await createRes.json()
+            }
+          }
+
+          if (!authUser?.id) {
+            return json({ error: 'Could not find or create the Supabase auth user for this email' }, 500, origin, env)
+          }
+
+          const profilePayload = {
+            id: authUser.id,
+            username: displayName || normalizedEmail.split('@')[0],
+            email: normalizedEmail,
+            avatar_url: avatarUrl || null,
+            fav_artists: favArtists || null,
+            fav_songs: favSongs || null,
+            instagram_id: instagramId || null,
+            approved: true,
+          }
+
+          const existingProfileRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(normalizedEmail)}&select=id,email`, {
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+            },
+          })
+
+          if (!existingProfileRes.ok) {
+            const errBody = await existingProfileRes.text()
+            return json({ error: `Failed to check existing profile email: ${errBody}` }, 500, origin, env)
+          }
+
+          const existingProfiles = await existingProfileRes.json() as any[]
+          const conflictingProfile = existingProfiles.find((profile) => profile.id !== authUser.id)
+
+          if (conflictingProfile) {
+            const releaseEmailRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(conflictingProfile.id)}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email: `${conflictingProfile.id}@placeholder.nullwave` }),
+            })
+
+            if (!releaseEmailRes.ok) {
+              const errBody = await releaseEmailRes.text()
+              return json({ error: `Failed to resolve duplicate profile email: ${errBody}` }, 500, origin, env)
+            }
+          }
+
+          const profileRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?on_conflict=id`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates,return=representation',
+            },
+            body: JSON.stringify(profilePayload),
+          })
+
+          if (!profileRes.ok) {
+            const errBody = await profileRes.text()
+            return json({ error: `Failed to approve profile: ${errBody}` }, 500, origin, env)
+          }
+
+          const requestPayload = {
+            display_name: displayName || normalizedEmail.split('@')[0],
+            email: normalizedEmail,
+            avatar_url: avatarUrl || null,
+            fav_artists: favArtists || null,
+            fav_songs: favSongs || null,
+            instagram_id: instagramId || null,
+            status: 'approved',
+          }
+
+          const requestRes = await fetch(`${env.SUPABASE_URL}/rest/v1/access_requests?id=eq.${encodeURIComponent(requestId)}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation',
+            },
+            body: JSON.stringify(requestPayload),
+          })
+
+          if (!requestRes.ok) {
+            const errBody = await requestRes.text()
+            return json({ error: `Profile was approved, but request status failed to update: ${errBody}` }, 500, origin, env)
+          }
+
+          const updatedRequest = await requestRes.json() as any[]
+          return json({
+            success: true,
+            userId: authUser.id,
+            request: updatedRequest?.[0] || requestPayload,
+          }, 200, origin, env)
+        } catch (e: any) {
+          return json({ error: e.message || 'Approval failed' }, 500, origin, env)
+        }
+      }
+
       // DELETE /admin/delete-user
       if (path === '/admin/delete-user' && request.method === 'DELETE') {
         if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -791,7 +991,7 @@ export default {
       }
 
       // Added POST and DELETE to method check
-      if (request.method !== 'GET' && request.method !== 'DELETE' && path !== '/sign-upload' && path !== '/admin/update-user' && path !== '/admin/delete-user') {
+      if (request.method !== 'GET' && request.method !== 'DELETE' && path !== '/sign-upload' && path !== '/admin/update-user' && path !== '/admin/delete-user' && path !== '/admin/approve-access-request') {
         return json({ error: 'Method not allowed' }, 405, origin, env)
       }
 

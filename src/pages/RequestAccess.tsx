@@ -81,6 +81,13 @@ export function RequestAccessPage() {
           setIsSubmitting(false)
           return
         } else {
+          if (isCompleteProfile) {
+            await supabase.auth.signOut()
+            setIsSubmitted(true)
+            setIsSubmitting(false)
+            return
+          }
+
           setError(
             <>
               You've already submitted a request! Please be patient or contact the Admin at{' '}
@@ -126,7 +133,12 @@ export function RequestAccessPage() {
       setIsSubmitted(true)
     } catch (err: any) {
       if (err.message?.includes('duplicate') || err.message?.includes('unique')) {
-        setError(<>You've already submitted a request with this email. <a href='#' onClick={(e) => { e.preventDefault(); supabase.auth.signOut().then(() => window.location.href='/login'); }} className="underline font-bold">Click here to sign out</a> and log in with your original method.</>)
+        if (isCompleteProfile) {
+          await supabase.auth.signOut()
+          setIsSubmitted(true)
+        } else {
+          setError(<>You've already submitted a request with this email. <a href='#' onClick={(e) => { e.preventDefault(); supabase.auth.signOut().then(() => window.location.href='/login'); }} className="underline font-bold">Click here to sign out</a> and log in with your original method.</>)
+        }
       } else {
         setError(err.message || 'Something went wrong. Please try again.')
       }
