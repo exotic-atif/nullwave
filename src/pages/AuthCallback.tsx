@@ -16,8 +16,9 @@ export function AuthCallback() {
     const handleSession = async (session: any) => {
       if (!session?.user) {
         const searchParams = new URLSearchParams(window.location.search)
-        const error = searchParams.get('error')
-        const errorDescription = searchParams.get('error_description')
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const error = searchParams.get('error') || hashParams.get('error')
+        const errorDescription = searchParams.get('error_description') || hashParams.get('error_description')
         
         if (error) {
           console.error('OAuth Error:', error, errorDescription)

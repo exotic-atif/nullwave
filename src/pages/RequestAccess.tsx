@@ -126,7 +126,7 @@ export function RequestAccessPage() {
       setIsSubmitted(true)
     } catch (err: any) {
       if (err.message?.includes('duplicate') || err.message?.includes('unique')) {
-        setError('You\'ve already submitted a request with this email.')
+        setError(<>You've already submitted a request with this email. <a href='#' onClick={(e) => { e.preventDefault(); supabase.auth.signOut().then(() => window.location.href='/login'); }} className="underline font-bold">Click here to sign out</a> and log in with your original method.</>)
       } else {
         setError(err.message || 'Something went wrong. Please try again.')
       }
