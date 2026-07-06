@@ -100,9 +100,12 @@ export async function getProfile(userId: string) {
     .from('users')
     .select('username, avatar_url, theme, role, fav_songs, fav_artists, approved')
     .eq('id', userId)
-    .maybeSingle()
-  if (error) console.error('Failed to fetch profile:', error.message)
-  return data
+    .limit(1)
+  if (error) {
+    console.error('Failed to fetch profile:', error.message)
+    return null
+  }
+  return data && data.length > 0 ? data[0] : null
 }
 
 export async function getSenderProfile(senderId: string) {
@@ -179,9 +182,9 @@ export async function addLikedSong(userId: string, track: Track) {
     .select('id')
     .eq('user_id', userId)
     .eq('track_id', track.id)
-    .maybeSingle()
+    .limit(1)
 
-  if (existing) return
+  if (existing && existing.length > 0) return
 
   // If not, insert it
   const { error } = await supabase.from('liked_tracks').insert({
@@ -656,8 +659,8 @@ export async function checkUserApproval(userId: string): Promise<boolean> {
     .from('users')
     .select('approved')
     .eq('id', userId)
-    .single();
+    .limit(1)
   
-  if (error || !data) return false;
-  return !!data.approved;
+  if (error || !data || data.length === 0) return false;
+  return !!data[0].approved;
 }
