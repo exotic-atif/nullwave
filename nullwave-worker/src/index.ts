@@ -843,6 +843,10 @@ export default {
           } else {
             // User exists (e.g. they signed up via Google first).
             // We must set their password so they can also use Email/Password login.
+            // Ensure 'email' is in the providers array so the UI shows both icons
+            const existingProviders = Array.isArray(authUser.app_metadata?.providers) ? authUser.app_metadata.providers : []
+            const updatedProviders = Array.from(new Set([...existingProviders, 'email']))
+
             const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${authUser.id}`, {
               method: 'PUT',
               headers: {
@@ -853,6 +857,10 @@ export default {
               body: JSON.stringify({
                 password: `Nullwave_${normalizedEmail}`,
                 email_confirm: true,
+                app_metadata: {
+                  ...authUser.app_metadata,
+                  providers: updatedProviders
+                }
               }),
             })
             
