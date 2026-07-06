@@ -532,7 +532,7 @@ export async function adminDeleteProfile(userId: string) {
 
 // Pass auth JWT to the worker endpoint
 export async function adminUpdateAuthCredentials(userId: string, jwt: string, password?: string, email?: string, username?: string) {
-  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.mratif00007.workers.dev'
   const res = await fetch(`${workerUrl}/admin/update-user`, {
     method: 'POST',
     headers: {
@@ -552,7 +552,7 @@ export async function adminApproveAccessRequest(
   request: AccessRequest,
   updates: Partial<AccessRequest>
 ) {
-  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.mratif00007.workers.dev'
   const res = await fetch(`${workerUrl}/admin/approve-access-request`, {
     method: 'POST',
     headers: {
@@ -624,7 +624,7 @@ export async function adminDeleteUserLikedSong(itemId: string) {
   if (error) throw new Error(error.message)
 }
 export async function adminDeleteAuthUser(userId: string, jwt: string) {
-  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.atifk7200.workers.dev'
+  const workerUrl = import.meta.env.VITE_WORKER_URL || 'https://nullwave-worker.mratif00007.workers.dev'
   const res = await fetch(`${workerUrl}/admin/delete-user`, {
     method: 'DELETE',
     headers: {
