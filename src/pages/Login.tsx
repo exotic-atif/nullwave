@@ -43,13 +43,16 @@ export function LoginPage() {
     e.preventDefault()
     setError('')
 
-    if (!email.trim() || !password.trim()) {
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+
+    if (!trimmedEmail || !trimmedPassword) {
       setError('Please enter both email and password')
       return
     }
 
     try {
-      await login(email, password)
+      await login(trimmedEmail, password)
       navigate(from + search, { replace: true })
     } catch (err) {
       setError((err as Error).message || 'Invalid credentials')
