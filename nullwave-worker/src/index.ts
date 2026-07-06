@@ -840,6 +840,25 @@ export default {
             } else {
               authUser = await createRes.json()
             }
+          } else {
+            // User exists (e.g. they signed up via Google first).
+            // We must set their password so they can also use Email/Password login.
+            const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${authUser.id}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                password: `Nullwave_${normalizedEmail}`,
+                email_confirm: true,
+              }),
+            })
+            
+            if (!updateRes.ok) {
+              console.error("Failed to update password for existing user:", await updateRes.text())
+            }
           }
 
           if (!authUser?.id) {
