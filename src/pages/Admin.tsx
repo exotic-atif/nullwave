@@ -249,13 +249,20 @@ function AdminDashboard() {
 
         if (!targetUserId && signUpError?.message.includes('User already registered')) {
           // Fetch the user ID from auth.users via RPC
-          const { data: userId } = await supabase
+          const { data: userId, error: rpcError } = await supabase
             .rpc('get_user_id_by_email', { p_email: req.email })
           
           if (userId) {
             targetUserId = userId
+          } else {
+            console.error('RPC get_user_id_by_email failed:', rpcError)
           }
         }
+
+      if (!targetUserId) {
+        toast.error('FATAL: Could not find user ID in auth.users. The get_user_id_by_email RPC failed. Please fix the RPC in Supabase SQL editor.', { duration: 10000 })
+        return // Abort early so we don\\'t falsely mark as approved
+      }
 
       // 2. Insert or Update public.users using the admin's session
       if (targetUserId) {
