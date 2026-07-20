@@ -264,6 +264,7 @@ input[type='range']::-moz-range-thumb {
 /* Custom Range Slider for Webkit */
 input[type=range].nw-slider {
   -webkit-appearance: none;
+  appearance: none;
   background: transparent;
 }
 
