@@ -442,10 +442,10 @@ async function handleRadio(
   try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
   
   if (smartSeeds.length > 0) {
-    // Take top 2 smart seeds and fetch their direct native recommendations
-    for (const seed of smartSeeds.slice(0, 2)) {
+    // Take top 2 smart seeds and search for them directly to guarantee valid results
+    for (const seedStr of smartSeeds.slice(0, 2)) {
       searches.push({
-        promise: fetchNativeRecommendations(seed).catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '5', p: '1' }).then(res => res.results || []).catch(() => []),
         reason: `Based on your high affinity listening`
       })
     }
@@ -527,10 +527,10 @@ async function handleHomeFeed(
     try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
 
     if (smartSeeds.length > 0) {
-      // Prioritize smart seeds! Fetch native recommendations for the top 3 highest affinity tracks
-      for (const seed of smartSeeds.slice(0, 3)) {
+      // Prioritize smart seeds! Use search to guarantee valid results (avoid JioSaavn reco.getreco returning Hindi)
+      for (const seedStr of smartSeeds.slice(0, 3)) {
         searches.push({
-          promise: fetchNativeRecommendations(seed).catch(() => []),
+          promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '5', p: '1' }).then(res => res.results || []).catch(() => []),
           reason: `Based on your high affinity listening`
         })
       }

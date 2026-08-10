@@ -270,8 +270,18 @@ export function Player() {
       const historyTitles = useQueueStore.getState().history.map(t => t.title)
       const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
       const { user } = useAuthStore.getState()
-      const likedTracks = useLikedStore.getState().likedTracks.map(t => t.title)
+      const likedTracks = useLikedStore.getState().likedTracks
       
+      const historyIds = useQueueStore.getState().history.map(t => t.id)
+      const likedIds = likedTracks.map(t => t.id)
+      const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+      
+      const allTracks = [...useQueueStore.getState().history, ...likedTracks]
+      const smartSeeds = smartSeedIds
+        .map(id => allTracks.find(t => t.id === id))
+        .filter(Boolean)
+        .map(t => `${t!.title} ${t!.artist}`)
+
       // If we are at the end of a queue/playlist, seed the radio
       api.radio({
         artist: current.artist,
@@ -279,7 +289,8 @@ export function Player() {
         favArtists: user?.favArtists || '',
         favSongs: user?.favSongs || '',
         excludeIds: dislikedTracks,
-        likedTracks
+        likedTracks: likedTracks.map(t => t.title),
+        smartSeeds
       }).then((tracks) => {
         if (tracks.length > 0) {
           // Just play the first one, don't populate the queue to keep it 1 song per session

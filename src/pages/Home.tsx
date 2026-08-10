@@ -49,7 +49,14 @@ export function HomePage() {
         // Generate personalized smart seeds based on actual listening duration!
         const historyIds = recents.map(t => t.id)
         const likedIds = likedTracks.map(t => t.id)
-        const smartSeeds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+        const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+        
+        // Convert IDs back to titles for better searching instead of relying on JioSaavn's reco API
+        const allTracks = [...recents, ...likedTracks]
+        const smartSeeds = smartSeedIds
+          .map(id => allTracks.find(t => t.id === id))
+          .filter(Boolean)
+          .map(t => `${t!.title} ${t!.artist}`)
 
         const result = await api.homeFeed({
           recentArtists: artists,
