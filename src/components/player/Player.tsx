@@ -4,9 +4,8 @@ import { IconButton } from '../ui/IconButton'
 import { formatTime } from '@/lib/utils'
 import { audioManager } from '@/lib/audio'
 import { recordPlayHistory } from '@/lib/supabase'
-import { api, parseLRC } from '@/lib/api'
+import { api } from '@/lib/api'
 import { toast } from 'sonner'
-import type { SyncedLine } from '@/lib/api'
 import {
   Play,
   Pause,
@@ -55,8 +54,6 @@ export function Player() {
 
   const [isDragging, setIsDragging] = useState(false)
   const [showFullScreen, setShowFullScreen] = useState(false)
-  const [lyricsData, setLyricsData] = useState<SyncedLine[] | null>(null)
-  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
   
@@ -115,8 +112,6 @@ export function Player() {
     
     // Stop and clear audio source immediately to prevent old track from resuming
     audioManager.stop()
-    // Clear lyrics immediately so old lyrics don't show for the new song
-    setLyricsData(null)
     setStreamStatus('Checking stream server...')
 
     async function loadStream() {
@@ -169,20 +164,6 @@ export function Player() {
 
     loadStream()
 
-    setIsFetchingLyrics(true)
-    api.lyrics(track.title, track.artist).then((result) => {
-      if (cancelled) return
-      if (result.synced) {
-        setLyricsData(parseLRC(result.synced))
-      } else {
-        setLyricsData(null)
-      }
-    }).catch(() => {
-      if (cancelled) return
-      setLyricsData(null)
-    }).finally(() => {
-      if (!cancelled) setIsFetchingLyrics(false)
-    })
 
     // Record play history
     if (user?.id && lastRecordedTrack.current !== track.id) {
@@ -354,8 +335,6 @@ export function Player() {
         track={currentTrack}
         progress={progress}
         duration={duration}
-        lyricsData={lyricsData}
-        isFetchingLyrics={isFetchingLyrics}
         onNext={performNextTrack}
         onPrevious={handlePrevious}
         isLiked={isLiked(currentTrack.id)}

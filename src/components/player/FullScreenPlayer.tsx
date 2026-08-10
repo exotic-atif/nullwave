@@ -1,5 +1,4 @@
 import type { Track } from '@/types'
-import type { SyncedLine } from '@/lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Loader2, Heart, ThumbsDown } from 'lucide-react'
 import { toast } from 'sonner'
@@ -17,16 +16,13 @@ interface FullScreenPlayerProps {
   track: Track
   progress: number
   duration: number
-  lyricsData: SyncedLine[] | null
-  isFetchingLyrics: boolean
   onNext: () => void
   onPrevious: () => void
   isLiked?: boolean
   toggleLike?: () => void
 }
 
-export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, lyricsData, isFetchingLyrics, onNext, onPrevious, isLiked, toggleLike }: FullScreenPlayerProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, onNext, onPrevious, isLiked, toggleLike }: FullScreenPlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number>(0)
   const [showLyrics, setShowLyrics] = useState(false)
@@ -46,32 +42,31 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
     cycleRepeat,
   } = usePlayerStore()
 
-  // Find active line index
-  const activeIndex = lyricsData
-    ? lyricsData.findIndex((line, i) => {
-        const nextLine = lyricsData[i + 1]
-        return progress >= line.time && (!nextLine || progress < nextLine.time)
-      })
-    : -1
+  const amLyricsRef = useRef<HTMLElement>(null)
 
-  // Auto-scroll to active line
+  // Sync am-lyrics time with audio progress
   useEffect(() => {
-    if (isOpen && showLyrics && containerRef.current) {
-      if (activeIndex >= 0) {
-        const activeEl = containerRef.current.children[activeIndex] as HTMLElement
-        if (activeEl) {
-          const container = containerRef.current
-          const offsetTop = activeEl.offsetTop - container.offsetTop
-          container.scrollTo({
-            top: offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2,
-            behavior: 'smooth'
-          })
-        }
-      } else if (activeIndex === -1 && progress < 5 && containerRef.current) {
-        containerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    if (showLyrics && amLyricsRef.current) {
+      // am-lyrics expects currentTime in milliseconds
+      ;(amLyricsRef.current as any).currentTime = progress * 1000
+    }
+  }, [progress, showLyrics])
+
+  // Handle line click
+  useEffect(() => {
+    const handleLineClick = (e: any) => {
+      if (e.detail && e.detail.timestamp !== undefined) {
+        audioManager.seek(e.detail.timestamp / 1000)
+        setProgress(e.detail.timestamp / 1000)
       }
     }
-  }, [activeIndex, isOpen, showLyrics, lyricsData, progress])
+    
+    const el = amLyricsRef.current
+    if (el) {
+      el.addEventListener('line-click', handleLineClick)
+      return () => el.removeEventListener('line-click', handleLineClick)
+    }
+  }, [showLyrics, setProgress])
 
   // ===== Audio Visualizer =====
   const drawVisualizer = useCallback(() => {
@@ -432,47 +427,26 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, l
                   className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden"
                 >
                   <div className="flex-1 w-full flex items-center justify-center h-full relative">
-                    {isFetchingLyrics ? (
-                      <div className="flex flex-col items-center gap-3 py-20">
-                        <Loader2 size={24} className="text-nw-accent animate-spin" />
-                        <p className="text-nw-text-secondary text-sm font-medium">Fetching lyrics...</p>
-                      </div>
-                    ) : !lyricsData || lyricsData.length === 0 ? (
-                      <div className="text-center py-20">
-                        <p className="text-nw-text-secondary font-medium">No lyrics available</p>
-                        <p className="text-nw-text-tertiary text-sm mt-1">
-                          Lyrics for "{track.title}" haven't been added yet
-                        </p>
-                      </div>
-                    ) : (
-                      <div
-                        ref={containerRef}
-                        className="w-full h-full overflow-y-auto no-scrollbar py-[40vh] px-4 space-y-6 select-none mask-image-vertical"
-                        style={{
-                          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                          maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                          paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
-                          paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
-                        }}
-                      >
-                        {lyricsData.map((line, i) => {
-                        const isActive = i === activeIndex
-                        const isPassed = i < activeIndex
-                        return (
-                          <div 
-                            key={i} 
-                            className={`text-2xl md:text-4xl lg:text-5xl font-display font-bold transition-all duration-500 cursor-default ${
-                              isActive ? 'text-nw-text scale-100 opacity-100 blur-0' : 
-                              isPassed ? 'text-nw-text-secondary/50 scale-95 opacity-40 blur-[2px] hover:text-nw-text-secondary/80 hover:opacity-80' : 
-                              'text-nw-text-secondary/30 scale-95 opacity-40 blur-[2px] hover:text-nw-text-secondary/60 hover:opacity-60'
-                            }`}
-                          >
-                            {line.text}
-                          </div>
-                        )
-                        })}
-                      </div>
-                    )}
+                    {/* @ts-expect-error am-lyrics is a custom element */}
+                    <am-lyrics
+                      ref={amLyricsRef}
+                      song-title={track.title}
+                      song-artist={track.artist}
+                      song-album={track.album || ''}
+                      song-duration={track.duration ? Math.round(track.duration * 1000) : undefined}
+                      query={`${track.title} ${track.artist}`}
+                      highlight-color="#ffffff"
+                      hover-background-color="rgba(255,255,255,0.1)"
+                      autoscroll="true"
+                      interpolate="true"
+                      class="w-full h-full block"
+                      style={{
+                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                        maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
+                        paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
+                        paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
+                      }}
+                    />
                   </div>
                   
                   {/* Mobile Lyrics Controls have been moved outside the flex container to pin them at the bottom */}
