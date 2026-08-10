@@ -252,7 +252,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                 transition={{ delay: 0.1, duration: 0.4 }}
                 className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'hidden md:flex w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
-                <div className={`relative ${showLyrics ? 'w-[40vh] h-[40vh]' : 'w-full max-w-[35vh] md:max-w-[45vh] lg:max-w-[50vh] aspect-square'} flex-shrink-0 transition-all duration-500`}>
+                <div className={`relative ${showLyrics ? 'w-full max-w-[200px] md:max-w-[300px] aspect-square' : 'w-full max-w-[300px] md:max-w-[380px] lg:max-w-[460px] aspect-square'} flex-shrink-0 transition-all duration-500`}>
                   {/* Audio Visualizer Canvas */}
                   {!showLyrics && (
                     <canvas
@@ -424,7 +424,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.4 }}
-                  className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden"
+                  className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden pb-32 md:pb-0"
                 >
                   <div className="flex-1 w-full flex items-center justify-center h-full relative">
                     {/* @ts-expect-error am-lyrics is a custom element */}
@@ -441,10 +441,8 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                       interpolate="true"
                       class="w-full h-full block"
                       style={{
-                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                        maskImage: 'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)',
-                        paddingTop: 'calc(40vh + env(safe-area-inset-top) + 48px)',
-                        paddingBottom: 'calc(40vh + env(safe-area-inset-bottom) + 24px)'
+                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+                        maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
                       }}
                     />
                   </div>
