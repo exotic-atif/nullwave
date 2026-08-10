@@ -3,6 +3,7 @@ import { AlbumArt } from '../ui/AlbumArt'
 import { IconButton } from '../ui/IconButton'
 import { formatTime } from '@/lib/utils'
 import { audioManager } from '@/lib/audio'
+import { listeningTracker } from '@/lib/listening-tracker'
 import { recordPlayHistory } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
@@ -98,6 +99,15 @@ export function Player() {
     if (!currentTrack) return
 
     const track = currentTrack
+
+    // Record listening session for the previous track before loading the new one
+    if (lastRecordedTrack.current && lastRecordedTrack.current !== track.id) {
+      const p = usePlayerStore.getState().progress
+      const d = usePlayerStore.getState().duration || 1
+      listeningTracker.reportPlaySession(lastRecordedTrack.current, p, d)
+    }
+    lastRecordedTrack.current = track.id
+
     let cancelled = false
     const healthPendingTimer = window.setTimeout(() => {
       if (!cancelled) {

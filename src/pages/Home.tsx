@@ -11,6 +11,7 @@ import type { Track, Album, Artist } from '@/types'
 import { motion } from 'framer-motion'
 import { Play, Sparkles, Search as SearchIcon } from 'lucide-react'
 import { fetchPlayHistory } from '@/lib/supabase'
+import { listeningTracker } from '@/lib/listening-tracker'
 import { useNavigate } from 'react-router-dom'
 
 export function HomePage() {
@@ -45,11 +46,17 @@ export function HomePage() {
         // deduplicate artists
         artists = [...new Set(artists)].slice(0, 10)
         
+        // Generate personalized smart seeds based on actual listening duration!
+        const historyIds = recents.map(t => t.id)
+        const likedIds = likedTracks.map(t => t.id)
+        const smartSeeds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+
         const result = await api.homeFeed({
           recentArtists: artists,
           favArtists: user?.favArtists || '',
           favSongs: user?.favSongs || '',
           likedTracks: likedTracks.map(t => t.title),
+          smartSeeds,
         })
         
         if (!cancelled) {

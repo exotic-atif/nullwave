@@ -382,7 +382,8 @@ async function handleRadio(
   favArtistsStr: string,
   favSongsStr: string,
   excludeIdsStr: string,
-  likedTracksStr: string
+  likedTracksStr: string,
+  smartSeedsStr: string = '[]'
 ): Promise<unknown> {
   let historyExclude: string[] = []
   let excludeIds: string[] = []
@@ -434,6 +435,20 @@ async function handleRadio(
       promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
       reason: `Because you like ${randomFavSong}`
     })
+  }
+
+  // Use Smart Seeds if available
+  let smartSeeds: string[] = []
+  try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
+  
+  if (smartSeeds.length > 0) {
+    // Take top 2 smart seeds and fetch their direct native recommendations
+    for (const seed of smartSeeds.slice(0, 2)) {
+      searches.push({
+        promise: fetchNativeRecommendations(seed).catch(() => []),
+        reason: `Based on your high affinity listening`
+      })
+    }
   }
 
   const resultsWithReason = await Promise.all(
@@ -493,7 +508,8 @@ async function handleHomeFeed(
   recentArtistsStr: string,
   favArtistsStr: string,
   favSongsStr: string,
-  likedTracksStr: string
+  likedTracksStr: string,
+  smartSeedsStr: string = '[]'
 ): Promise<unknown> {
   try {
     let recentArtists: string[] = []
@@ -507,20 +523,33 @@ async function handleHomeFeed(
     // Build a candidate pool
     const searches: { promise: Promise<any>, reason: string }[] = []
 
-    // 1. Pick a random liked track as seed
-    if (likedTracks.length > 0) {
-      const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
-      searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '5', p: '1' })
-          .then(async (res) => {
-            if (res?.results?.[0]?.id) {
-              return await fetchNativeRecommendations(res.results[0].id)
-            }
-            return res.results || []
-          })
-          .catch(() => []),
-        reason: `Because you liked ${randomLikedTrack}`
-      })
+    let smartSeeds: string[] = []
+    try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
+
+    if (smartSeeds.length > 0) {
+      // Prioritize smart seeds! Fetch native recommendations for the top 3 highest affinity tracks
+      for (const seed of smartSeeds.slice(0, 3)) {
+        searches.push({
+          promise: fetchNativeRecommendations(seed).catch(() => []),
+          reason: `Based on your high affinity listening`
+        })
+      }
+    } else {
+      // Fallback: Pick a random liked track as seed
+      if (likedTracks.length > 0) {
+        const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
+        searches.push({
+          promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '5', p: '1' })
+            .then(async (res) => {
+              if (res?.results?.[0]?.id) {
+                return await fetchNativeRecommendations(res.results[0].id)
+              }
+              return res.results || []
+            })
+            .catch(() => []),
+          reason: `Because you liked ${randomLikedTrack}`
+        })
+      }
     }
 
     // 2. Pick a random recent artist
@@ -675,9 +704,10 @@ export default {
         const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
         const excludeIdsStr = url.searchParams.get('excludeIds')?.trim() || '[]'
         const likedTracksStr = url.searchParams.get('likedTracks')?.trim() || '[]'
+        const smartSeedsStr = url.searchParams.get('smartSeeds')?.trim() || '[]'
 
         if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
-        return json(await handleRadio(artist, historyStr, favArtistsStr, favSongsStr, excludeIdsStr, likedTracksStr), 200, origin, env)
+        return json(await handleRadio(artist, historyStr, favArtistsStr, favSongsStr, excludeIdsStr, likedTracksStr, smartSeedsStr), 200, origin, env)
       }
 
       // GET /home-feed?history=X
@@ -686,7 +716,8 @@ export default {
         const favArtistsStr = url.searchParams.get('favArtists')?.trim() || ''
         const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
         const likedTracksStr = url.searchParams.get('likedTracks')?.trim() || '[]'
-        return json(await handleHomeFeed(historyStr, favArtistsStr, favSongsStr, likedTracksStr), 200, origin, env)
+        const smartSeedsStr = url.searchParams.get('smartSeeds')?.trim() || '[]'
+        return json(await handleHomeFeed(historyStr, favArtistsStr, favSongsStr, likedTracksStr, smartSeedsStr), 200, origin, env)
       }
 
       // GET /track/:id
