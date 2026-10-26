@@ -8,6 +8,7 @@ import os
 import sys
 import re
 import json
+import time
 import logging
 import subprocess
 import base64
@@ -241,42 +242,43 @@ def _jiosaavn_search(title, artist):
 # yt-dlp — Fallback source (residential IPs only)
 # ---------------------------------------------------------------------------
 
+_STREAM_CACHE = {}  # cache_key -> {"url": url, "source": source, "expires": timestamp}
+
 def _ytdlp_search(title, artist):
-    """Use yt-dlp to find a YouTube audio stream. Only works on residential IPs."""
+    """Use yt-dlp to find a YouTube audio stream with fast single-query search."""
     clean_title = _clean(title)
     clean_artist = _clean(_primary_artist(artist))
 
-    queries = list(dict.fromkeys(filter(None, [
-        f"{clean_title} {clean_artist} official audio",
-        f"{clean_title} {clean_artist}",
-    ])))
+    # Single targeted query to avoid 15s+ multi-query latency
+    query = f"{clean_title} {clean_artist}".strip()
+    search = f"ytsearch1:{query}"
+    log.info("[yt-dlp] Searching: %s", search)
 
-    for q in queries:
-        search = f"ytsearch1:{q}"
-        log.info("[yt-dlp] Searching: %s", search)
+    ytdlp_bin = shutil.which("yt-dlp") or os.path.join(os.path.dirname(sys.executable), "yt-dlp") or "yt-dlp"
+    cmd = [
+        ytdlp_bin,
+        "--remote-components", "ejs:github",
+        "--format", "bestaudio[ext=m4a]/bestaudio/best",
+        "--get-url",
+        "--no-playlist",
+        "--skip-download",
+        "--socket-timeout", "10",
+        "--no-warnings",
+        "--no-check-certificate",
+        "--user-agent", MOCK_UA,
+    ]
+    if COOKIES_PATH:
+        cmd += ["--cookies", COOKIES_PATH]
+    cmd.append(search)
 
-        ytdlp_bin = shutil.which("yt-dlp") or os.path.join(os.path.dirname(sys.executable), "yt-dlp") or "yt-dlp"
-        cmd = [
-            ytdlp_bin,
-            "--remote-components", "ejs:github",
-            "--format", "bestaudio[ext=m4a]/bestaudio/best",
-            "--get-url",
-            "--no-warnings",
-            "--no-check-certificate",
-            "--user-agent", MOCK_UA,
-        ]
-        if COOKIES_PATH:
-            cmd += ["--cookies", COOKIES_PATH]
-        cmd.append(search)
-
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            url = (result.stdout or "").strip().split("\n")[0].strip()
-            if url.startswith("http"):
-                log.info("[yt-dlp] Found URL: %s...", url[:60])
-                return url
-        except Exception as e:
-            log.warning("[yt-dlp] Failed: %s", e)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        url = (result.stdout or "").strip().split("\n")[0].strip()
+        if url.startswith("http"):
+            log.info("[yt-dlp] Found URL: %s...", url[:60])
+            return url
+    except Exception as e:
+        log.warning("[yt-dlp] Failed: %s", e)
 
     return None
 
@@ -285,16 +287,26 @@ def _ytdlp_search(title, artist):
 # ---------------------------------------------------------------------------
 
 def _find_stream_url(title, artist):
+    cache_key = f"{_normalize_text(title)}::{_normalize_text(artist)}"
+    now = time.time()
+    if cache_key in _STREAM_CACHE:
+        cached = _STREAM_CACHE[cache_key]
+        if cached["expires"] > now:
+            log.info("[Stream] Serving from cache: %s", cache_key)
+            return {"streamUrl": cached["url"], "source": cached["source"]}
+
     # 1. Primary on VM: yt-dlp / YouTube (relays and proxies audio)
     log.info("[Stream] Searching yt-dlp (primary) for: %s - %s", title, artist)
     url = _ytdlp_search(title, artist)
     if url:
+        _STREAM_CACHE[cache_key] = {"url": url, "source": "ytdlp", "expires": now + 14400}
         return {"streamUrl": url, "source": "ytdlp"}
 
     # 2. Fallback on VM: JioSaavn
     log.info("[Stream] yt-dlp returned no stream, falling back to JioSaavn for: %s - %s", title, artist)
     url = _jiosaavn_search(title, artist)
     if url:
+        _STREAM_CACHE[cache_key] = {"url": url, "source": "jiosaavn", "expires": now + 14400}
         return {"streamUrl": url, "source": "jiosaavn"}
 
     return {"streamUrl": None, "source": None}
@@ -392,8 +404,17 @@ def stream():
     proxied = f"{_base_url()}/audio?url={requests.utils.quote(result['streamUrl'], safe='')}"
     return jsonify(streamUrl=proxied, quality="high", mimeType="audio/mp4", source=result["source"])
 
-@app.route("/audio")
+@app.route("/audio", methods=["GET", "OPTIONS"])
 def audio():
+    if request.method == "OPTIONS":
+        return Response("", status=200, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Accept-Ranges, Origin, User-Agent",
+            "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, Content-Type",
+            "Access-Control-Max-Age": "86400",
+        })
+
     target_url = request.args.get("url", "")
     if not target_url:
         return jsonify(error="Missing url"), 400
@@ -427,6 +448,11 @@ def audio():
     resp_headers["Cache-Control"] = "private, max-age=300"
     if "Content-Type" not in resp_headers:
         resp_headers["Content-Type"] = "audio/mp4"
+
+    # Crucial for browser <audio crossOrigin="anonymous"> support
+    resp_headers["Access-Control-Allow-Origin"] = "*"
+    resp_headers["Access-Control-Allow-Headers"] = "Range, Content-Type, Accept-Ranges, Origin"
+    resp_headers["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Length, Content-Range, Content-Type"
 
     def generate():
         for chunk in upstream.iter_content(chunk_size=64 * 1024):

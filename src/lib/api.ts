@@ -9,7 +9,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
 export const PRIMARY_STREAM_URL = (
   import.meta.env.VITE_STREAM_API_URL ||
   import.meta.env.VITE_PRIMARY_STREAM_API_URL ||
-  'http://localhost:4000'
+  'https://thenullwave.duckdns.org'
 ).replace(/\/+$/, '')
 
 // Fallback server: Used automatically if primary is high on load, offline, or times out
@@ -272,7 +272,7 @@ export const api = {
 
     // Default flow: Try Primary (Oracle VM) first
     try {
-      const primaryRes = await tryFetchStream(PRIMARY_STREAM_URL, 'primary', 10000)
+      const primaryRes = await tryFetchStream(PRIMARY_STREAM_URL, 'primary', 25000)
       streamFailoverState.primaryHealthy = true
       streamFailoverState.primaryCooldownUntil = 0
       streamFailoverState.activeServer = 'primary'
