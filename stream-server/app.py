@@ -258,7 +258,7 @@ def _ytdlp_search(title, artist):
     cmd = [
         ytdlp_bin,
         "--remote-components", "ejs:github",
-        "--format", "bestaudio[ext=m4a]/bestaudio/best",
+        "--format", "140/bestaudio[ext=m4a]/bestaudio/best",
         "--get-url",
         "--no-playlist",
         "--skip-download",

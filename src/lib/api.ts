@@ -221,7 +221,6 @@ export const api = {
   ): Promise<StreamResult> {
     const now = Date.now()
     const hasFallback = !!FALLBACK_STREAM_URL && FALLBACK_STREAM_URL !== PRIMARY_STREAM_URL
-    const inCooldown = now < streamFailoverState.primaryCooldownUntil
 
     async function tryFetchStream(baseUrl: string, serverTag: 'primary' | 'fallback', timeoutMs: number): Promise<StreamResult> {
       const endpoint = `/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`
@@ -244,33 +243,22 @@ export const api = {
       }
     }
 
-    // If caller requested forceFallback, or primary is in active cooldown
-    if ((options?.forceFallback || inCooldown) && hasFallback) {
+    // Only go directly to fallback if caller explicitly forced it
+    if (options?.forceFallback && hasFallback) {
       try {
         const fallbackRes = await tryFetchStream(FALLBACK_STREAM_URL, 'fallback', 15000)
         streamFailoverState.activeServer = 'fallback'
         return fallbackRes
       } catch (fbErr) {
-        console.warn('[StreamManager] Fallback stream failed:', fbErr)
-        // If not explicitly forced, try primary as last ditch
-        if (!options?.forceFallback) {
-          try {
-            const primaryRes = await tryFetchStream(PRIMARY_STREAM_URL, 'primary', 12000)
-            streamFailoverState.primaryHealthy = true
-            streamFailoverState.primaryCooldownUntil = 0
-            streamFailoverState.activeServer = 'primary'
-            return primaryRes
-          } catch {}
-        }
         return {
           streamUrl: '',
-          error: fbErr instanceof Error ? fbErr.message : 'Stream temporarily unavailable',
+          error: fbErr instanceof Error ? fbErr.message : 'Fallback stream unavailable',
           server: 'fallback',
         }
       }
     }
 
-    // Default flow: Try Primary (Oracle VM) first
+    // Default & Preferred flow: Always try Primary (Oracle VM yt-dlp) first!
     try {
       const primaryRes = await tryFetchStream(PRIMARY_STREAM_URL, 'primary', 25000)
       streamFailoverState.primaryHealthy = true
@@ -280,7 +268,7 @@ export const api = {
     } catch (primaryErr) {
       console.warn(`[StreamManager] Primary stream failed for "${title}" (${primaryErr}). Attempting fallback server...`)
       streamFailoverState.primaryHealthy = false
-      streamFailoverState.primaryCooldownUntil = now + 40_000 // 40s cooldown
+      streamFailoverState.primaryCooldownUntil = now + 15_000 // Short 15s cooldown before re-checking primary
 
       if (hasFallback) {
         try {

@@ -122,22 +122,14 @@ export function Player() {
     
     // Stop and clear audio source immediately to prevent old track from resuming
     audioManager.stop()
-    setStreamStatus('Checking stream server...')
+    setStreamStatus('Finding audio...')
 
     async function loadStream() {
       try {
-        const health = await api.streamHealth()
+        const result = await api.stream(track.title, track.artist)
         if (cancelled) return
         window.clearTimeout(healthPendingTimer)
         window.clearTimeout(longHealthPendingTimer)
-
-        const serverNotice = health.activeServer === 'fallback'
-          ? 'Primary busy (using backup stream). Finding audio...'
-          : 'Stream server online. Finding audio...'
-        setStreamStatus(serverNotice)
-
-        const result = await api.stream(track.title, track.artist)
-        if (cancelled) return
 
         if (result.streamUrl) {
           const via = result.server === 'fallback' ? ' (backup)' : ''
@@ -145,6 +137,11 @@ export function Player() {
           audioManager.playUrl(result.streamUrl).then(() => {
             if (!usePlayerStore.getState().isPlaying) {
               audioManager.pause()
+            }
+            // Background pre-fetch next track in queue so next song starts instantly (<0.5s)
+            const nextTrack = useQueueStore.getState().queue[0]
+            if (nextTrack) {
+              api.stream(nextTrack.title, nextTrack.artist).catch(() => {})
             }
           })
         } else if (track.audioUrl) {
