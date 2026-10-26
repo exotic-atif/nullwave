@@ -1,14 +1,18 @@
 [Unit]
 Description=NullWave Audio Stream Proxy Server
-After=network.target
+After=network.target network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/NullWave/stream-server
-ExecStart=/home/ubuntu/NullWave/stream-server/venv/bin/gunicorn --bind 0.0.0.0:4000 --workers 1 --threads 4 --worker-class gthread --timeout 60 --max-requests 250 --max-requests-jitter 25 app:app
+WorkingDirectory=/home/ubuntu/Thenullwave-Worker
+ExecStart=/home/ubuntu/Thenullwave-Worker/venv/bin/gunicorn --bind 0.0.0.0:4000 --workers 1 --threads 4 --worker-class gthread --timeout 60 --max-requests 250 --max-requests-jitter 25 app:app
 Restart=always
-RestartSec=5
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=10
 # Protect 500MB RAM VM from runaway memory
 MemoryMax=450M
 
