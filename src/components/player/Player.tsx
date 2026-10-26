@@ -126,17 +126,22 @@ export function Player() {
 
     async function loadStream() {
       try {
-        await api.streamHealth()
+        const health = await api.streamHealth()
         if (cancelled) return
         window.clearTimeout(healthPendingTimer)
         window.clearTimeout(longHealthPendingTimer)
-        setStreamStatus('Stream server online. Finding audio...')
+
+        const serverNotice = health.activeServer === 'fallback'
+          ? 'Primary busy (using backup stream). Finding audio...'
+          : 'Stream server online. Finding audio...'
+        setStreamStatus(serverNotice)
 
         const result = await api.stream(track.title, track.artist)
         if (cancelled) return
 
         if (result.streamUrl) {
-          setStreamStatus('Buffering audio...')
+          const via = result.server === 'fallback' ? ' (backup)' : ''
+          setStreamStatus(`Buffering audio${via}...`)
           audioManager.playUrl(result.streamUrl).then(() => {
             if (!usePlayerStore.getState().isPlaying) {
               audioManager.pause()
@@ -159,14 +164,14 @@ export function Player() {
         if (cancelled) return
 
         if (track.audioUrl) {
-          setStreamStatus('Stream server unavailable. Playing preview.')
+          setStreamStatus('Stream servers unavailable. Playing preview.')
           audioManager.playUrl(track.audioUrl).then(() => {
             if (!usePlayerStore.getState().isPlaying) {
               audioManager.pause()
             }
           })
         } else {
-          setStreamStatus('Stream server unavailable.')
+          setStreamStatus('Stream servers unavailable.')
           usePlayerStore.getState().setIsLoadingStream(false)
         }
       }

@@ -5,6 +5,7 @@ Fallback: yt-dlp / YouTube (works from residential IPs only)
 """
 
 import os
+import sys
 import re
 import json
 import logging
@@ -61,13 +62,19 @@ JIOSAAVN_KEY = b"38346591"
 def _resolve_cookies():
     candidates = [
         os.environ.get("COOKIES_PATH", ""),
-        "/etc/secrets/cookies.txt",
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "cookies.txt"),
+        os.path.expanduser("~/Thenullwave-Worker/cookies.txt"),
+        os.path.expanduser("~/Nullwave-Worker/cookies.txt"),
+        "/tmp/cookies.txt",
+        "/etc/secrets/cookies.txt",
     ]
     source = next((p for p in candidates if p and os.path.isfile(p)), None)
     if not source:
+        log.warning("[Cookies] No cookies.txt found in candidate paths")
         return None
     writable = "/tmp/cookies.txt"
+    if source == writable:
+        return writable
     try:
         shutil.copy2(source, writable)
         log.info("Cookies: %s -> %s", source, writable)
@@ -248,14 +255,15 @@ def _ytdlp_search(title, artist):
         search = f"ytsearch1:{q}"
         log.info("[yt-dlp] Searching: %s", search)
 
+        ytdlp_bin = shutil.which("yt-dlp") or os.path.join(os.path.dirname(sys.executable), "yt-dlp") or "yt-dlp"
         cmd = [
-            "yt-dlp",
+            ytdlp_bin,
+            "--remote-components", "ejs:github",
             "--format", "bestaudio[ext=m4a]/bestaudio/best",
             "--get-url",
             "--no-warnings",
             "--no-check-certificate",
             "--user-agent", MOCK_UA,
-            "--extractor-args", "youtube:player_client=tv,android",
         ]
         if COOKIES_PATH:
             cmd += ["--cookies", COOKIES_PATH]
@@ -273,25 +281,64 @@ def _ytdlp_search(title, artist):
     return None
 
 # ---------------------------------------------------------------------------
-# Combined search: JioSaavn first, then yt-dlp fallback
+# Combined search: yt-dlp primary, then JioSaavn fallback
 # ---------------------------------------------------------------------------
 
 def _find_stream_url(title, artist):
-    # 1. Try JioSaavn (works from datacenter IPs)
-    url = _jiosaavn_search(title, artist)
-    if url:
-        return {"streamUrl": url, "source": "jiosaavn"}
-
-    # 2. Fallback to yt-dlp (works from residential IPs)
+    # 1. Primary on VM: yt-dlp / YouTube (relays and proxies audio)
+    log.info("[Stream] Searching yt-dlp (primary) for: %s - %s", title, artist)
     url = _ytdlp_search(title, artist)
     if url:
         return {"streamUrl": url, "source": "ytdlp"}
+
+    # 2. Fallback on VM: JioSaavn
+    log.info("[Stream] yt-dlp returned no stream, falling back to JioSaavn for: %s - %s", title, artist)
+    url = _jiosaavn_search(title, artist)
+    if url:
+        return {"streamUrl": url, "source": "jiosaavn"}
 
     return {"streamUrl": None, "source": None}
 
 
 def _base_url():
-    return request.host_url.rstrip("/")
+    # Support X-Forwarded-Proto and X-Forwarded-Host from reverse proxies or Cloudflare Tunnels
+    proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+    host = request.headers.get("X-Forwarded-Host", request.host)
+    return f"{proto}://{host}".rstrip("/")
+
+def _check_system_health():
+    """
+    Check system resources on low-memory VMs (e.g. Oracle Cloud Free Tier <1GB RAM).
+    Returns memory stats and an 'overloaded' flag when RAM/CPU is critically constrained.
+    """
+    mem_info = {"available_mb": None, "total_mb": None, "overloaded": False}
+    try:
+        if os.path.exists("/proc/meminfo"):
+            with open("/proc/meminfo", "r") as f:
+                data = {}
+                for line in f:
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        data[parts[0].strip()] = int(parts[1].split()[0])
+            total_kb = data.get("MemTotal", 0)
+            avail_kb = data.get("MemAvailable", total_kb)
+            mem_info["total_mb"] = round(total_kb / 1024, 1)
+            mem_info["available_mb"] = round(avail_kb / 1024, 1)
+            # If available RAM is under 35MB, declare overloaded so client can safely fall back
+            if avail_kb < 35 * 1024:
+                mem_info["overloaded"] = True
+    except Exception as e:
+        log.warning("[Health] Could not check /proc/meminfo: %s", e)
+
+    try:
+        load1, _, _ = os.getloadavg()
+        mem_info["load1"] = round(load1, 2)
+        if load1 > 4.5:
+            mem_info["overloaded"] = True
+    except (AttributeError, OSError):
+        pass
+
+    return mem_info
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -303,10 +350,35 @@ def index():
 
 @app.route("/health")
 def health():
-    return jsonify(ok=True, service="nullwave-stream", crypto=HAS_CRYPTO)
+    sys_health = _check_system_health()
+    if sys_health["overloaded"]:
+        log.warning("[Health] Server overloaded: %s", sys_health)
+        return jsonify(
+            ok=False,
+            overloaded=True,
+            service="nullwave-stream",
+            crypto=HAS_CRYPTO,
+            system=sys_health,
+        ), 503
+
+    return jsonify(
+        ok=True,
+        overloaded=False,
+        service="nullwave-stream",
+        crypto=HAS_CRYPTO,
+        system=sys_health,
+    )
 
 @app.route("/stream")
 def stream():
+    sys_health = _check_system_health()
+    if sys_health["overloaded"]:
+        log.warning("[Stream] Server overloaded (%s MB free), sending 503 for fallback", sys_health.get("available_mb"))
+        return jsonify(
+            error="Stream server high on load or low memory",
+            overloaded=True,
+        ), 503
+
     title = (request.args.get("title") or "").strip()
     artist = (request.args.get("artist") or "").strip()
     if not title:

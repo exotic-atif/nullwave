@@ -19,4 +19,4 @@ COPY cookie[s].txt ./
 
 EXPOSE 4000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:4000", "--workers", "2", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:4000", "--workers", "1", "--threads", "4", "--worker-class", "gthread", "--timeout", "60", "--max-requests", "250", "--max-requests-jitter", "25", "app:app"]
