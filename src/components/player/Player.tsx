@@ -304,8 +304,12 @@ export function Player() {
         smartSeeds
       }).then((tracks) => {
         if (tracks.length > 0) {
-          // Just play the first one, don't populate the queue to keep it 1 song per session
-          usePlayerStore.getState().setTrack(tracks[0])
+          const queue = useQueueStore.getState().queue
+          if (queue.length === 0) {
+            useQueueStore.getState().setQueue(tracks)
+            const first = useQueueStore.getState().playNext()
+            if (first) usePlayerStore.getState().setTrack(first)
+          }
         } else {
           usePlayerStore.setState({ isPlaying: false, progress: 0 })
         }
@@ -315,6 +319,44 @@ export function Player() {
       })
     }
   }, [addToHistory])
+
+  // Keep a small recommendation buffer ready so playback continues after
+  // library, album, and manually queued tracks finish.
+  useEffect(() => {
+    if (!currentTrack || useQueueStore.getState().queue.length > 2) return
+    let cancelled = false
+    const queue = useQueueStore.getState().queue
+    const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
+    const history = useQueueStore.getState().history
+    const likedTracks = useLikedStore.getState().likedTracks
+    const user = useAuthStore.getState().user
+    const smartSeedIds = listeningTracker.getSmartSeeds(history.map(t => t.id), likedTracks.map(t => t.id), 5, dislikedTracks)
+    const seeds = [...history, ...likedTracks]
+      .filter(t => smartSeedIds.includes(t.id))
+      .map(t => `${t.title} ${t.artist}`)
+
+    api.radio({
+      artist: currentTrack.artist,
+      historyTitles: history.map(t => t.title),
+      favArtists: user?.favArtists || '',
+      favSongs: user?.favSongs || '',
+      excludeIds: [...dislikedTracks, currentTrack.id, ...queue.map(t => t.id)],
+      likedTracks: likedTracks.map(t => t.title),
+      smartSeeds: seeds,
+    }).then((tracks) => {
+      if (cancelled || tracks.length === 0) return
+      const known = new Set([
+        usePlayerStore.getState().currentTrack?.id,
+        ...useQueueStore.getState().queue.map(t => t.id),
+        ...useQueueStore.getState().history.map(t => t.id),
+        ...dislikedTracks,
+      ])
+      const fresh = tracks.filter(t => !known.has(t.id)).slice(0, 8)
+      if (fresh.length) useQueueStore.getState().addMultipleToQueue(fresh)
+    }).catch(() => {})
+
+    return () => { cancelled = true }
+  }, [currentTrack?.id, useQueueStore(s => s.queue.length)])
 
   const handleNext = useCallback(() => {
     performNextTrack()

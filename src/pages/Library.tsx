@@ -126,6 +126,7 @@ export function LibraryPage() {
                   onClick={async () => {
                     if (user?.id) {
                       await clearPlayHistory(user.id)
+                      useQueueStore.getState().clearHistory()
                       setHistory([])
                     }
                   }}

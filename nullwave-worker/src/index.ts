@@ -203,8 +203,9 @@ const BLOCKED_KEYWORDS = [
   'prarthana', 'bihari ji', 'anup jalota', 'navin tripathi', 'indresh upadhyay',
   'hansraj raghuwanshi', 'sadhu tiwari', 'mandir', 'pandit', 'swami', 'guru',
   'bhagwan', 'deva', 'ganesh', 'ganpati', 'durga', 'lakshmi', 'saraswati', 'sai baba',
-  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'zee music devotional',
-  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar'
+  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'barsane', 'vrindavan',
+  'govind', 'gopal', 'murari', 'namo namo', 'zee music devotional',
+  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar', 't-series bhakti', 'bhaktisangeet'
 ]
 
 function isCleanTrack(track: { title?: string; artist?: string; album?: string }): boolean {

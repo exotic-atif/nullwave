@@ -8,6 +8,8 @@ import {
 } from '@/lib/firebase'
 import { getProfile } from '@/lib/supabase'
 import { listeningTracker } from '@/lib/listening-tracker'
+import { audioManager } from '@/lib/audio'
+import { usePlayerStore } from './playerStore'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -75,6 +77,12 @@ export const useAuthStore = create<AuthStore>()(
               set({ user: null, isAuthenticated: false, isLoading: false })
             }
           } else {
+            try {
+              audioManager.stop()
+            } catch {}
+            try {
+              usePlayerStore.getState().reset()
+            } catch {}
             set({ user: null, isAuthenticated: false, isLoading: false })
           }
         })
@@ -134,6 +142,12 @@ export const useAuthStore = create<AuthStore>()(
 
       /** Sign out from Firebase */
       logout: async () => {
+        try {
+          audioManager.stop()
+        } catch {}
+        try {
+          usePlayerStore.getState().reset()
+        } catch {}
         try {
           listeningTracker.clear()
         } catch {}

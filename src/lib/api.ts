@@ -95,18 +95,17 @@ export interface SyncedLine {
 export function parseLRC(lrc: string): SyncedLine[] {
   const lines: SyncedLine[] = []
   for (const raw of lrc.split('\n')) {
-    const match = raw.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)/)
-    if (match) {
-      const mins = parseInt(match[1])
-      const secs = parseInt(match[2])
-      const ms = parseInt(match[3].padEnd(3, '0'))
-      let time = mins * 60 + secs + ms / 1000
-      // Offset by -0.4s to fix late syncing
-      time = Math.max(0, time - 0.4)
-      const text = match[4].trim()
-      if (text) {
-        lines.push({ time, text })
-      }
+    // Accept standard centiseconds, milliseconds, timestamps without fractions,
+    // and lines carrying more than one timestamp.
+    const timestamps = [...raw.matchAll(/\[(\d{1,3}):(\d{2})(?:[.,](\d{1,3}))?\]/g)]
+    if (!timestamps.length) continue
+    const text = raw.replace(/\[(?:\d{1,3}):(?:\d{2})(?:[.,]\d{1,3})?\]/g, '').trim()
+    if (!text) continue
+    for (const match of timestamps) {
+      const fraction = match[3] ?? ''
+      const fractionalSeconds = fraction ? Number(`0.${fraction}`) : 0
+      const time = Number(match[1]) * 60 + Number(match[2]) + fractionalSeconds
+      lines.push({ time, text })
     }
   }
   return lines.sort((a, b) => a.time - b.time)
@@ -120,8 +119,9 @@ export const BLOCKED_KEYWORDS = [
   'prarthana', 'bihari ji', 'anup jalota', 'navin tripathi', 'indresh upadhyay',
   'hansraj raghuwanshi', 'sadhu tiwari', 'mandir', 'pandit', 'swami', 'guru',
   'bhagwan', 'deva', 'ganesh', 'ganpati', 'durga', 'lakshmi', 'saraswati', 'sai baba',
-  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'zee music devotional',
-  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar',
+  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'barsane', 'vrindavan',
+  'govind', 'gopal', 'murari', 'namo namo', 'zee music devotional',
+  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar', 't-series bhakti', 'bhaktisangeet',
   'slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'mashup', 'instrumental', 'karaoke', 'bass boosted', '8d'
 ]
 

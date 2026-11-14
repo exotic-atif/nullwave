@@ -189,9 +189,9 @@ export const TrackRow = memo(function TrackRow({ track, index, showIndex = false
 
         {/* Album */}
         {showAlbum && (
-          <p className="hidden md:block text-xs text-nw-text-tertiary truncate max-w-[200px]">
+          <button onClick={(e) => { e.stopPropagation(); if (track.albumId) navigate(`/album/${encodeURIComponent(track.albumId)}`) }} className="hidden max-w-[200px] truncate text-left text-xs text-nw-text-tertiary hover:text-nw-accent md:block" title={`Open ${track.album}`}>
             {track.album}
-          </p>
+          </button>
         )}
 
         {/* Duration + Actions */}

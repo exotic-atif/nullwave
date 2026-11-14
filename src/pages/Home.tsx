@@ -37,8 +37,8 @@ export function HomePage() {
         let recents: Track[] = []
         if (user) {
           const dbHistory = await fetchPlayHistory(user.id, 20)
-          recents = dbHistory
-          artists = dbHistory.map(t => t.artist)
+          recents = dbHistory.length > 0 ? dbHistory : [...queueHistory].reverse()
+          artists = recents.map(t => t.artist)
         } else {
           recents = [...queueHistory].reverse()
           artists = queueHistory.map(t => t.artist)
@@ -100,9 +100,10 @@ export function HomePage() {
   // Derive unique albums/artists from tracks with memoization to prevent recalculation
   const albums: Album[] = useMemo(() => Object.values(
     tracks.reduce<Record<string, Album>>((acc, t) => {
-      if (!acc[t.albumId]) {
-        acc[t.albumId] = {
-          id: t.albumId,
+      const albumKey = t.albumId?.trim() || `${t.album}::${t.artist}`
+      if (!acc[albumKey]) {
+        acc[albumKey] = {
+          id: albumKey,
           title: t.album,
           artist: t.artist,
           coverUrl: t.coverUrl,
@@ -110,7 +111,7 @@ export function HomePage() {
           tracks: [],
         }
       }
-      acc[t.albumId].tracks.push(t)
+      acc[albumKey].tracks.push(t)
       return acc
     }, {})
   ).slice(0, 8), [tracks])

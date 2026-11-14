@@ -18,6 +18,7 @@ import { PrivacyPolicy } from '@/pages/PrivacyPolicy'
 import { TermsOfService } from '@/pages/TermsOfService'
 import { LandingPage } from '@/pages/Landing'
 import { DataDeletion } from '@/pages/DataDeletion'
+import { NotFoundPage } from '@/pages/NotFound'
 
 export const router = createBrowserRouter([
   {
@@ -68,6 +69,7 @@ export const router = createBrowserRouter([
           { path: 'queue', element: <QueuePage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'you', element: <YouPage /> },
+          { path: '*', element: <NotFoundPage /> },
         ],
       },
     ],

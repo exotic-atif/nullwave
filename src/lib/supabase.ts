@@ -326,11 +326,21 @@ export async function removeLikedSong(userId: string, trackId: string) {
 
 // ===== PLAY HISTORY =====
 
+const parseHistoryTimestamp = (value: unknown): number => {
+  if (value && typeof value === 'object' && 'toMillis' in value && typeof (value as any).toMillis === 'function') {
+    return (value as any).toMillis()
+  }
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return Date.parse(value) || 0
+  return 0
+}
+
 export async function recordPlayHistory(userId: string, track: Track) {
   try {
     const colRef = getColRef('play_history')
     const currentUid = auth.currentUser?.uid || userId
-    if (!auth.currentUser || auth.currentUser.uid !== currentUid) return
+    if (!auth.currentUser || (auth.currentUser.uid !== currentUid && auth.currentUser.uid !== userId)) return
     const historyDoc = doc(colRef)
     await setDoc(historyDoc, {
       id: historyDoc.id,
@@ -347,14 +357,31 @@ export async function recordPlayHistory(userId: string, track: Track) {
     // Keep only the newest 100 play events for this user. Aggregation avoids
     // reading the full history on every play; delete only the overflow tail.
     const ownerQuery = query(colRef, where('auth_uid', '==', currentUid))
-    // Retry a few times so overlapping plays converge back to the cap.
     for (let pass = 0; pass < 3; pass += 1) {
-      const count = (await getCountFromServer(ownerQuery)).data().count
-      const overflow = count - 100
-      if (overflow <= 0) break
-      const oldest = await getDocs(query(ownerQuery, orderBy('played_at', 'asc'), limit(overflow)))
-      if (!oldest.size) break
-      await Promise.all(oldest.docs.map((entry) => deleteDoc(entry.ref)))
+      try {
+        const count = (await getCountFromServer(ownerQuery)).data().count
+        const overflow = count - 100
+        if (overflow <= 0) break
+
+        try {
+          const oldest = await getDocs(query(ownerQuery, orderBy('played_at', 'asc'), limit(overflow)))
+          if (!oldest.size) break
+          await Promise.all(oldest.docs.map((entry) => deleteDoc(entry.ref)))
+        } catch {
+          // In-memory prune fallback if composite index is pending/building
+          const allDocs = await getDocs(ownerQuery)
+          const sorted = allDocs.docs.sort((a, b) => {
+            const tA = parseHistoryTimestamp(a.data().played_at)
+            const tB = parseHistoryTimestamp(b.data().played_at)
+            return tA - tB
+          })
+          const toDelete = sorted.slice(0, overflow)
+          await Promise.all(toDelete.map((entry) => deleteDoc(entry.ref)))
+          break
+        }
+      } catch {
+        break
+      }
     }
   } catch (err: any) {
     console.error('Failed to record history:', err)
@@ -366,15 +393,19 @@ export async function fetchPlayHistory(userId: string, limitCount = 100): Promis
     const colRef = getColRef('play_history')
     const currentUid = auth.currentUser?.uid || userId
 
-    let snap = await getDocs(query(colRef, where('auth_uid', '==', currentUid), orderBy('played_at', 'desc'), limit(limitCount)))
-    if (snap.empty) {
-      snap = await getDocs(query(colRef, where('user_id', '==', userId), orderBy('played_at', 'desc'), limit(limitCount)))
+    // Play history is capped at 100 records per user. Fetch with single-field equality
+    // index and sort locally, avoiding composite index errors during provisioning.
+    let snap = await getDocs(query(colRef, where('auth_uid', '==', currentUid)))
+    if (snap.empty && userId !== currentUid) {
+      snap = await getDocs(query(colRef, where('user_id', '==', userId)))
     }
 
-    return snap.docs.map((d) => {
+    const tracks = snap.docs.map((d) => {
       const data = d.data()
-      return (data.track_data || data) as Track
+      return { track: (data.track_data || data) as Track, playedAt: parseHistoryTimestamp(data.played_at) }
     })
+    const safeLimit = Math.max(0, Math.min(100, Math.floor(limitCount)))
+    return tracks.sort((a, b) => b.playedAt - a.playedAt).slice(0, safeLimit).map(({ track }) => track)
   } catch (err) {
     console.error('Failed to fetch play history:', err)
     return []
@@ -389,8 +420,10 @@ export async function clearPlayHistory(userId: string) {
     const snap1 = await getDocs(query(colRef, where('auth_uid', '==', currentUid)))
     for (const d of snap1.docs) await deleteDoc(d.ref)
 
-    const snap2 = await getDocs(query(colRef, where('user_id', '==', userId)))
-    for (const d of snap2.docs) await deleteDoc(d.ref)
+    if (userId !== currentUid) {
+      const snap2 = await getDocs(query(colRef, where('user_id', '==', userId)))
+      for (const d of snap2.docs) await deleteDoc(d.ref)
+    }
   } catch (err: any) {
     console.error('Failed to clear play history:', err)
   }
@@ -401,11 +434,27 @@ export async function removePlayHistoryItem(userId: string, trackId: string) {
     const colRef = getColRef('play_history')
     const currentUid = auth.currentUser?.uid || userId
 
-    const snap1 = await getDocs(query(colRef, where('auth_uid', '==', currentUid), where('track_id', '==', trackId)))
-    for (const d of snap1.docs) await deleteDoc(d.ref)
+    try {
+      const snap1 = await getDocs(query(colRef, where('auth_uid', '==', currentUid), where('track_id', '==', trackId)))
+      for (const d of snap1.docs) await deleteDoc(d.ref)
+    } catch {
+      const snap1 = await getDocs(query(colRef, where('auth_uid', '==', currentUid)))
+      for (const d of snap1.docs) {
+        if (d.data().track_id === trackId) await deleteDoc(d.ref)
+      }
+    }
 
-    const snap2 = await getDocs(query(colRef, where('user_id', '==', userId), where('track_id', '==', trackId)))
-    for (const d of snap2.docs) await deleteDoc(d.ref)
+    if (userId !== currentUid) {
+      try {
+        const snap2 = await getDocs(query(colRef, where('user_id', '==', userId), where('track_id', '==', trackId)))
+        for (const d of snap2.docs) await deleteDoc(d.ref)
+      } catch {
+        const snap2 = await getDocs(query(colRef, where('user_id', '==', userId)))
+        for (const d of snap2.docs) {
+          if (d.data().track_id === trackId) await deleteDoc(d.ref)
+        }
+      }
+    }
   } catch (err: any) {
     console.error('Failed to remove history item:', err)
   }

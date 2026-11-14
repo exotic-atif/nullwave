@@ -31,6 +31,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState<number | null>(null)
   const [lyrics, setLyrics] = useState<{ synced: string | null; plain: string | null } | null>(null)
+  const activeLyricRef = useRef<HTMLButtonElement>(null)
   
   const {
     isPlaying,
@@ -54,6 +55,12 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
 
   const syncedLines = lyrics?.synced ? parseLRC(lyrics.synced) : []
   const activeLyricIndex = syncedLines.reduce((found, line, index) => line.time <= progress ? index : found, -1)
+
+  useEffect(() => {
+    if (showLyrics && activeLyricIndex >= 0) {
+      activeLyricRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [activeLyricIndex, showLyrics])
 
   // Handlers passed from Player.tsx
   const handleNext = () => onNext()
@@ -324,7 +331,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                       <p className="text-nw-text-secondary">Loading lyrics…</p>
                     ) : syncedLines.length ? (
                       syncedLines.map((line, index) => (
-                        <button key={`${line.time}-${index}`} onClick={() => { audioManager.seek(line.time); setProgress(line.time) }} className={`max-w-full px-4 py-2 text-left text-2xl font-semibold transition-colors md:text-3xl ${index === activeLyricIndex ? 'text-white' : 'text-white/40 hover:text-white/75'}`}>
+                        <button ref={index === activeLyricIndex ? activeLyricRef : null} key={`${line.time}-${index}`} onClick={() => { audioManager.seek(line.time); setProgress(line.time) }} className={`max-w-full px-4 py-2 text-left text-2xl font-semibold transition-colors md:text-3xl ${index === activeLyricIndex ? 'scale-105 text-white' : 'text-white/40 hover:text-white/75'}`}>
                           {line.text}
                         </button>
                       ))

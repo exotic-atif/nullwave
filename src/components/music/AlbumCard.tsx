@@ -45,7 +45,7 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
 
   return (
     <>
-      <Link to={`/album/${album.id}`} className="block">
+      <Link to={`/album/${encodeURIComponent(album.id)}`} className="block" aria-label={`Open ${album.title} by ${album.artist}`}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
