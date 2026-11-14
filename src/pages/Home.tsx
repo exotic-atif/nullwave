@@ -6,7 +6,7 @@ import { TrackRow } from '@/components/ui/TrackRow'
 import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRowSkeleton, AlbumCardSkeleton, ArtistCardSkeleton } from '@/components/ui/Skeleton'
 import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
-import { api } from '@/lib/api'
+import { api, filterCleanTracks } from '@/lib/api'
 import type { Track, Album, Artist } from '@/types'
 import { motion } from 'framer-motion'
 import { Play, Sparkles, Search as SearchIcon } from 'lucide-react'
@@ -68,8 +68,9 @@ export function HomePage() {
         })
         
         if (!cancelled) {
-          setTracks(result)
-          setRecentTracks(recents)
+          const clean = filterCleanTracks(result)
+          setTracks(clean)
+          setRecentTracks(filterCleanTracks(recents))
           setError('')
         }
       } catch (err) {

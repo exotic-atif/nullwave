@@ -112,10 +112,40 @@ export function parseLRC(lrc: string): SyncedLine[] {
   return lines.sort((a, b) => a.time - b.time)
 }
 
+export const BLOCKED_KEYWORDS = [
+  'bhajan', 'aarti', 'arti', 'chalisa', 'kripa', 'krishna', 'radhe', 'radha', 'shyam', 'ram',
+  'shree ram', 'ramayana', 'sita', 'hanuman', 'shiv', 'shiva', 'mahadev', 'bholenath', 'kedarnath',
+  'bhakti', 'devotional', 'katha', 'mantra', 'stotram', 'amritwani', 'dhun', 'jaap',
+  'kirtan', 'qawwali', 'naat', 'nasheed', 'gospel', 'hymn', 'chandan', 'pooja', 'puja',
+  'prarthana', 'bihari ji', 'anup jalota', 'navin tripathi', 'indresh upadhyay',
+  'hansraj raghuwanshi', 'sadhu tiwari', 'mandir', 'pandit', 'swami', 'guru',
+  'bhagwan', 'deva', 'ganesh', 'ganpati', 'durga', 'lakshmi', 'saraswati', 'sai baba',
+  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'zee music devotional',
+  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar',
+  'slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'mashup', 'instrumental', 'karaoke', 'bass boosted', '8d'
+]
+
+export function filterCleanTracks(tracks: Track[]): Track[] {
+  if (!Array.isArray(tracks)) return []
+  return tracks.filter((t) => {
+    if (!t) return false
+    const text = `${t.title || ''} ${t.artist || ''} ${t.album || ''}`.toLowerCase()
+    return !BLOCKED_KEYWORDS.some((kw) => text.includes(kw))
+  })
+}
+
 export const api = {
   async trending(): Promise<Track[]> {
-    const data = await request<{ tracks: Track[] }>('/songs/trending')
-    return data.tracks
+    try {
+      const data = await request<{ tracks: Track[] }>('/songs/trending')
+      const clean = filterCleanTracks(data.tracks || [])
+      if (clean.length >= 6) return clean
+      const fallback = await api.search('Today Top Hits')
+      return filterCleanTracks(fallback.tracks || []).slice(0, 20)
+    } catch {
+      const fallback = await api.search('Today Top Hits')
+      return filterCleanTracks(fallback.tracks || []).slice(0, 20)
+    }
   },
 
   async search(query: string): Promise<{ tracks: Track[]; albums: Album[]; artists: Artist[] }> {
@@ -335,8 +365,20 @@ export const api = {
       likedTracks: JSON.stringify(params.likedTracks || []),
       smartSeeds: JSON.stringify(params.smartSeeds || []),
     })
-    const data = await request<{ tracks: Track[] }>(`/home-feed?${query.toString()}`)
-    return data.tracks
+    try {
+      const data = await request<{ tracks: Track[] }>(`/home-feed?${query.toString()}`)
+      const clean = filterCleanTracks(data.tracks || [])
+      if (clean.length >= 6) {
+        return clean
+      }
+      // If live worker response is depleted by religious/devotional filters, fallback to curated top hits
+      const fallback = await api.search('Today Top Hits')
+      const fallbackClean = filterCleanTracks(fallback.tracks || [])
+      return [...clean, ...fallbackClean].slice(0, 20)
+    } catch {
+      const fallback = await api.search('Today Top Hits')
+      return filterCleanTracks(fallback.tracks || []).slice(0, 20)
+    }
   },
 
   /** Get a smart infinite radio queue */
@@ -350,7 +392,11 @@ export const api = {
       likedTracks: JSON.stringify(params.likedTracks || []),
       smartSeeds: JSON.stringify(params.smartSeeds || []),
     })
-    const data = await request<{ tracks: Track[] }>(`/radio?${query.toString()}`)
-    return data.tracks
+    try {
+      const data = await request<{ tracks: Track[] }>(`/radio?${query.toString()}`)
+      return filterCleanTracks(data.tracks || [])
+    } catch {
+      return []
+    }
   },
 }

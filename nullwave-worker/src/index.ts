@@ -190,27 +190,58 @@ async function handleLyrics(title: string, artist: string): Promise<unknown> {
   }
 }
 
+// ===== CONTENT FILTER & BLACKLIST =====
+
+const BLOCKED_KEYWORDS = [
+  'slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental',
+  'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted',
+  // Religious, devotional, and bhajan blacklist
+  'bhajan', 'aarti', 'arti', 'chalisa', 'kripa', 'krishna', 'radhe', 'radha', 'shyam', 'ram',
+  'shree ram', 'ramayana', 'sita', 'hanuman', 'shiv', 'shiva', 'mahadev', 'bholenath', 'kedarnath',
+  'bhakti', 'devotional', 'katha', 'mantra', 'stotram', 'amritwani', 'dhun', 'jaap',
+  'kirtan', 'qawwali', 'naat', 'nasheed', 'gospel', 'hymn', 'chandan', 'pooja', 'puja',
+  'prarthana', 'bihari ji', 'anup jalota', 'navin tripathi', 'indresh upadhyay',
+  'hansraj raghuwanshi', 'sadhu tiwari', 'mandir', 'pandit', 'swami', 'guru',
+  'bhagwan', 'deva', 'ganesh', 'ganpati', 'durga', 'lakshmi', 'saraswati', 'sai baba',
+  'har har', 'jai shree', 'jai jai', 'vaishno', 'parvati', 'zee music devotional',
+  'anandmurti', 'anuradha paudwal', 'lakhbir singh', 'gulshan kumar'
+]
+
+function isCleanTrack(track: { title?: string; artist?: string; album?: string }): boolean {
+  if (!track) return false
+  const fullText = `${track.title || ''} ${track.artist || ''} ${track.album || ''}`.toLowerCase()
+  return !BLOCKED_KEYWORDS.some(kw => fullText.includes(kw))
+}
+
 // ===== JIOSAAVN HANDLERS =====
 
 async function handleTrending(): Promise<unknown> {
-  // Use JioSaavn's "Trending Today" playlist (ID: 110858205)
-  // and "Weekly Top Songs" for variety
-  const playlistIds = ['110858205', '93518779', '93520680']
-  const picked = playlistIds[Math.floor(Math.random() * playlistIds.length)]
+  const trendingQueries = [
+    'Top Global Hits 2026',
+    'Today Top Hits',
+    'Billboard Hot 100',
+    'Global Pop Hits',
+    'International Hits'
+  ]
+  const q = trendingQueries[Math.floor(Math.random() * trendingQueries.length)]
 
   try {
     const data = await saavnFetch({
-      __call: 'playlist.getDetails',
-      listid: picked,
+      __call: 'search.getResults',
+      q,
+      n: '30',
+      p: '1',
     })
 
-    const songs = (data.songs || []) as any[]
-    const tracks = songs.slice(0, 25).map((s: any) => mapTrack(s))
+    const songs = (data.results || []) as any[]
+    const tracks = songs
+      .map((s: any) => mapTrack(s, 'Trending across NullWave'))
+      .filter(t => t.id && isCleanTrack(t))
 
     // Shuffle for variety
     for (let i = tracks.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-        ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
+      ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
     }
 
     return { tracks: tracks.slice(0, 20) }
@@ -451,7 +482,6 @@ async function handleRadio(
   )
 
   // Filter and deduplicate
-  const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
   const seen = new Set<string>()
   const validTracks = []
 
@@ -459,10 +489,8 @@ async function handleRadio(
     for (const s of group.results) {
       if (!s.id) continue
       const track = mapTrack(s, group.reason)
-      const titleLower = track.title.toLowerCase()
 
-      const isGarbage = badKeywords.some(b => titleLower.includes(b))
-      if (isGarbage) continue
+      if (!isCleanTrack(track)) continue
 
       if (excludeIds.includes(track.id)) continue
 
@@ -585,7 +613,6 @@ async function handleHomeFeed(
       .filter((r): r is PromiseFulfilledResult<{ results: any[], reason: string }> => r.status === 'fulfilled')
       .map(r => r.value)
 
-    const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
     const seenTracks = new Set<string>()
     const tracks = []
 
@@ -593,8 +620,7 @@ async function handleHomeFeed(
       for (const s of group.results) {
         if (!s.id) continue
         const track = mapTrack(s, group.reason)
-        const titleLower = track.title.toLowerCase()
-        if (badKeywords.some(b => titleLower.includes(b))) continue
+        if (!isCleanTrack(track)) continue
 
         const baseTitle = getBaseTitle(track.title)
         const dedupKey = `${baseTitle}::${track.artist.toLowerCase()}`
