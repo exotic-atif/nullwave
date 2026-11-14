@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store'
 import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { auth, googleProvider, githubProvider, facebookProvider, signInWithPopup, signInWithRedirect } from '@/lib/firebase'
 import { FcGoogle } from 'react-icons/fc'
 import { FaGithub, FaFacebook } from 'react-icons/fa'
 
@@ -60,45 +60,44 @@ export function LoginPage() {
   }
 
   const handleGoogleLogin = async () => {
+    setError('')
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        }
-      })
-      if (error) throw error
-    } catch (err) {
-      setError((err as Error).message || 'Failed to initialize Google Login')
+      await signInWithPopup(auth, googleProvider)
+      navigate(from + search, { replace: true })
+    } catch (err: any) {
+      if (err.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, googleProvider)
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Failed to sign in with Google')
+      }
     }
   }
 
   const handleGithubLogin = async () => {
+    setError('')
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        }
-      })
-      if (error) throw error
-    } catch (err) {
-      setError((err as Error).message || 'Failed to initialize GitHub Login')
+      await signInWithPopup(auth, githubProvider)
+      navigate(from + search, { replace: true })
+    } catch (err: any) {
+      if (err.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, githubProvider)
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Failed to sign in with GitHub')
+      }
     }
   }
 
   const handleFacebookLogin = async () => {
+    setError('')
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'public_profile,email'
-        }
-      })
-      if (error) throw error
-    } catch (err) {
-      setError((err as Error).message || 'Failed to initialize Facebook Login')
+      await signInWithPopup(auth, facebookProvider)
+      navigate(from + search, { replace: true })
+    } catch (err: any) {
+      if (err.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, facebookProvider)
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || 'Failed to sign in with Facebook')
+      }
     }
   }
 

@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, getProfile } from '@/lib/supabase'
+import {
+  auth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from '@/lib/firebase'
+import { getProfile } from '@/lib/supabase'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -23,128 +29,93 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: true,
 
-      /** Initialize auth — call on app mount. Restores session + listens for changes. */
+      /** Initialize Firebase Auth — call on app mount. Restores session + listens for changes. */
       init: async () => {
         set({ isLoading: true })
 
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
+        onAuthStateChanged(auth, async (fbUser) => {
+          if (fbUser) {
+            try {
+              const profile = await getProfile(fbUser.uid, fbUser.email || undefined)
+              const displayName =
+                profile?.username ||
+                fbUser.displayName ||
+                fbUser.email?.split('@')[0] ||
+                'User'
+              const avatarUrl = profile?.avatar_url || fbUser.photoURL || undefined
 
-          if (session?.user) {
-            const u = session.user
-            let displayName = u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
-            let avatarUrl = u.user_metadata?.avatar_url
-            
-            // Try to fetch profile from db
-            const profile = await getProfile(u.id, u.email)
-            if (profile) {
-              displayName = profile.username || displayName
-              avatarUrl = profile.avatar_url || avatarUrl
-              if (profile.theme && profile.theme !== 'system') {
-                useThemeStore.getState().setTheme(profile.theme as any)
-              }
-            }
-
-            const appUser: User = {
-              id: u.id,
-              email: u.email || '',
-              displayName,
-              avatarUrl,
-              favSongs: profile?.fav_songs || '',
-              favArtists: profile?.fav_artists || '',
-              role: (profile?.role as any) || 'member',
-              createdAt: u.created_at,
-              approved: profile?.approved || false,
-            }
-            set({ user: appUser, isAuthenticated: true })
-          } else {
-            set({ user: null, isAuthenticated: false })
-          }
-        } catch (err) {
-          console.error('Auth init failed:', err)
-          set({ user: null, isAuthenticated: false })
-        } finally {
-          set({ isLoading: false })
-        }
-
-        // Listen for future auth changes (tab focus, token refresh, etc.)
-        supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
-            const u = session.user
-            getProfile(u.id, u.email).then((profile) => {
-              const displayName = profile?.username || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
-              const avatarUrl = profile?.avatar_url || u.user_metadata?.avatar_url
-              
               if (profile?.theme && profile.theme !== 'system') {
                 useThemeStore.getState().setTheme(profile.theme as any)
               }
 
-              set({
-                user: {
-                  id: u.id,
-                  email: u.email || '',
-                  displayName,
-                  avatarUrl,
-                  favSongs: profile?.fav_songs || '',
-                  favArtists: profile?.fav_artists || '',
-                  role: (profile?.role as any) || 'member',
-                  createdAt: u.created_at,
-                  approved: profile?.approved || false,
-                },
-                isAuthenticated: true,
-              })
-            })
+              const appUser: User = {
+                id: fbUser.uid,
+                email: fbUser.email || '',
+                displayName,
+                avatarUrl,
+                favSongs: profile?.fav_songs || '',
+                favArtists: profile?.fav_artists || '',
+                role: (profile?.role as any) || 'member',
+                createdAt: fbUser.metadata?.creationTime || new Date().toISOString(),
+                approved: profile?.approved ?? true,
+              }
+              set({ user: appUser, isAuthenticated: true, isLoading: false })
+            } catch (err) {
+              console.error('Failed to init profile:', err)
+              set({ user: null, isAuthenticated: false, isLoading: false })
+            }
           } else {
-            set({ user: null, isAuthenticated: false })
+            set({ user: null, isAuthenticated: false, isLoading: false })
           }
         })
       },
 
-      /** Sign in with email + password via Supabase */
+      /** Sign in with email + password via Firebase */
       login: async (email: string, password: string) => {
         set({ isLoading: true })
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+        try {
+          const cred = await signInWithEmailAndPassword(auth, email.trim(), password)
+          const u = cred.user
+          const profile = await getProfile(u.uid, u.email || undefined)
+          const displayName =
+            profile?.username || u.displayName || u.email?.split('@')[0] || 'User'
+          const avatarUrl = profile?.avatar_url || u.photoURL || undefined
 
-        if (error) {
-          set({ isLoading: false })
-          throw new Error(error.message)
-        }
-
-          const u = data.user
-          let displayName = u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
-          let avatarUrl = u.user_metadata?.avatar_url
-          
-          const profile = await getProfile(u.id, u.email)
-          if (profile) {
-            displayName = profile.username || displayName
-            avatarUrl = profile.avatar_url || avatarUrl
-            if (profile.theme && profile.theme !== 'system') {
-              useThemeStore.getState().setTheme(profile.theme as any)
-            }
+          if (profile?.theme && profile.theme !== 'system') {
+            useThemeStore.getState().setTheme(profile.theme as any)
           }
 
           const appUser: User = {
-            id: u.id,
+            id: u.uid,
             email: u.email || '',
             displayName,
             avatarUrl,
             favSongs: profile?.fav_songs || '',
             favArtists: profile?.fav_artists || '',
             role: (profile?.role as any) || 'member',
-            createdAt: u.created_at,
-            approved: profile?.approved || false,
+            createdAt: u.metadata?.creationTime || new Date().toISOString(),
+            approved: profile?.approved ?? true,
           }
 
           set({ user: appUser, isAuthenticated: true, isLoading: false })
+        } catch (error: any) {
+          set({ isLoading: false })
+          const code = error?.code || ''
+          if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+            throw new Error('Incorrect email or password. Please verify your credentials.')
+          } else if (code === 'auth/user-not-found') {
+            throw new Error('No account found with this email.')
+          } else if (code === 'auth/too-many-requests') {
+            throw new Error('Access to this account has been temporarily disabled due to many failed attempts.')
+          }
+          throw new Error(error.message || 'Invalid credentials')
+        }
       },
 
-      /** Sign out */
+      /** Sign out from Firebase */
       logout: async () => {
-        await supabase.auth.signOut()
+        await signOut(auth)
         set({ user: null, isAuthenticated: false })
       },
 
