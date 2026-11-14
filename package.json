@@ -1,14 +1,15 @@
 {
   "name": "nullwave",
   "private": true,
-  "version": "1.5.10-beta",
+  "version": "1.5.11-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "stream": "npm --prefix stream-server run start",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node scripts/patch-amll.cjs"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "^0.6.0",

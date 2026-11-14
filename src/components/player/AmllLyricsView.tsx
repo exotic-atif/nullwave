@@ -1,8 +1,38 @@
 import React, { Component, useMemo, useRef, useEffect, useState, type ReactNode } from 'react'
 import { LyricPlayer } from '@applemusic-like-lyrics/react'
+import { DomLyricPlayer } from '@applemusic-like-lyrics/core'
 import type { LyricLine, LyricWord } from '@applemusic-like-lyrics/core'
 import { Loader2, Music2 } from 'lucide-react'
 import '@applemusic-like-lyrics/core/style.css'
+
+// Safely disarm LineBalancer's buggy calculation loop across all instances to prevent browser hang
+try {
+  if (typeof window !== 'undefined') {
+    const dummy = new DomLyricPlayer()
+    dummy.setLyricLines([
+      {
+        startTime: 0,
+        endTime: 1000,
+        words: [{ word: 'a', startTime: 0, endTime: 1000 }],
+        translatedLyric: '',
+        romanLyric: '',
+        isBG: false,
+        isDuet: false,
+      },
+    ])
+    const lineEl = dummy.currentLyricGroups?.[0]?.mainLine
+    if (lineEl) {
+      const LineElClass = lineEl.constructor as any
+      const LineBaseClass = Object.getPrototypeOf(LineElClass)
+      if (LineBaseClass) {
+        LineBaseClass.wordSegmenter = null
+      }
+    }
+    dummy.dispose()
+  }
+} catch {
+  // safe fallback
+}
 
 // Apple Music Typography & Fluid Word Styling
 const APPLE_MUSIC_FONT =
@@ -57,8 +87,9 @@ function parseInlineWordTimestamps(rawText: string, lineEndMs: number): LyricWor
   inlineRegex.lastIndex = 0
   const tags: { timeMs: number; index: number; length: number }[] = []
   let match: RegExpExecArray | null
+  let regexGuard = 0
 
-  while ((match = inlineRegex.exec(rawText)) !== null) {
+  while ((match = inlineRegex.exec(rawText)) !== null && regexGuard++ < 200) {
     const min = parseInt(match[1] || match[4], 10)
     const sec = parseInt(match[2] || match[5], 10)
     const rawMs = match[3] || match[6]

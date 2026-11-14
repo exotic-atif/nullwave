@@ -55,8 +55,14 @@ export function FullScreenPlayer({
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState<number | null>(null)
   const [lyrics, setLyrics] = useState<{ synced: string | null; plain: string | null } | null>(null)
-  const [lyricTime, setLyricTime] = useState(progress)
   const [lyricsLoading, setLyricsLoading] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 768 : true))
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
 
 
@@ -104,27 +110,6 @@ export function FullScreenPlayer({
       active = false
     }
   }, [track.id, track.title, track.artist])
-
-  // High-frequency 60fps timer for microsecond-accurate lyric synchronization
-  useEffect(() => {
-    if (!showLyrics) {
-      setLyricTime(progress)
-      return
-    }
-
-    let animId = 0
-    const syncLoop = () => {
-      if (audioManager.hasSource) {
-        setLyricTime(audioManager.currentTime)
-      } else {
-        setLyricTime(usePlayerStore.getState().progress)
-      }
-      animId = requestAnimationFrame(syncLoop)
-    }
-
-    animId = requestAnimationFrame(syncLoop)
-    return () => cancelAnimationFrame(animId)
-  }, [showLyrics, progress])
 
   const effectiveProgress = isDragging && dragProgress !== null ? dragProgress : progress
 
@@ -401,10 +386,10 @@ export function FullScreenPlayer({
                   {!showLyrics ? (
                     <motion.div
                       key="desktop-info"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
                       className="flex-1 max-w-xl flex flex-col justify-center space-y-6 text-left"
                     >
                       {/* Track Header */}
@@ -487,20 +472,20 @@ export function FullScreenPlayer({
                         </div>
                       )}
                     </motion.div>
-                  ) : (
-                    /* Desktop Lyrics Column */
+                  ) : isDesktop ? (
+                    /* Desktop Lyrics Column (Mounted ONLY on Desktop view) */
                     <motion.div
                       key="desktop-lyrics"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
                       className="flex-1 h-full min-h-0 max-w-2xl flex flex-col items-center justify-center overflow-hidden"
                     >
                       <AmllLyricsView
                         lyrics={lyrics}
                         lyricsLoading={lyricsLoading}
-                        currentTime={lyricTime}
+                        currentTime={effectiveProgress}
                         isPlaying={isPlaying}
                         onSeek={(time) => {
                           audioManager.seek(time)
@@ -510,7 +495,7 @@ export function FullScreenPlayer({
                         isMobile={false}
                       />
                     </motion.div>
-                  )}
+                  ) : null}
                 </AnimatePresence>
               </div>
 
@@ -585,20 +570,20 @@ export function FullScreenPlayer({
                         <div className="flex justify-center">{renderControls(false)}</div>
                       </div>
                     </motion.div>
-                  ) : (
-                    /* Mobile Lyrics Screen */
+                  ) : !isDesktop ? (
+                    /* Mobile Lyrics Screen (Mounted ONLY on Mobile view) */
                     <motion.div
                       key="mobile-lyrics"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
                       className="w-full h-full flex flex-col items-center justify-center overflow-hidden pb-32"
                     >
                       <AmllLyricsView
                         lyrics={lyrics}
                         lyricsLoading={lyricsLoading}
-                        currentTime={lyricTime}
+                        currentTime={effectiveProgress}
                         isPlaying={isPlaying}
                         onSeek={(time) => {
                           audioManager.seek(time)
@@ -642,7 +627,7 @@ export function FullScreenPlayer({
                         </div>
                       </div>
                     </motion.div>
-                  )}
+                  ) : null}
                 </AnimatePresence>
               </div>
             </div>

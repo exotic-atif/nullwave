@@ -36,7 +36,10 @@ export function AlbumDetailPage() {
   const { setQueue, addMultipleToQueue } = useQueueStore()
 
   useEffect(() => {
-    if (!id) return
+    if (!id || id.trim() === '') {
+      navigate('/albums', { replace: true })
+      return
+    }
     let active = true
     setLoading(true)
     setError(false)
