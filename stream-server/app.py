@@ -15,6 +15,8 @@ import base64
 import shutil
 import html
 import unicodedata
+import socket
+import ipaddress
 from urllib.parse import urlparse
 
 import requests
@@ -312,11 +314,120 @@ def _find_stream_url(title, artist):
     return {"streamUrl": None, "source": None}
 
 
+# ---------------------------------------------------------------------------
+# SSRF Defense, Rate Limiting & Proxy Configuration
+# ---------------------------------------------------------------------------
+
+ALLOWED_STREAM_DOMAINS = (
+    "googlevideo.com",
+    "saavncdn.com",
+    "jiosaavn.com",
+    "saavn.com",
+    "ytimg.com",
+    "youtube.com",
+)
+
+ALLOWED_BASE_HOSTS = {
+    "thenullwave.vercel.app",
+    "nullwave.vercel.app",
+    "localhost",
+    "127.0.0.1",
+}
+
+# Rate limiting: max requests per minute per IP
+_RATE_LIMITS = {}
+MAX_REQUESTS_PER_MINUTE = 120
+MAX_STREAM_BYTES = 150 * 1024 * 1024  # 150MB maximum audio response cap
+
+def _check_rate_limit(client_ip, max_requests=MAX_REQUESTS_PER_MINUTE):
+    now = time.time()
+    cutoff = now - 60
+
+    # Evict stale client IPs periodically to prevent unbounded memory state (ratings.md finding)
+    if len(_RATE_LIMITS) > 500:
+        stale = [ip for ip, ts_list in _RATE_LIMITS.items() if not ts_list or ts_list[-1] < cutoff]
+        for ip in stale:
+            _RATE_LIMITS.pop(ip, None)
+
+    window = [ts for ts in _RATE_LIMITS.get(client_ip, []) if ts > cutoff]
+    if len(window) >= max_requests:
+        return False
+    window.append(now)
+    _RATE_LIMITS[client_ip] = window
+    return True
+
+def _is_safe_stream_url(target_url):
+    """
+    Validates that a URL points to an approved streaming CDN and does not
+    resolve to a private, loopback, link-local, or cloud metadata IP (SSRF protection).
+    """
+    if not target_url:
+        return False, "Missing URL"
+    
+    try:
+        parsed = urlparse(target_url)
+    except Exception:
+        return False, "Unparseable URL"
+        
+    if parsed.scheme not in ("http", "https"):
+        return False, "Invalid scheme (only http/https allowed)"
+        
+    hostname = (parsed.hostname or "").lower().strip()
+    if not hostname:
+        return False, "Missing hostname"
+        
+    # 1. Allowed domain validation
+    is_allowed = any(
+        hostname == domain or hostname.endswith("." + domain)
+        for domain in ALLOWED_STREAM_DOMAINS
+    )
+    if not is_allowed:
+        return False, f"Forbidden host: {hostname}"
+        
+    # 2. DNS Resolution & IP address blocklist validation
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        addr_info = socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)
+        if not addr_info:
+            return False, "Host could not be resolved"
+            
+        for _, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+                or ip.is_unspecified
+                or ip_str == "169.254.169.254"
+            ):
+                return False, f"Target resolved to forbidden IP: {ip_str}"
+    except Exception as e:
+        return False, f"DNS resolution failed: {e}"
+        
+    return True, None
+
+
 def _base_url():
-    # Support X-Forwarded-Proto and X-Forwarded-Host from reverse proxies or Cloudflare Tunnels
+    # If explicitly configured in environment, use canonical origin
+    env_url = os.environ.get("STREAM_PUBLIC_URL") or os.environ.get("CANONICAL_HOST")
+    if env_url:
+        return env_url.rstrip("/")
+        
     proto = request.headers.get("X-Forwarded-Proto", request.scheme)
-    host = request.headers.get("X-Forwarded-Host", request.host)
-    return f"{proto}://{host}".rstrip("/")
+    if proto not in ("https", "http"):
+        proto = "https"
+    f_host = request.headers.get("X-Forwarded-Host")
+    
+    # Only trust X-Forwarded-Host if it matches allowed domains or an IP address
+    if f_host:
+        clean_f_host = f_host.split(":")[0].lower()
+        if clean_f_host in ALLOWED_BASE_HOSTS or clean_f_host.endswith(".vercel.app") or re.match(r"^\d+\.\d+\.\d+\.\d+$", clean_f_host):
+            return f"{proto}://{f_host}".rstrip("/")
+            
+    return f"{proto}://{request.host}".rstrip("/")
 
 def _check_system_health():
     """
@@ -383,6 +494,10 @@ def health():
 
 @app.route("/stream")
 def stream():
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+    if not _check_rate_limit(client_ip, max_requests=60):
+        return jsonify(error="Stream request rate limit exceeded. Please wait a moment."), 429
+
     sys_health = _check_system_health()
     if sys_health["overloaded"]:
         log.warning("[Stream] Server overloaded (%s MB free), sending 503 for fallback", sys_health.get("available_mb"))
@@ -415,13 +530,16 @@ def audio():
             "Access-Control-Max-Age": "86400",
         })
 
-    target_url = request.args.get("url", "")
-    if not target_url:
-        return jsonify(error="Missing url"), 400
+    # Rate limiting check
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+    if not _check_rate_limit(client_ip):
+        return jsonify(error="Rate limit exceeded. Please try again shortly."), 429
 
-    parsed = urlparse(target_url)
-    if parsed.scheme not in ("http", "https"):
-        return jsonify(error="Invalid url"), 400
+    target_url = request.args.get("url", "")
+    is_safe, reason = _is_safe_stream_url(target_url)
+    if not is_safe:
+        log.warning("[Audio] Blocked unsafe target URL from %s: %s (Reason: %s)", client_ip, target_url[:80], reason)
+        return jsonify(error="Forbidden audio target", reason=reason), 403
 
     upstream_headers = {"User-Agent": MOCK_UA}
     range_header = request.headers.get("Range")
@@ -429,8 +547,9 @@ def audio():
         upstream_headers["Range"] = range_header
 
     try:
+        # Disable redirects to prevent open redirect SSRF attacks
         upstream = requests.get(
-            target_url, headers=upstream_headers, stream=True, timeout=30,
+            target_url, headers=upstream_headers, stream=True, timeout=15, allow_redirects=False
         )
     except requests.RequestException as exc:
         log.error("[Audio] Upstream fetch failed: %s", exc)
@@ -438,6 +557,11 @@ def audio():
 
     if upstream.status_code not in (200, 206):
         return jsonify(error=f"Upstream returned {upstream.status_code}"), upstream.status_code
+
+    content_length = upstream.headers.get("Content-Length")
+    if content_length and int(content_length) > MAX_STREAM_BYTES:
+        log.warning("[Audio] Upstream Content-Length exceeds limit: %s", content_length)
+        return jsonify(error="Media exceeds allowed size limit"), 413
 
     resp_headers = {}
     for key, value in upstream.headers.items():
@@ -455,8 +579,14 @@ def audio():
     resp_headers["Access-Control-Expose-Headers"] = "Accept-Ranges, Content-Length, Content-Range, Content-Type"
 
     def generate():
+        total_bytes = 0
         for chunk in upstream.iter_content(chunk_size=64 * 1024):
-            yield chunk
+            if chunk:
+                total_bytes += len(chunk)
+                if total_bytes > MAX_STREAM_BYTES:
+                    log.warning("[Audio] Streaming capped at %d bytes", MAX_STREAM_BYTES)
+                    break
+                yield chunk
 
     return Response(
         stream_with_context(generate()),

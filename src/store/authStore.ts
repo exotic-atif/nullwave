@@ -7,6 +7,7 @@ import {
   signOut,
 } from '@/lib/firebase'
 import { getProfile } from '@/lib/supabase'
+import { listeningTracker } from '@/lib/listening-tracker'
 import { useThemeStore } from './themeStore'
 import type { User } from '@/types'
 
@@ -133,6 +134,9 @@ export const useAuthStore = create<AuthStore>()(
 
       /** Sign out from Firebase */
       logout: async () => {
+        try {
+          listeningTracker.clear()
+        } catch {}
         await signOut(auth)
         set({ user: null, isAuthenticated: false })
       },

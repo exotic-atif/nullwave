@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { AlbumCard } from '@/components/music/AlbumCard'
 import { ArtistCard } from '@/components/music/ArtistCard'
@@ -18,6 +18,7 @@ export function HomePage() {
   const setTrack = usePlayerStore((s) => s.setTrack)
   const addMultipleToQueue = useQueueStore((s) => s.addMultipleToQueue)
   const queueHistory = useQueueStore((s) => s.history)
+  const dislikedTracks = useQueueStore((s) => s.dislikedTracks)
   const user = useAuthStore((s) => s.user)
   const likedTracks = useLikedStore((s) => s.likedTracks)
   const navigate = useNavigate()
@@ -49,7 +50,7 @@ export function HomePage() {
         // Generate personalized smart seeds based on actual listening duration!
         const historyIds = recents.map(t => t.id)
         const likedIds = likedTracks.map(t => t.id)
-        const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+        const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5, dislikedTracks.map((t) => t.id))
         
         // Convert IDs back to titles for better searching instead of relying on JioSaavn's reco API
         const allTracks = [...recents, ...likedTracks]
@@ -79,7 +80,7 @@ export function HomePage() {
     }
     load()
     return () => { cancelled = true }
-  }, [user, queueHistory.length])
+  }, [user?.id])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,8 +96,8 @@ export function HomePage() {
     }
   }
 
-  // Derive unique albums/artists from tracks
-  const albums: Album[] = Object.values(
+  // Derive unique albums/artists from tracks with memoization to prevent recalculation
+  const albums: Album[] = useMemo(() => Object.values(
     tracks.reduce<Record<string, Album>>((acc, t) => {
       if (!acc[t.albumId]) {
         acc[t.albumId] = {
@@ -111,16 +112,16 @@ export function HomePage() {
       acc[t.albumId].tracks.push(t)
       return acc
     }, {})
-  ).slice(0, 8)
+  ).slice(0, 8), [tracks])
 
-  const artists: Artist[] = Array.from(
+  const artists: Artist[] = useMemo(() => Array.from(
     new Map(
       tracks.map((t) => [
         t.artist,
         { id: t.artist, name: t.artist, imageUrl: t.coverUrl, genres: [] },
       ])
     ).values()
-  ).slice(0, 8)
+  ).slice(0, 8), [tracks])
 
   return (
     <div className="px-4 md:px-8 py-6 space-y-10">

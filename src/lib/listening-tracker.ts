@@ -25,7 +25,23 @@ class ListeningTracker {
 
   private save() {
     try {
+      // Bound size: Keep maximum 200 tracks to prevent unbounded localStorage growth
+      const entries = Object.entries(this.signals)
+      if (entries.length > 200) {
+        entries.sort((a, b) => b[1].playCount - a[1].playCount)
+        this.signals = Object.fromEntries(entries.slice(0, 200))
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.signals))
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Reset all local tracking signals (privacy/shared device cleanup) */
+  clear() {
+    this.signals = {}
+    try {
+      localStorage.removeItem(STORAGE_KEY)
     } catch {
       // ignore
     }
@@ -59,13 +75,22 @@ class ListeningTracker {
   /**
    * Generates a ranked list of "Smart Seeds" (track IDs) based on affinity score.
    */
-  getSmartSeeds(historyTrackIds: string[], favTrackIds: string[], limit: number = 5): string[] {
+  getSmartSeeds(
+    historyTrackIds: string[],
+    favTrackIds: string[],
+    limit: number = 5,
+    excludedTrackIds: string[] = []
+  ): string[] {
     const scored = new Map<string, number>()
+    const excluded = new Set(excludedTrackIds.map(String))
 
     const addWithScore = (trackIds: string[], baseWeight: number) => {
-      for (const id of trackIds) {
-        if (!id) continue
-        
+      const ordered = trackIds
+      ordered.forEach((rawId, index) => {
+        const id = String(rawId || '')
+        if (!id) return
+        if (excluded.has(id)) return
+
         const signal = this.getTrackSignal(id)
         let bonus = 0
 
@@ -75,16 +100,18 @@ class ListeningTracker {
           else if (signal.avgCompletionRatio < 0.2 && signal.playCount >= 2) bonus = -3 // Frequent skip penalty
         }
 
-        const score = baseWeight + (signal ? signal.playCount * 0.1 : 0) + bonus
-        
+        // Favor recent listening while reducing repeats and giving favorites a clear boost.
+        const recency = Math.exp(-index / 8)
+        const repeatPenalty = signal ? Math.min(1.5, Math.log1p(signal.playCount) * 0.45) : 0
+        const score = baseWeight + recency * 2 + repeatPenalty + bonus
         const existing = scored.get(id) || 0
         scored.set(id, existing + score)
-      }
+      })
     }
 
-    // Weight Favorites higher than just History
-    addWithScore(favTrackIds, 3)
-    addWithScore(historyTrackIds, 1)
+    addWithScore(favTrackIds, 4.5)
+    // Callers provide newest-first history (from the database or reversed queue history).
+    addWithScore(historyTrackIds, 1.5)
 
     // Sort by score descending
     const sorted = Array.from(scored.entries())
@@ -96,7 +123,7 @@ class ListeningTracker {
       })
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => id)
-      .slice(0, limit)
+      .slice(0, Math.max(0, Math.min(20, limit)))
 
     return sorted
   }

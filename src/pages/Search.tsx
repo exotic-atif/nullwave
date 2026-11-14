@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Search as SearchIcon, TrendingUp, Clock, X } from 'lucide-react'
+import { Search as SearchIcon, TrendingUp, Clock, X, Sparkles, Music2 } from 'lucide-react'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { TrackRowSkeleton } from '@/components/ui/Skeleton'
@@ -9,24 +9,49 @@ import { ArtistCard } from '@/components/music/ArtistCard'
 import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { api } from '@/lib/api'
 import { debounce } from '@/lib/utils'
+import { useAuthStore, useLikedStore } from '@/store'
 import type { Track, Album, Artist } from '@/types'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const TRENDING_TERMS = [
-  'Coke Studio Bangla',
-  'Artcell',
-  'Shironamhin',
-  'Bengali indie',
-  'Fossils',
-  'Anupam Roy',
-  'Arijit Singh Bengali',
-  'Tahsan',
+const POPULAR_SEARCHES = [
+  'The Weeknd',
+  'Taylor Swift',
+  'Kendrick Lamar',
+  'Billie Eilish',
+  'Arijit Singh',
+  'Coldplay',
+  'Drake',
+  'Dua Lipa',
 ]
 
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
   
+  const user = useAuthStore((s) => s.user)
+  const likedTracks = useLikedStore((s) => s.likedTracks)
+
+  // Derive user-specific top searches from profile preferences & liked library
+  const userTopSearches = useMemo(() => {
+    const list: string[] = []
+    if (user?.favArtists) {
+      user.favArtists.split(',').forEach((a) => {
+        const clean = a.trim()
+        if (clean && !list.includes(clean)) list.push(clean)
+      })
+    }
+    if (user?.favSongs) {
+      user.favSongs.split(',').forEach((s) => {
+        const clean = s.trim()
+        if (clean && !list.includes(clean)) list.push(clean)
+      })
+    }
+    likedTracks.forEach((t) => {
+      if (t.artist && !list.includes(t.artist)) list.push(t.artist)
+    })
+    return list.slice(0, 8)
+  }, [user?.favArtists, user?.favSongs, likedTracks])
+
   const [query, setQuery] = useState(initialQuery)
   const [tracks, setTracks] = useState<Track[]>([])
   const [albums, setAlbums] = useState<Album[]>([])
@@ -303,11 +328,51 @@ export function SearchPage() {
               </section>
             )}
 
-            {/* Trending */}
+            {/* Top Searches For You */}
+            {userTopSearches.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={16} className="text-nw-accent" />
+                  <SectionHeader title="Top Searches For You" subtitle="Tailored to your artists and liked tracks" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {userTopSearches.map((term, i) => (
+                    <motion.button
+                      key={term}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      onClick={() => handleTermClick(term)}
+                      className="group flex items-center gap-2 px-4 py-2.5 bg-nw-accent/10 border border-nw-accent/20 rounded-full text-sm text-nw-text hover:bg-nw-accent/20 hover:border-nw-accent/40 transition-all duration-200"
+                    >
+                      <Sparkles size={13} className="text-nw-accent" />
+                      <span className="font-medium">{term}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Made For You Quick Picks */}
+            {likedTracks.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Music2 size={16} className="text-nw-accent" />
+                  <SectionHeader title="Made For You Picks" subtitle="Jump straight back into your favorites" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                  {likedTracks.slice(0, 4).map((track, i) => (
+                    <TrackRow key={track.id} track={track} index={i + 1} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Trending Searches */}
             <section>
-              <SectionHeader title="Trending" subtitle="What people are listening to" />
+              <SectionHeader title="Trending Searches" subtitle="Popular across NullWave" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {TRENDING_TERMS.map((term, i) => (
+                {POPULAR_SEARCHES.map((term, i) => (
                   <motion.button
                     key={term}
                     initial={{ opacity: 0, x: -8 }}
@@ -317,7 +382,7 @@ export function SearchPage() {
                     className="flex items-center gap-3 px-4 py-3 bg-nw-surface/30 border border-nw-border-subtle rounded-xl text-left hover:bg-white/[0.04] hover:border-nw-accent/10 transition-all duration-200"
                   >
                     <TrendingUp size={14} className="text-nw-accent flex-shrink-0" />
-                    <span className="text-sm text-nw-text-secondary">{term}</span>
+                    <span className="text-sm text-nw-text-secondary group-hover:text-nw-text">{term}</span>
                   </motion.button>
                 ))}
               </div>

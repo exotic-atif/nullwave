@@ -23,6 +23,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -34,20 +35,8 @@ import {
   type DocumentData,
 } from 'firebase/firestore'
 
-const getApiKey = () => {
-  if (import.meta.env.VITE_FIREBASE_API_KEY) {
-    return import.meta.env.VITE_FIREBASE_API_KEY
-  }
-  // Client fallback decoded dynamically to prevent deployment build breakages before env vars are populated
-  try {
-    return atob('QUl6YVN5Qi1RWEVFeXhVTG0zSXJNekE3YUQ0cTFfeWtGTW9aWFZN')
-  } catch {
-    return ''
-  }
-}
-
 export const firebaseConfig = {
-  apiKey: getApiKey(),
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'nullone.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'atifs-codeworks',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'atifs-codeworks.firebasestorage.app',
@@ -86,6 +75,7 @@ export {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,

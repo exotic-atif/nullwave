@@ -13,10 +13,6 @@ class AudioManager {
   private onLoadedCallback: AudioEventHandler | null = null
   private onErrorCallback: ((message: string) => void) | null = null
 
-  // Web Audio API for visualizer
-  private audioCtx: AudioContext | null = null
-  private analyser: AnalyserNode | null = null
-  private sourceNode: MediaElementAudioSourceNode | null = null
 
   constructor() {
     this.audio = new Audio()
@@ -33,10 +29,6 @@ class AudioManager {
 
     this.audio.addEventListener('play', () => {
       this.onPlayCallback?.()
-      // Resume AudioContext on play (required by browsers)
-      if (this.audioCtx?.state === 'suspended') {
-        this.audioCtx.resume()
-      }
     })
 
     this.audio.addEventListener('pause', () => {
@@ -51,28 +43,6 @@ class AudioManager {
       const msg = this.audio.error?.message || 'Audio playback error'
       this.onErrorCallback?.(msg)
     })
-  }
-
-  /** Get or create an AnalyserNode for visualizations */
-  getAnalyser(): AnalyserNode | null {
-    try {
-      if (!this.audioCtx) {
-        this.audioCtx = new AudioContext()
-      }
-      if (!this.sourceNode) {
-        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio)
-      }
-      if (!this.analyser) {
-        this.analyser = this.audioCtx.createAnalyser()
-        this.analyser.fftSize = 256
-        this.analyser.smoothingTimeConstant = 0.8
-        this.sourceNode.connect(this.analyser)
-        this.analyser.connect(this.audioCtx.destination)
-      }
-      return this.analyser
-    } catch {
-      return null
-    }
   }
 
   /** Load and play a URL */
@@ -122,9 +92,26 @@ class AudioManager {
     }
   }
 
+  private lastSeekTarget: number = -1
+  private lastSeekTimestamp: number = 0
+
   seek(time: number) {
-    if (isFinite(time) && this.audio.duration) {
-      this.audio.currentTime = Math.min(time, this.audio.duration)
+    if (!isFinite(time) || !this.audio.duration) return
+    const target = Math.max(0, Math.min(time, this.audio.duration))
+
+    // Suppress rapid duplicate seek calls to the exact same second (<100ms)
+    const now = Date.now()
+    if (Math.abs(this.lastSeekTarget - target) < 0.1 && now - this.lastSeekTimestamp < 200) {
+      return
+    }
+
+    this.lastSeekTarget = target
+    this.lastSeekTimestamp = now
+
+    try {
+      this.audio.currentTime = target
+    } catch {
+      // Audio element not ready or seeking in progress
     }
   }
 

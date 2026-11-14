@@ -6,12 +6,12 @@ import {
   Search, ChevronDown, Mail, Music, Sparkles, LogOut
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
-import { 
-  supabase, 
-  fetchAccessRequests, 
-  updateAccessRequest, 
-  deleteAccessRequest, 
-  adminApproveAccessRequest 
+import {
+  supabase,
+  fetchAccessRequests,
+  updateAccessRequest,
+  deleteAccessRequest,
+  adminApproveAccessRequest
 } from '@/lib/supabase'
 import type { AccessRequest } from '@/lib/supabase'
 import { ProfileManagement } from '@/components/admin/ProfileManagement'
@@ -19,7 +19,6 @@ import { getProfile } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditRequestModal } from '@/components/admin/EditRequestModal'
 import { AtSign } from 'lucide-react'
-import { auth } from '@/lib/firebase'
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected'
 
@@ -42,12 +41,8 @@ export function AdminPage() {
 
   // Logged in but not admin
   const isMasterAdmin =
-    (user.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
-    user.id === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
-    user.id === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
-    (auth.currentUser?.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
-    auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
-
+    user.email === 'mratif00007@gmail.com' ||
+    user.id === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
   if (user.role !== 'admin' && !isMasterAdmin) {
     return <AccessDenied />
   }
@@ -240,7 +235,7 @@ function AdminDashboard() {
 
       const result = await adminApproveAccessRequest(session.access_token, req, updatedData)
       const fullUpdates = result.request || { ...req, ...updatedData, status: 'approved' as const }
-      
+
       setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, ...fullUpdates } : r))
       setEditingRequest(null)
       toast.success(`Access approved for ${req.email}. Google login will work now.`)
@@ -292,7 +287,7 @@ function AdminDashboard() {
       rejected: 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)]',
     }
     return (
-      <motion.span 
+      <motion.span
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${colors[s] || ''}`}
@@ -322,16 +317,16 @@ function AdminDashboard() {
               <p className="text-[10px] text-nw-muted">{user?.email}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <div className="flex bg-white/[0.04] p-1 rounded-lg border border-white/[0.06]">
-              <button 
+              <button
                 onClick={() => setActiveView('requests')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeView === 'requests' ? 'bg-nw-surface text-nw-text shadow-sm' : 'text-nw-muted hover:text-nw-text-secondary'}`}
               >
                 Requests
               </button>
-              <button 
+              <button
                 onClick={() => setActiveView('profiles')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${activeView === 'profiles' ? 'bg-nw-surface text-nw-text shadow-sm' : 'text-nw-muted hover:text-nw-text-secondary'}`}
               >
@@ -355,217 +350,216 @@ function AdminDashboard() {
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((key, i) => (
-            <motion.button
-              key={key}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              onClick={() => setFilter(key)}
-              className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden group ${
-                filter === key
-                  ? 'bg-nw-surface/80 border-nw-accent/40 shadow-[0_0_30px_rgba(56,189,248,0.1)]'
-                  : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.06] hover:border-white/[0.1]'
-              }`}
-            >
-              {filter === key && (
-                <div className="absolute inset-0 bg-gradient-to-br from-nw-accent/10 to-transparent opacity-50" />
-              )}
-              <div className="relative z-10 flex items-center gap-2 mb-2">
-                {key === 'all' ? <Users size={14} className={filter === key ? 'text-nw-accent' : 'text-nw-muted'} /> : statusIcon(key)}
-                <span className="text-[10px] uppercase tracking-wider text-nw-text-tertiary font-bold">{key}</span>
-              </div>
-              <p className={`text-3xl font-display font-bold relative z-10 ${filter === key ? 'text-white' : 'text-nw-text-secondary group-hover:text-nw-text'}`}>{counts[key]}</p>
-            </motion.button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="relative mb-8"
-        >
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-nw-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, email, or artists..."
-            className="w-full pl-11 pr-4 py-3.5 bg-nw-surface/50 backdrop-blur-md border border-white/[0.06] rounded-2xl text-sm text-nw-text placeholder:text-nw-muted/60 focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent/20 transition-all shadow-inner"
-          />
-        </motion.div>
-
-        {/* Request List */}
-        {loading ? (
-          <div className="flex items-center justify-center py-32">
-            <Loader2 size={32} className="text-nw-accent animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-32"
-          >
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center">
-              <Filter size={32} className="text-nw-muted" />
-            </div>
-            <p className="text-nw-text font-medium text-lg">No requests found</p>
-            <p className="text-nw-text-tertiary text-sm mt-2">
-              {filter !== 'all' ? 'Try changing the filter.' : 'No access requests yet.'}
-            </p>
-          </motion.div>
-        ) : (
-          <div className="space-y-3">
-            <AnimatePresence mode="popLayout">
-              {filtered.map((req, i) => (
-                <motion.div
-                  layout
-                  key={req.id}
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                  transition={{ delay: Math.min(i * 0.05, 0.5) }}
-                  className={`bg-nw-surface/40 backdrop-blur-sm border ${expandedId === req.id ? 'border-nw-accent/30 shadow-[0_0_20px_rgba(56,189,248,0.05)]' : 'border-white/[0.06] hover:border-white/[0.12]'} rounded-2xl overflow-hidden transition-all duration-300`}
+              {(['all', 'pending', 'approved', 'rejected'] as const).map((key, i) => (
+                <motion.button
+                  key={key}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  onClick={() => setFilter(key)}
+                  className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden group ${filter === key
+                    ? 'bg-nw-surface/80 border-nw-accent/40 shadow-[0_0_30px_rgba(56,189,248,0.1)]'
+                    : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.06] hover:border-white/[0.1]'
+                    }`}
                 >
-                  {/* Row */}
-                  <button
-                    onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
-                    className="w-full flex items-center gap-4 p-4 text-left group"
-                  >
-                    {/* Avatar */}
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-white/[0.04] border border-white/[0.08] flex-shrink-0 group-hover:border-nw-accent/40 transition-colors">
-                      {req.avatar_url ? (
-                        <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-nw-muted">
-                          <Users size={18} />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-base font-semibold text-nw-text truncate group-hover:text-nw-accent transition-colors">{req.display_name}</p>
-                      <p className="text-xs text-nw-text-tertiary truncate">{req.email}</p>
-                    </div>
-
-                    {/* Status */}
-                    <div className="hidden sm:block">{statusBadge(req.status)}</div>
-
-                    {/* Date */}
-                    <span className="text-[10px] text-nw-muted font-medium tabular-nums hidden md:block">
-                      {new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-
-                    <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
-                      <ChevronDown
-                        size={16}
-                        className={`text-nw-muted transition-transform duration-300 ${expandedId === req.id ? 'rotate-180 text-white' : ''}`}
-                      />
-                    </div>
-                  </button>
-
-                  {/* Expanded Details */}
-                  <AnimatePresence>
-                    {expandedId === req.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-5 pb-5 pt-2 border-t border-white/[0.04] bg-black/20">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                            {/* Mobile status */}
-                            <div className="sm:hidden">{statusBadge(req.status)}</div>
-
-                            <div className="space-y-4">
-                              <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
-                                  <Mail size={12} /> Email
-                                </label>
-                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">{req.email}</p>
-                              </div>
-                              <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
-                                  <AtSign size={12} /> Instagram ID
-                                </label>
-                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
-                                  {req.instagram_id || <span className="text-nw-muted italic font-normal">Not provided</span>}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
-                                  <Sparkles size={12} /> Favorite Artists
-                                </label>
-                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
-                                  {req.fav_artists || <span className="text-nw-muted italic font-normal">Not provided</span>}
-                                </p>
-                              </div>
-                              <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
-                                  <Music size={12} /> Favorite Songs
-                                </label>
-                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
-                                  {req.fav_songs || <span className="text-nw-muted italic font-normal">Not provided</span>}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-4">
-                              <div>
-                                <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-bold mb-1.5 block">
-                                  <Clock size={12} /> Submitted
-                                </label>
-                                <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
-                                  {new Date(req.created_at).toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-3 mt-6 pt-5 border-t border-white/[0.04]">
-                            {req.status !== 'approved' && (
-                              <button
-                                onClick={() => setEditingRequest(req)}
-                                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-green-500 hover:bg-green-400 text-black rounded-xl transition-all glow-accent"
-                              >
-                                <CheckCircle size={16} /> Review & Approve
-                              </button>
-                            )}
-                            {req.status !== 'rejected' && (
-                              <button
-                                onClick={() => handleStatus(req.id, 'rejected')}
-                                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition-colors border border-red-500/20"
-                              >
-                                <XCircle size={16} /> Reject
-                              </button>
-                            )}
-                            <div className="flex-1" />
-                            <button
-                              onClick={() => handleDelete(req.id)}
-                              className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-nw-text-tertiary hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
-                            >
-                              <Trash2 size={14} /> Delete
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                  {filter === key && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-nw-accent/10 to-transparent opacity-50" />
+                  )}
+                  <div className="relative z-10 flex items-center gap-2 mb-2">
+                    {key === 'all' ? <Users size={14} className={filter === key ? 'text-nw-accent' : 'text-nw-muted'} /> : statusIcon(key)}
+                    <span className="text-[10px] uppercase tracking-wider text-nw-text-tertiary font-bold">{key}</span>
+                  </div>
+                  <p className={`text-3xl font-display font-bold relative z-10 ${filter === key ? 'text-white' : 'text-nw-text-secondary group-hover:text-nw-text'}`}>{counts[key]}</p>
+                </motion.button>
               ))}
-            </AnimatePresence>
-          </div>
-        )}
-        </>
+            </div>
+
+            {/* Search */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="relative mb-8"
+            >
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-nw-muted" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, email, or artists..."
+                className="w-full pl-11 pr-4 py-3.5 bg-nw-surface/50 backdrop-blur-md border border-white/[0.06] rounded-2xl text-sm text-nw-text placeholder:text-nw-muted/60 focus:outline-none focus:border-nw-accent/40 focus:ring-1 focus:ring-nw-accent/20 transition-all shadow-inner"
+              />
+            </motion.div>
+
+            {/* Request List */}
+            {loading ? (
+              <div className="flex items-center justify-center py-32">
+                <Loader2 size={32} className="text-nw-accent animate-spin" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-32"
+              >
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center">
+                  <Filter size={32} className="text-nw-muted" />
+                </div>
+                <p className="text-nw-text font-medium text-lg">No requests found</p>
+                <p className="text-nw-text-tertiary text-sm mt-2">
+                  {filter !== 'all' ? 'Try changing the filter.' : 'No access requests yet.'}
+                </p>
+              </motion.div>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence mode="popLayout">
+                  {filtered.map((req, i) => (
+                    <motion.div
+                      layout
+                      key={req.id}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                      transition={{ delay: Math.min(i * 0.05, 0.5) }}
+                      className={`bg-nw-surface/40 backdrop-blur-sm border ${expandedId === req.id ? 'border-nw-accent/30 shadow-[0_0_20px_rgba(56,189,248,0.05)]' : 'border-white/[0.06] hover:border-white/[0.12]'} rounded-2xl overflow-hidden transition-all duration-300`}
+                    >
+                      {/* Row */}
+                      <button
+                        onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
+                        className="w-full flex items-center gap-4 p-4 text-left group"
+                      >
+                        {/* Avatar */}
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-white/[0.04] border border-white/[0.08] flex-shrink-0 group-hover:border-nw-accent/40 transition-colors">
+                          {req.avatar_url ? (
+                            <img src={req.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-nw-muted">
+                              <Users size={18} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-base font-semibold text-nw-text truncate group-hover:text-nw-accent transition-colors">{req.display_name}</p>
+                          <p className="text-xs text-nw-text-tertiary truncate">{req.email}</p>
+                        </div>
+
+                        {/* Status */}
+                        <div className="hidden sm:block">{statusBadge(req.status)}</div>
+
+                        {/* Date */}
+                        <span className="text-[10px] text-nw-muted font-medium tabular-nums hidden md:block">
+                          {new Date(req.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+
+                        <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-colors">
+                          <ChevronDown
+                            size={16}
+                            className={`text-nw-muted transition-transform duration-300 ${expandedId === req.id ? 'rotate-180 text-white' : ''}`}
+                          />
+                        </div>
+                      </button>
+
+                      {/* Expanded Details */}
+                      <AnimatePresence>
+                        {expandedId === req.id && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="px-5 pb-5 pt-2 border-t border-white/[0.04] bg-black/20">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                                {/* Mobile status */}
+                                <div className="sm:hidden">{statusBadge(req.status)}</div>
+
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
+                                      <Mail size={12} /> Email
+                                    </label>
+                                    <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">{req.email}</p>
+                                  </div>
+                                  <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-accent font-bold mb-1.5">
+                                      <AtSign size={12} /> Instagram ID
+                                    </label>
+                                    <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
+                                      {req.instagram_id || <span className="text-nw-muted italic font-normal">Not provided</span>}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
+                                      <Sparkles size={12} /> Favorite Artists
+                                    </label>
+                                    <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
+                                      {req.fav_artists || <span className="text-nw-muted italic font-normal">Not provided</span>}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-purple-400 font-bold mb-1.5">
+                                      <Music size={12} /> Favorite Songs
+                                    </label>
+                                    <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5 min-h-[38px]">
+                                      {req.fav_songs || <span className="text-nw-muted italic font-normal">Not provided</span>}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-nw-muted font-bold mb-1.5 block">
+                                      <Clock size={12} /> Submitted
+                                    </label>
+                                    <p className="text-sm text-nw-text bg-white/5 px-3 py-2 rounded-lg border border-white/5">
+                                      {new Date(req.created_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center gap-3 mt-6 pt-5 border-t border-white/[0.04]">
+                                {req.status !== 'approved' && (
+                                  <button
+                                    onClick={() => setEditingRequest(req)}
+                                    className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-green-500 hover:bg-green-400 text-black rounded-xl transition-all glow-accent"
+                                  >
+                                    <CheckCircle size={16} /> Review & Approve
+                                  </button>
+                                )}
+                                {req.status !== 'rejected' && (
+                                  <button
+                                    onClick={() => handleStatus(req.id, 'rejected')}
+                                    className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition-colors border border-red-500/20"
+                                  >
+                                    <XCircle size={16} /> Reject
+                                  </button>
+                                )}
+                                <div className="flex-1" />
+                                <button
+                                  onClick={() => handleDelete(req.id)}
+                                  className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-nw-text-tertiary hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+                                >
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </>
         )}
       </div>
 

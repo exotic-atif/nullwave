@@ -54,9 +54,11 @@ export function Player() {
   const { isLiked, toggle: toggleLike } = useLikedStore()
 
   const [isDragging, setIsDragging] = useState(false)
+  const [dragProgress, setDragProgress] = useState<number | null>(null)
   const [showFullScreen, setShowFullScreen] = useState(false)
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
+  const lastHistoryKey = useRef<string | null>(null)
   
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverPos, setHoverPos] = useState<number>(0)
@@ -177,18 +179,22 @@ export function Player() {
     loadStream()
 
 
-    // Record play history
-    if (user?.id && lastRecordedTrack.current !== track.id) {
-      lastRecordedTrack.current = track.id
-      recordPlayHistory(user.id, track)
-    }
-
     return () => {
       cancelled = true
       window.clearTimeout(healthPendingTimer)
       window.clearTimeout(longHealthPendingTimer)
     }
   }, [currentTrack?.id])
+
+  // Persist one play-history event per selected track for the signed-in user.
+  // Kept separate from the stream-loading effect so auth hydration cannot replay network work.
+  useEffect(() => {
+    if (!currentTrack || !user?.id) return
+    const historyKey = `${user.id}:${currentTrack.id}`
+    if (lastHistoryKey.current === historyKey) return
+    lastHistoryKey.current = historyKey
+    void recordPlayHistory(user.id, currentTrack)
+  }, [currentTrack?.id, user?.id])
 
   // Sync play/pause state
   useEffect(() => {
@@ -276,7 +282,7 @@ export function Player() {
       
       const historyIds = useQueueStore.getState().history.map(t => t.id)
       const likedIds = likedTracks.map(t => t.id)
-      const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5)
+      const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5, dislikedTracks)
       
       const allTracks = [...useQueueStore.getState().history, ...likedTracks]
       const smartSeeds = smartSeedIds
@@ -323,9 +329,23 @@ export function Player() {
     }
   }, [progress, setProgress, playPrevious, setTrack])
 
-  const handleSeek = (value: number) => {
-    setProgress(value)
-    audioManager.seek(value)
+  const effectiveProgress = isDragging && dragProgress !== null ? dragProgress : progress
+
+  const commitSeek = (targetValue?: number) => {
+    const finalVal = typeof targetValue === 'number' ? targetValue : (dragProgress ?? progress)
+    setIsDragging(false)
+    setDragProgress(null)
+    setProgress(finalVal)
+    audioManager.seek(finalVal)
+  }
+
+  const handleSeekChange = (value: number) => {
+    if (isDragging) {
+      setDragProgress(value)
+    } else {
+      setProgress(value)
+      audioManager.seek(value)
+    }
   }
 
   const handleLike = () => {
@@ -517,7 +537,7 @@ export function Player() {
                 </IconButton>
 
                 <span className="text-[10px] tabular-nums text-nw-text-tertiary w-8 text-right hidden md:block">
-                  {formatTime(progress)}
+                  {formatTime(effectiveProgress)}
                 </span>
                 
                 {/* Scrubber Container */}
@@ -538,18 +558,17 @@ export function Player() {
                     min={0}
                     max={duration || 100}
                     step={0.1}
-                    value={progress}
-                    onChange={(e) => handleSeek(Number(e.target.value))}
+                    value={effectiveProgress}
+                    onChange={(e) => handleSeekChange(Number(e.target.value))}
                     onMouseDown={() => setIsDragging(true)}
-                    onMouseUp={() => {
-                      setIsDragging(false)
-                      audioManager.seek(progress)
-                    }}
+                    onTouchStart={() => setIsDragging(true)}
+                    onMouseUp={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
+                    onTouchEnd={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
                     className="w-full cursor-pointer nw-slider h-1 group-hover:h-1.5 transition-[height] duration-200"
                     style={{
                       background: `linear-gradient(to right, #38bdf8 ${
-                        duration > 0 ? (progress / duration) * 100 : 0
-                      }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
+                        duration > 0 ? (effectiveProgress / duration) * 100 : 0
+                      }%, #27272a ${duration > 0 ? (effectiveProgress / duration) * 100 : 0}%)`,
                     }}
                   />
                   {/* Tooltip */}

@@ -1,0 +1,502 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model & Architecture
+// ===============================================================
+//
+// Project: NullWave (Underground Audio Streaming)
+// Base Path: /atifs_codeworks/apps/nullwave/{table}/records/{docId}
+//
+// 1. User Profiles Collection
+//    Path: /atifs_codeworks/apps/nullwave/users/records/{userId}
+//    Fields:
+//      - id: string (optional, max 128) - Profile / User ID
+//      - auth_uid: string (optional, max 128) - Firebase Auth UID
+//      - user_id: string (optional, max 128) - User identifier alias
+//      - username: string (optional, max 100) - Display handle
+//      - email: string (optional, max 150) - User email address
+//      - avatar_url: string (optional, nullable, max 2000) - Profile picture URL
+//      - fav_artists: string (optional, nullable, max 1000) - Favorite artists
+//      - fav_songs: string (optional, nullable, max 1000) - Favorite songs
+//      - instagram_id: string (optional, nullable, max 100) - Instagram handle
+//      - theme: string (optional, max 30) - UI theme ('light', 'dark', 'system')
+//      - approved: bool (restricted, admin-managed access grant)
+//      - role: string (restricted, admin-managed role, e.g. 'admin', 'member')
+//      - created_at: string (optional, max 60) or timestamp - Creation timestamp
+//      - updated_at: string (optional, max 60) or timestamp - Last update timestamp
+//      - status: string (optional, max 50) - Account status
+//      - full_name: string (optional, max 100) - Full name
+//      - phone: string (optional, max 30) - Phone number
+//
+// 2. Access Requests Collection
+//    Path: /atifs_codeworks/apps/nullwave/access_requests/records/{reqId}
+//    Fields:
+//      - id: string (optional, max 128) - Request ID
+//      - display_name: string (required, 1..100) - Applicant's name
+//      - email: string (required, valid email, max 150) - Applicant's email
+//      - avatar_url: string (optional, nullable, max 2000) - Avatar URL
+//      - fav_artists: string (optional, nullable, max 1000) - Favorite artists
+//      - fav_songs: string (optional, nullable, max 1000) - Favorite songs
+//      - instagram_id: string (optional, nullable, max 100) - Instagram handle
+//      - status: string (required, enum: ['pending', 'approved', 'rejected'])
+//      - created_at: string (optional, max 60) or timestamp - Request timestamp
+//      - updated_at: string (optional, max 60) or timestamp - Decision timestamp
+//
+// 3. Liked Tracks Collection
+//    Path: /atifs_codeworks/apps/nullwave/liked_tracks/records/{docId}
+//    Fields:
+//      - id: string (optional, max 128) - Record ID (`${currentUid}_${track.id}`)
+//      - user_id: string (optional, max 128) - Owner UID
+//      - auth_uid: string (optional, max 128) - Owner Auth UID
+//      - legacy_user_id: string (optional, max 128) - Legacy user ID
+//      - track_id: string (optional, max 128) - Track identifier
+//      - title: string (optional, max 300) - Track title
+//      - artist: string (optional, max 300) - Artist name
+//      - track_data: map (optional) - Full track payload
+//      - liked_at: string (optional, max 60) or timestamp - Timestamp
+//      - duration: number or string (optional) - Duration
+//      - plays: number (optional, >= 0) - Plays count
+//      - liked: bool (optional) - Liked flag
+//
+// 4. Disliked Songs Collection
+//    Path: /atifs_codeworks/apps/nullwave/disliked_songs/records/{docId}
+//    Fields:
+//      - id: string (optional, max 128) - Record ID (`${currentUid}_${track.id}`)
+//      - user_id: string (optional, max 128) - Owner UID
+//      - auth_uid: string (optional, max 128) - Owner Auth UID
+//      - legacy_user_id: string (optional, max 128) - Legacy user ID
+//      - track_id: string (optional, max 128) - Track identifier
+//      - title: string (optional, max 300) - Track title
+//      - artist: string (optional, max 300) - Artist name
+//      - track_data: map (optional) - Full track payload
+//      - disliked_at: string (optional, max 60) or timestamp - Timestamp
+//
+// 5. Play History Collection
+//    Path: /atifs_codeworks/apps/nullwave/play_history/records/{docId}
+//    Fields:
+//      - id: string (optional, max 128) - Record ID (`${currentUid}_${track.id}`)
+//      - user_id: string (optional, max 128) - Owner UID
+//      - auth_uid: string (optional, max 128) - Owner Auth UID
+//      - legacy_user_id: string (optional, max 128) - Legacy user ID
+//      - track_id: string (optional, max 128) - Track identifier
+//      - title: string (optional, max 300) - Track title
+//      - artist: string (optional, max 300) - Artist name
+//      - track_data: map (optional) - Full track payload
+//      - played_at: string (optional, max 60) or timestamp - Timestamp
+//
+// 6. Playlists Collection
+//    Path: /atifs_codeworks/apps/nullwave/playlists/records/{docId}
+//    Fields:
+//      - id: string (optional, max 128) - Playlist ID
+//      - user_id: string (optional, max 128) - Owner UID
+//      - auth_uid: string (optional, max 128) - Owner Auth UID
+//      - legacy_user_id: string (optional, max 128) - Legacy user ID
+//      - name: string (required, 1..150) - Playlist title
+//      - cover_url: string (optional, nullable, max 2000) - Cover artwork URL
+//      - created_at: string (optional, max 60) or timestamp - Timestamp
+//      - updated_at: string (optional, max 60) or timestamp - Timestamp
+//      - tracksCount: number (optional, >= 0) - Tracks count
+//      - tracks: list (optional, max 500 items) - Inline tracks array
+//      - playlist_tracks: list (optional, max 500 items) - Tracks array
+//
+// 7. Playlist Tracks Collection
+//    Path: /atifs_codeworks/apps/nullwave/playlist_tracks/records/{docId}
+//    Fields:
+//      - id: string (optional, max 128) - Record ID (`${playlistId}_${track.id}`)
+//      - playlist_id: string (required, max 128) - Parent playlist ID
+//      - user_id: string (optional, max 128) - Owner UID
+//      - auth_uid: string (optional, max 128) - Owner Auth UID
+//      - track_id: string (required, max 128) - Track identifier
+//      - track_data: map (optional) - Full track payload
+//      - title: string (optional, max 300) - Track title
+//      - artist: string (optional, max 300) - Artist name
+//      - added_at: string (optional, max 60) or timestamp - Timestamp
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated with Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // Check if user is administrator (Atif Arman verified UID, email, or admin claim/role)
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+        ('email' in request.auth.token && request.auth.token.email == 'mratif00007@gmail.com' && request.auth.token.email_verified == true) ||
+        ('role' in request.auth.token && request.auth.token.role == 'admin') ||
+        ('admin' in request.auth.token && request.auth.token.admin == true)
+      );
+    }
+
+    // Check if user owns the document by path userId or document owner fields
+    function isUserDocOwner(userId, data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        request.auth.uid == userId ||
+        (data != null && (
+          ('auth_uid' in data && data.auth_uid == request.auth.uid) ||
+          ('user_id' in data && data.user_id == request.auth.uid)
+        ))
+      );
+    }
+
+    // Check if user is the legitimate creator of their own user record on create
+    function isNewUserDocCreator(userId, data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (
+          (request.auth.uid == userId || ('auth_uid' in data && data.auth_uid == request.auth.uid)) &&
+          (!('auth_uid' in data) || data.auth_uid == request.auth.uid) &&
+          (!('user_id' in data) || data.user_id == request.auth.uid)
+        )
+      );
+    }
+
+    // Checks ownership of audio data (liked tracks, playlists, history, tracks)
+    function isAudioOwner(data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (data != null && (
+          ('auth_uid' in data && data.auth_uid == request.auth.uid) ||
+          ('user_id' in data && data.user_id == request.auth.uid)
+        ))
+      );
+    }
+
+    // Checks valid ownership creation for audio resources (cannot spoof user_id or auth_uid)
+    function isAudioCreator(data) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (data != null && (
+          (('auth_uid' in data && data.auth_uid == request.auth.uid) ||
+           ('user_id' in data && data.user_id == request.auth.uid)) &&
+          (!('auth_uid' in data) || data.auth_uid == request.auth.uid) &&
+          (!('user_id' in data) || data.user_id == request.auth.uid)
+        ))
+      );
+    }
+
+    // Ensure immutable fields are not changed during update operations
+    function areImmutableFieldsUnchanged(fields) {
+      return resource == null || !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate email string format
+    function isValidEmail(email) {
+      return email is string && email.size() <= 150 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Protected identities: MUST NEVER be deleted by anyone, including administrators
+    function isProtectedUser(userId, data) {
+      return userId in [
+        '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc',
+        'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+        '04e2ceee-cfc4-40eb-bcbf-db049e011356',
+        'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+      ] || (data != null && (
+        ('id' in data && data.id in [
+          '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc',
+          'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+          '04e2ceee-cfc4-40eb-bcbf-db049e011356',
+          'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+        ]) ||
+        ('auth_uid' in data && data.auth_uid in [
+          '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc',
+          'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+          '04e2ceee-cfc4-40eb-bcbf-db049e011356',
+          'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+        ]) ||
+        ('email' in data && data.email in [
+          'mratif00007@gmail.com',
+          'tya44239@gmail.com'
+        ])
+      ));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    // Validates User document structure and field limits
+    function isValidUser(data) {
+      return data != null &&
+        data.keys().hasOnly([
+          'id', 'auth_uid', 'user_id', 'username', 'email', 'avatar_url',
+          'fav_artists', 'fav_songs', 'instagram_id', 'theme', 'approved',
+          'role', 'created_at', 'updated_at', 'status', 'full_name', 'phone'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('auth_uid' in data) || (data.auth_uid is string && data.auth_uid.size() <= 128)) &&
+        (!('user_id' in data) || (data.user_id is string && data.user_id.size() <= 128)) &&
+        (!('username' in data) || (data.username is string && data.username.size() <= 100)) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+        (!('avatar_url' in data) || data.avatar_url == null || (data.avatar_url is string && data.avatar_url.size() <= 2000)) &&
+        (!('fav_artists' in data) || data.fav_artists == null || (data.fav_artists is string && data.fav_artists.size() <= 1000)) &&
+        (!('fav_songs' in data) || data.fav_songs == null || (data.fav_songs is string && data.fav_songs.size() <= 1000)) &&
+        (!('instagram_id' in data) || data.instagram_id == null || (data.instagram_id is string && data.instagram_id.size() <= 100)) &&
+        (!('theme' in data) || (data.theme is string && data.theme.size() <= 30)) &&
+        (!('approved' in data) || data.approved is bool) &&
+        (!('role' in data) || (data.role is string && data.role.size() <= 50)) &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 60) || data.created_at is timestamp) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 60) || data.updated_at is timestamp) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('full_name' in data) || (data.full_name is string && data.full_name.size() <= 100)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 30));
+    }
+
+    // Validates Access Request document structure and field limits
+    function isValidAccessRequest(data) {
+      return data != null &&
+        data.keys().hasOnly([
+          'id', 'display_name', 'email', 'avatar_url',
+          'fav_artists', 'fav_songs', 'instagram_id', 'status',
+          'created_at', 'updated_at'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        ('display_name' in data && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 100) &&
+        ('email' in data && isValidEmail(data.email)) &&
+        (!('avatar_url' in data) || data.avatar_url == null || (data.avatar_url is string && data.avatar_url.size() <= 2000)) &&
+        (!('fav_artists' in data) || data.fav_artists == null || (data.fav_artists is string && data.fav_artists.size() <= 1000)) &&
+        (!('fav_songs' in data) || data.fav_songs == null || (data.fav_songs is string && data.fav_songs.size() <= 1000)) &&
+        (!('instagram_id' in data) || data.instagram_id == null || (data.instagram_id is string && data.instagram_id.size() <= 100)) &&
+        ('status' in data && data.status is string && data.status in ['pending', 'approved', 'rejected']) &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 60) || data.created_at is timestamp) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 60) || data.updated_at is timestamp);
+    }
+
+    // Validates Track documents (liked_tracks, disliked_songs, play_history)
+    function isValidTrack(data) {
+      return data != null &&
+        data.keys().hasOnly([
+          'id', 'user_id', 'auth_uid', 'legacy_user_id',
+          'track_id', 'title', 'artist', 'track_data',
+          'liked_at', 'disliked_at', 'played_at', 'created_at', 'updated_at',
+          'duration', 'plays', 'liked'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('user_id' in data) || (data.user_id is string && data.user_id.size() <= 128)) &&
+        (!('auth_uid' in data) || (data.auth_uid is string && data.auth_uid.size() <= 128)) &&
+        (!('legacy_user_id' in data) || (data.legacy_user_id is string && data.legacy_user_id.size() <= 128)) &&
+        (!('track_id' in data) || (data.track_id is string && data.track_id.size() <= 128)) &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 300)) &&
+        (!('artist' in data) || (data.artist is string && data.artist.size() <= 300)) &&
+        (!('track_data' in data) || data.track_data is map) &&
+        (!('liked_at' in data) || (data.liked_at is string && data.liked_at.size() <= 60) || data.liked_at is timestamp) &&
+        (!('disliked_at' in data) || (data.disliked_at is string && data.disliked_at.size() <= 60) || data.disliked_at is timestamp) &&
+        (!('played_at' in data) || (data.played_at is string && data.played_at.size() <= 60) || data.played_at is timestamp) &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 60) || data.created_at is timestamp) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 60) || data.updated_at is timestamp) &&
+        (!('duration' in data) || (data.duration is number) || (data.duration is string && data.duration.size() <= 30)) &&
+        (!('plays' in data) || (data.plays is number && data.plays >= 0)) &&
+        (!('liked' in data) || data.liked is bool);
+    }
+
+    // Validates Playlist documents
+    function isValidPlaylist(data) {
+      return data != null &&
+        data.keys().hasOnly([
+          'id', 'user_id', 'auth_uid', 'legacy_user_id',
+          'name', 'cover_url', 'created_at', 'updated_at',
+          'tracksCount', 'tracks', 'playlist_tracks'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('user_id' in data) || (data.user_id is string && data.user_id.size() <= 128)) &&
+        (!('auth_uid' in data) || (data.auth_uid is string && data.auth_uid.size() <= 128)) &&
+        (!('legacy_user_id' in data) || (data.legacy_user_id is string && data.legacy_user_id.size() <= 128)) &&
+        ('name' in data && data.name is string && data.name.size() >= 1 && data.name.size() <= 150) &&
+        (!('cover_url' in data) || data.cover_url == null || (data.cover_url is string && data.cover_url.size() <= 2000)) &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 60) || data.created_at is timestamp) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 60) || data.updated_at is timestamp) &&
+        (!('tracksCount' in data) || (data.tracksCount is number && data.tracksCount >= 0)) &&
+        (!('tracks' in data) || (data.tracks is list && data.tracks.size() <= 500)) &&
+        (!('playlist_tracks' in data) || (data.playlist_tracks is list && data.playlist_tracks.size() <= 500));
+    }
+
+    // Validates Playlist Track documents
+    function isValidPlaylistTrack(data) {
+      return data != null &&
+        data.keys().hasOnly([
+          'id', 'playlist_id', 'user_id', 'auth_uid',
+          'track_id', 'track_data', 'title', 'artist',
+          'added_at', 'created_at', 'updated_at'
+        ]) &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        ('playlist_id' in data && data.playlist_id is string && data.playlist_id.size() <= 128) &&
+        (!('user_id' in data) || (data.user_id is string && data.user_id.size() <= 128)) &&
+        (!('auth_uid' in data) || (data.auth_uid is string && data.auth_uid.size() <= 128)) &&
+        ('track_id' in data && data.track_id is string && data.track_id.size() <= 128) &&
+        (!('track_data' in data) || data.track_data is map) &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 300)) &&
+        (!('artist' in data) || (data.artist is string && data.artist.size() <= 300)) &&
+        (!('added_at' in data) || (data.added_at is string && data.added_at.size() <= 60) || data.added_at is timestamp) &&
+        (!('created_at' in data) || (data.created_at is string && data.created_at.size() <= 60) || data.created_at is timestamp) &&
+        (!('updated_at' in data) || (data.updated_at is string && data.updated_at.size() <= 60) || data.updated_at is timestamp);
+    }
+
+    // ===============================================================
+    // Root Match & Default Deny
+    // ===============================================================
+
+    // Deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // NullWave Application Rules
+    // Path: /atifs_codeworks/apps/nullwave/{table}/records/{docId}
+    // ===============================================================
+
+    match /atifs_codeworks/apps/nullwave {
+
+      // 1. Users Collection
+      // Path: /atifs_codeworks/apps/nullwave/users/records/{userId}
+      match /users/records/{userId} {
+        // Read: Authenticated users can read profiles
+        allow read: if isAuthenticated();
+
+        // Create:
+        // - Admin can create any profile with any valid role and approved flag
+        // - Normal user can only create their own profile, and CANNOT set role or approved
+        allow create: if (isAdmin() && isValidUser(request.resource.data)) || (
+          isAuthenticated() &&
+          isNewUserDocCreator(userId, request.resource.data) &&
+          isValidUser(request.resource.data) &&
+          !('role' in request.resource.data) &&
+          !('approved' in request.resource.data)
+        );
+
+        // Update:
+        // - Admin can update any profile, set role, and approve accounts
+        // - Normal user can only update their own profile, and CANNOT change role, approved, auth_uid, id
+        allow update: if (isAdmin() && isValidUser(request.resource.data)) || (
+          isAuthenticated() &&
+          isUserDocOwner(userId, resource.data) &&
+          isValidUser(request.resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'role', 'approved'])
+        );
+
+        // Delete: Admin only, BUT MUST NEVER DELETE entries for Atif Arman or Taniya Karmakar
+        allow delete: if isAdmin() && !isProtectedUser(userId, resource.data);
+      }
+
+      // 2. Access Requests Collection
+      // Path: /atifs_codeworks/apps/nullwave/access_requests/records/{reqId}
+      match /access_requests/records/{reqId} {
+        // Create: Anyone can create a pending access request
+        allow create: if request.resource.data.status == 'pending' &&
+          isValidAccessRequest(request.resource.data);
+
+        // Read, Delete: Admin only
+        allow read, delete: if isAdmin();
+
+        // Update: Admin only (for approving/rejecting requests)
+        allow update: if isAdmin() && isValidAccessRequest(request.resource.data);
+      }
+
+      // 3. Liked Tracks Collection
+      // Path: /atifs_codeworks/apps/nullwave/liked_tracks/records/{docId}
+      match /liked_tracks/records/{docId} {
+        // Read: Owner or Admin
+        allow read: if isAudioOwner(resource.data);
+
+        // Create: Owner
+        allow create: if isAudioCreator(request.resource.data) &&
+          isValidTrack(request.resource.data);
+
+        // Update: Owner or Admin (with immutable ownership and track ID fields)
+        allow update: if isAudioOwner(resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'user_id', 'track_id', 'liked_at']) &&
+          isValidTrack(request.resource.data);
+
+        // Delete: Owner or Admin
+        allow delete: if isAudioOwner(resource.data);
+      }
+
+      // 4. Disliked Songs Collection
+      // Path: /atifs_codeworks/apps/nullwave/disliked_songs/records/{docId}
+      match /disliked_songs/records/{docId} {
+        // Read: Owner or Admin
+        allow read: if isAudioOwner(resource.data);
+
+        // Create: Owner
+        allow create: if isAudioCreator(request.resource.data) &&
+          isValidTrack(request.resource.data);
+
+        // Update: Owner or Admin
+        allow update: if isAudioOwner(resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'user_id', 'track_id', 'disliked_at']) &&
+          isValidTrack(request.resource.data);
+
+        // Delete: Owner or Admin
+        allow delete: if isAudioOwner(resource.data);
+      }
+
+      // 5. Play History Collection
+      // Path: /atifs_codeworks/apps/nullwave/play_history/records/{docId}
+      match /play_history/records/{docId} {
+        // Read: Owner or Admin
+        allow read: if isAudioOwner(resource.data);
+
+        // Create: Owner
+        allow create: if isAudioCreator(request.resource.data) &&
+          isValidTrack(request.resource.data);
+
+        // Update: Owner or Admin
+        allow update: if isAudioOwner(resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'user_id', 'track_id', 'played_at']) &&
+          isValidTrack(request.resource.data);
+
+        // Delete: Owner or Admin
+        allow delete: if isAudioOwner(resource.data);
+      }
+
+      // 6. Playlists Collection
+      // Path: /atifs_codeworks/apps/nullwave/playlists/records/{docId}
+      match /playlists/records/{docId} {
+        // Read: Owner or Admin
+        allow read: if isAudioOwner(resource.data);
+
+        // Create: Owner
+        allow create: if isAudioCreator(request.resource.data) &&
+          isValidPlaylist(request.resource.data);
+
+        // Update: Owner or Admin
+        allow update: if isAudioOwner(resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'user_id', 'created_at']) &&
+          isValidPlaylist(request.resource.data);
+
+        // Delete: Owner or Admin
+        allow delete: if isAudioOwner(resource.data);
+      }
+
+      // 7. Playlist Tracks Collection
+      // Path: /atifs_codeworks/apps/nullwave/playlist_tracks/records/{docId}
+      match /playlist_tracks/records/{docId} {
+        // Read: Owner or Admin
+        allow read: if isAudioOwner(resource.data);
+
+        // Create: Owner
+        allow create: if isAudioCreator(request.resource.data) &&
+          isValidPlaylistTrack(request.resource.data);
+
+        // Update: Owner or Admin
+        allow update: if isAudioOwner(resource.data) &&
+          areImmutableFieldsUnchanged(['id', 'auth_uid', 'user_id', 'playlist_id', 'track_id', 'added_at']) &&
+          isValidPlaylistTrack(request.resource.data);
+
+        // Delete: Owner or Admin
+        allow delete: if isAudioOwner(resource.data);
+      }
+    }
+  }
+}

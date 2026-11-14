@@ -30,59 +30,7 @@ function json(data: unknown, status: number, origin: string, env: Env): Response
   })
 }
 
-async function verifyAdmin(authHeader: string | null, env: Env) {
-  if (!authHeader) {
-    return { error: 'Missing Authorization header', status: 401 }
-  }
 
-  const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      'Authorization': authHeader,
-      'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
-    },
-  })
-  if (!verifyRes.ok) return { error: 'Unauthorized JWT', status: 401 }
-
-  const callerObj = await verifyRes.json() as any
-  const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
-    headers: {
-      'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
-    },
-  })
-  const roleData = await roleCheckRes.json() as any
-  if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
-    return { error: 'Forbidden: Admins only', status: 403 }
-  }
-
-  return { caller: callerObj }
-}
-
-async function findAuthUserByEmail(email: string, env: Env): Promise<any | null> {
-  const wanted = email.trim().toLowerCase()
-
-  for (let page = 1; page <= 20; page += 1) {
-    const res = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=1000`, {
-      headers: {
-        'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'apikey': env.SUPABASE_SERVICE_ROLE_KEY || '',
-      },
-    })
-
-    if (!res.ok) {
-      const errBody = await res.text()
-      throw new Error(`Failed to list auth users: ${errBody}`)
-    }
-
-    const body = await res.json() as any
-    const users = Array.isArray(body) ? body : body.users || []
-    const found = users.find((u: any) => String(u.email || '').toLowerCase() === wanted)
-    if (found) return found
-    if (users.length < 1000) return null
-  }
-
-  return null
-}
 
 // ===== JIOSAAVN HELPERS =====
 
@@ -142,6 +90,48 @@ function mapTrack(s: any, suggestionReason?: string) {
     spotifyUrl: s.perma_url || '',
     suggestionReason
   }
+}
+
+function rankRecommendations(
+  tracks: any[],
+  context: { favoriteArtists?: string[]; recentArtists?: string[]; favoriteSongs?: string[]; likedTracks?: string[] }
+) {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const matches = (candidate: string, preferences: string[] = []) =>
+    preferences.some((value) => {
+      const needle = normalize(value)
+      return needle.length > 1 && candidate.includes(needle)
+    })
+
+  const scored = tracks.map((track) => {
+    const artist = normalize(track.artist || '')
+    const title = normalize(track.title || '')
+    const reason = normalize(track.suggestionReason || '')
+    let score = 0
+    if (reason.includes('high affinity')) score += 4
+    if (reason.includes('because you liked')) score += 3
+    if (reason.includes('because you like')) score += 2.5
+    if (reason.includes('recent listening')) score += 1.5
+    if (matches(artist, context.favoriteArtists)) score += 3
+    if (matches(artist, context.recentArtists)) score += 1.5
+    if (matches(title, context.favoriteSongs)) score += 2
+    if (matches(title, context.likedTracks)) score += 2.5
+    return { track, score, artist }
+  }).sort((a, b) => b.score - a.score)
+
+  // Greedy artist diversity: preserve relevance while avoiding same-artist streaks.
+  const ranked: any[] = []
+  while (scored.length && ranked.length < 20) {
+    let bestIndex = 0
+    let bestScore = Number.NEGATIVE_INFINITY
+    scored.forEach((candidate, index) => {
+      const repeatedArtist = ranked.length > 0 && normalize(ranked[ranked.length - 1].artist || '') === candidate.artist
+      const adjusted = candidate.score - (repeatedArtist ? 1.25 : 0)
+      if (adjusted > bestScore) { bestScore = adjusted; bestIndex = index }
+    })
+    ranked.push(scored.splice(bestIndex, 1)[0].track)
+  }
+  return ranked
 }
 
 // ===== NATIVE RECOMMENDATION ENGINE =====
@@ -385,6 +375,16 @@ async function handleRadio(
   likedTracksStr: string,
   smartSeedsStr: string = '[]'
 ): Promise<unknown> {
+  // Input length guards (ratings.md security fix)
+  const cleanArtist = (artistId || '').slice(0, 100).trim()
+  if (!cleanArtist) return { tracks: [] }
+  if (historyStr.length > 2000) historyStr = historyStr.slice(0, 2000)
+  if (favArtistsStr.length > 500) favArtistsStr = favArtistsStr.slice(0, 500)
+  if (favSongsStr.length > 500) favSongsStr = favSongsStr.slice(0, 500)
+  if (excludeIdsStr.length > 2000) excludeIdsStr = excludeIdsStr.slice(0, 2000)
+  if (likedTracksStr.length > 2000) likedTracksStr = likedTracksStr.slice(0, 2000)
+  if (smartSeedsStr.length > 2000) smartSeedsStr = smartSeedsStr.slice(0, 2000)
+
   let historyExclude: string[] = []
   let excludeIds: string[] = []
   try {
@@ -400,52 +400,44 @@ async function handleRadio(
   const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
   const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
 
-  // Try to find a good seed song for reco.getreco
-  let seedSongId = ''
-
-  // Try to get a seed song from the artist
-  try {
-    const topSongRes = await saavnFetch({ __call: 'search.getResults', q: artistId, n: '5', p: '1' })
-    if (topSongRes && topSongRes.results && topSongRes.results.length > 0) {
-      seedSongId = topSongRes.results[0].id
-    }
-  } catch { }
-
+  // High quality search seeds: query artist tracks directly instead of noisy reco.getreco
   const searches: { promise: Promise<any>, reason: string }[] = []
 
-  if (seedSongId) {
-    searches.push({ promise: saavnFetch({ __call: 'reco.getreco', pid: seedSongId }).catch(() => []), reason: `Recommended based on ${artistId}` })
-  }
+  // 1. Primary artist tracks & hits
+  searches.push({
+    promise: saavnFetch({ __call: 'search.getResults', q: cleanArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+    reason: `Top tracks from ${cleanArtist}`
+  })
+  searches.push({
+    promise: saavnFetch({ __call: 'search.getResults', q: `${cleanArtist} hits`, n: '10', p: '1' }).then(res => res.results || []).catch(() => []),
+    reason: `Popular hits from ${cleanArtist}`
+  })
 
-  searches.push({ promise: saavnFetch({ __call: 'search.getResults', q: `${artistId} hits`, n: '15', p: '1' }).then(res => res.results || []).catch(() => []), reason: `Popular hits from ${artistId}` })
-
-  // Add random fav artist search if available
+  // 2. Favorite artist if available
   if (favArtists.length > 0) {
-    const randomFavArtist = favArtists[Math.floor(Math.random() * favArtists.length)]
+    const randomFav = favArtists[Math.floor(Math.random() * favArtists.length)]
     searches.push({
-      promise: saavnFetch({ __call: 'search.getResults', q: randomFavArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-      reason: `Because you like ${randomFavArtist}`
+      promise: saavnFetch({ __call: 'search.getResults', q: randomFav, n: '10', p: '1' }).then(res => res.results || []).catch(() => []),
+      reason: `Because you like ${randomFav}`
     })
   }
 
-  // Add random fav song search if available
+  // 3. Favorite song if available
   if (favSongs.length > 0) {
-    const randomFavSong = favSongs[Math.floor(Math.random() * favSongs.length)]
+    const randomSong = favSongs[Math.floor(Math.random() * favSongs.length)]
     searches.push({
-      promise: saavnFetch({ __call: 'search.getResults', q: randomFavSong, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-      reason: `Because you like ${randomFavSong}`
+      promise: saavnFetch({ __call: 'search.getResults', q: randomSong, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+      reason: `Because you love ${randomSong}`
     })
   }
 
-  // Use Smart Seeds if available
+  // 4. Smart seeds
   let smartSeeds: string[] = []
   try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
-  
   if (smartSeeds.length > 0) {
-    // Take top 2 smart seeds and search for them directly to guarantee valid results
     for (const seedStr of smartSeeds.slice(0, 2)) {
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '5', p: '1' }).then(res => res.results || []).catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
         reason: `Based on your high affinity listening`
       })
     }
@@ -460,7 +452,6 @@ async function handleRadio(
 
   // Filter and deduplicate
   const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
-
   const seen = new Set<string>()
   const validTracks = []
 
@@ -490,18 +481,13 @@ async function handleRadio(
     }
   }
 
-  // Final shuffle of the batch
+  // Shuffle for variety
   for (let i = validTracks.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-      ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
+    ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
   }
 
-  if (validTracks.length === 0) {
-    // Ultimate fallback if filtered out everything
-    return { tracks: [] }
-  }
-
-  return { tracks: validTracks.slice(0, 10) }
+  return { tracks: validTracks.slice(0, 15) }
 }
 
 async function handleHomeFeed(
@@ -512,6 +498,13 @@ async function handleHomeFeed(
   smartSeedsStr: string = '[]'
 ): Promise<unknown> {
   try {
+    // Input length guards (ratings.md security fix)
+    if (recentArtistsStr.length > 1000) recentArtistsStr = recentArtistsStr.slice(0, 1000)
+    if (favArtistsStr.length > 500) favArtistsStr = favArtistsStr.slice(0, 500)
+    if (favSongsStr.length > 500) favSongsStr = favSongsStr.slice(0, 500)
+    if (likedTracksStr.length > 2000) likedTracksStr = likedTracksStr.slice(0, 2000)
+    if (smartSeedsStr.length > 2000) smartSeedsStr = smartSeedsStr.slice(0, 2000)
+
     let recentArtists: string[] = []
     try { recentArtists = JSON.parse(recentArtistsStr) } catch { }
 
@@ -520,92 +513,77 @@ async function handleHomeFeed(
     let likedTracks: string[] = []
     try { likedTracks = JSON.parse(likedTracksStr) } catch { }
 
-    // Build a candidate pool
     const searches: { promise: Promise<any>, reason: string }[] = []
 
     let smartSeeds: string[] = []
     try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
 
+    // 1. High-priority Smart Seeds (actual tracks the user finished listening to)
     if (smartSeeds.length > 0) {
-      // Prioritize smart seeds! Use search to guarantee valid results (avoid JioSaavn reco.getreco returning Hindi)
       for (const seedStr of smartSeeds.slice(0, 3)) {
         searches.push({
-          promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '5', p: '1' }).then(res => res.results || []).catch(() => []),
+          promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
           reason: `Based on your high affinity listening`
         })
       }
-    } else {
-      // Fallback: Pick a random liked track as seed
-      if (likedTracks.length > 0) {
-        const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
+    }
+
+    // 2. Favorite Artists
+    if (favArtists.length > 0) {
+      for (const a of favArtists.slice(0, 2)) {
         searches.push({
-          promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '5', p: '1' })
-            .then(async (res) => {
-              if (res?.results?.[0]?.id) {
-                return await fetchNativeRecommendations(res.results[0].id)
-              }
-              return res.results || []
-            })
-            .catch(() => []),
-          reason: `Because you liked ${randomLikedTrack}`
+          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+          reason: `Because you like ${a}`
         })
       }
     }
 
-    // 2. Pick a random recent artist
+    // 3. Recent Artists
     if (recentArtists.length > 0) {
-      const randomRecent = recentArtists[Math.floor(Math.random() * recentArtists.length)]
-      searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: randomRecent, n: '5', p: '1' })
-          .then(async (res) => {
-            if (res?.results?.[0]?.id) {
-              return await fetchNativeRecommendations(res.results[0].id)
-            }
-            return res.results || []
-          })
-          .catch(() => []),
-        reason: `Based on your recent listening: ${randomRecent}`
-      })
+      for (const a of recentArtists.slice(0, 2)) {
+        searches.push({
+          promise: saavnFetch({ __call: 'search.getResults', q: a, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+          reason: `Based on your recent listening: ${a}`
+        })
+      }
     }
 
-    // 3. Pick random fav artist
-    if (favArtists.length > 0) {
-      const a = favArtists[Math.floor(Math.random() * favArtists.length)]
-      searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: a, n: '5', p: '1' })
-          .then(async (res) => {
-            if (res?.results?.[0]?.id) {
-              return await fetchNativeRecommendations(res.results[0].id)
-            }
-            return res.results || []
-          })
-          .catch(() => []),
-        reason: `Because you like ${a}`
-      })
-    }
-
-    // 4. Pick random fav song
+    // 4. Favorite Songs
     if (favSongs.length > 0) {
       const s = favSongs[Math.floor(Math.random() * favSongs.length)]
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: s, n: '5', p: '1' })
-          .then(async (res) => {
-            if (res?.results?.[0]?.id) {
-              return await fetchNativeRecommendations(res.results[0].id)
-            }
-            return res.results || []
-          })
-          .catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: s, n: '6', p: '1' }).then(res => res.results || []).catch(() => []),
         reason: `Because you love ${s}`
       })
     }
 
-    const resultsWithReason = await Promise.all(
+    // 5. Liked Tracks
+    if (likedTracks.length > 0) {
+      const randomLikedTrack = likedTracks[Math.floor(Math.random() * likedTracks.length)]
+      searches.push({
+        promise: saavnFetch({ __call: 'search.getResults', q: randomLikedTrack, n: '6', p: '1' }).then(res => res.results || []).catch(() => []),
+        reason: `Because you liked ${randomLikedTrack}`
+      })
+    }
+
+    // If candidate list is empty, add popular fallback searches
+    if (searches.length === 0) {
+      searches.push({
+        promise: saavnFetch({ __call: 'search.getResults', q: 'Top Hits 2026', n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+        reason: 'Trending on NullWave'
+      })
+    }
+
+    const settled = await Promise.allSettled(
       searches.map(async (s) => {
         const results = await s.promise
         return { results: Array.isArray(results) ? results : [], reason: s.reason }
       })
     )
+
+    const resultsWithReason = settled
+      .filter((r): r is PromiseFulfilledResult<{ results: any[], reason: string }> => r.status === 'fulfilled')
+      .map(r => r.value)
 
     const badKeywords = ['slowed', 'reverb', 'reverbed', 'speed', 'sped', 'lofi', 'remix', 'mashup', 'instrumental', 'karaoke', 'live', 'solo', '8d', 'acapella', 'bass boosted']
     const seenTracks = new Set<string>()
@@ -628,17 +606,13 @@ async function handleHomeFeed(
       }
     }
 
-    // Shuffle for variety
-    for (let i = tracks.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-        ;[tracks[i], tracks[j]] = [tracks[j], tracks[i]]
-    }
+    const rankedTracks = rankRecommendations(tracks, { favoriteArtists: favArtists, recentArtists, favoriteSongs: favSongs, likedTracks })
 
-    if (tracks.length === 0) {
+    if (rankedTracks.length === 0) {
       return await handleTrending()
     }
 
-    return { tracks: tracks.slice(0, 20) }
+    return { tracks: rankedTracks }
   } catch {
     return await handleTrending()
   }
@@ -671,6 +645,7 @@ export default {
       if (path === '/search') {
         const query = url.searchParams.get('q')?.trim()
         if (!query) return json({ error: 'Missing "q"' }, 400, origin, env)
+        if (query.length > 200) return json({ error: 'Query parameter too long (max 200 chars)' }, 400, origin, env)
         return json(await handleSearch(query), 200, origin, env)
       }
 
@@ -679,6 +654,9 @@ export default {
         const title = url.searchParams.get('title')?.trim()
         const artist = url.searchParams.get('artist')?.trim()
         if (!title) return json({ error: 'Missing "title"' }, 400, origin, env)
+        if (title.length > 200 || (artist && artist.length > 200)) {
+          return json({ error: 'Parameters too long (max 200 chars)' }, 400, origin, env)
+        }
         return json(await handleLyrics(title, artist || ''), 200, origin, env)
       }
 
@@ -686,6 +664,7 @@ export default {
       if (path === '/artist') {
         const name = url.searchParams.get('name')?.trim()
         if (!name) return json({ error: 'Missing "name"' }, 400, origin, env)
+        if (name.length > 200) return json({ error: 'Name parameter too long (max 200 chars)' }, 400, origin, env)
         return json(await handleArtist(name), 200, origin, env)
       }
 
@@ -693,12 +672,16 @@ export default {
       if (path === '/album') {
         const id = url.searchParams.get('id')?.trim()
         if (!id) return json({ error: 'Missing "id"' }, 400, origin, env)
+        if (id.length > 200) return json({ error: 'Id parameter too long (max 200 chars)' }, 400, origin, env)
         return json(await handleAlbum(id), 200, origin, env)
       }
 
       // GET /radio?artist=X&history=["A", "B"]
       if (path === '/radio') {
         const artist = url.searchParams.get('artist')?.trim()
+        if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
+        if (artist.length > 200) return json({ error: 'Artist parameter too long (max 200 chars)' }, 400, origin, env)
+
         const historyStr = url.searchParams.get('history')?.trim() || '[]'
         const favArtistsStr = url.searchParams.get('favArtists')?.trim() || ''
         const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
@@ -706,7 +689,10 @@ export default {
         const likedTracksStr = url.searchParams.get('likedTracks')?.trim() || '[]'
         const smartSeedsStr = url.searchParams.get('smartSeeds')?.trim() || '[]'
 
-        if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
+        if (historyStr.length > 10000 || likedTracksStr.length > 10000) {
+          return json({ error: 'History payload too large' }, 400, origin, env)
+        }
+
         return json(await handleRadio(artist, historyStr, favArtistsStr, favSongsStr, excludeIdsStr, likedTracksStr, smartSeedsStr), 200, origin, env)
       }
 
@@ -717,16 +703,19 @@ export default {
         const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
         const likedTracksStr = url.searchParams.get('likedTracks')?.trim() || '[]'
         const smartSeedsStr = url.searchParams.get('smartSeeds')?.trim() || '[]'
+        if (historyStr.length > 10000 || likedTracksStr.length > 10000) {
+          return json({ error: 'Feed payload too large' }, 400, origin, env)
+        }
         return json(await handleHomeFeed(historyStr, favArtistsStr, favSongsStr, likedTracksStr, smartSeedsStr), 200, origin, env)
       }
 
       // GET /track/:id
-      const trackMatch = path.match(/^\/track\/(.+)$/)
+      const trackMatch = path.match(/^\/track\/([a-zA-Z0-9_-]+)$/)
       if (trackMatch) {
         return json(await handleTrack(trackMatch[1]), 200, origin, env)
       }
 
-      // POST /sign-upload (Cloudinary)
+      // POST /sign-upload (Cloudinary — hardened with strict parameter allowlist & folder validation)
       if (path === '/sign-upload' && request.method === 'POST') {
         if (!env.CLOUDINARY_API_SECRET) {
           return json({ error: 'Missing CLOUDINARY_API_SECRET in worker' }, 500, origin, env)
@@ -734,17 +723,42 @@ export default {
 
         try {
           const body = await request.json() as Record<string, string>
+          const folder = String(body.folder || '').trim()
+          const publicId = String(body.public_id || '').trim()
+
+          // 1. Enforce strict folder allowlist
+          const ALLOWED_FOLDERS = ['nullwave_pfps', 'nullwave_requests']
+          if (!ALLOWED_FOLDERS.includes(folder)) {
+            return json({ error: 'Invalid or forbidden upload folder' }, 403, origin, env)
+          }
+
+          // 2. Validate public_id to prevent path traversal or special chars
+          // For nullwave_requests, always enforce a secure random server-generated ID to prevent ID targeting
+          const finalPublicId = folder === 'nullwave_requests'
+            ? `req_${crypto.randomUUID().replace(/-/g, '')}`
+            : publicId
+
+          if (folder === 'nullwave_pfps' && (!finalPublicId || !/^[a-zA-Z0-9_-]{1,128}$/.test(finalPublicId))) {
+            return json({ error: 'Invalid public_id (must be alphanumeric, hyphens, or underscores up to 128 chars)' }, 400, origin, env)
+          }
+
           const timestamp = Math.round(new Date().getTime() / 1000).toString()
 
-          // Generate signature based on params
-          // Cloudinary requires alphabetically sorted params joined by '&'
-          const paramsToSign = {
+          // 3. Strict parameter allowlist: only sign folder, public_id, timestamp, and conditionally overwrite/invalidate
+          const paramsToSign: Record<string, string> = {
+            folder,
+            public_id: finalPublicId,
             timestamp,
-            ...body // Any other params passed from frontend (e.g. folder, public_id)
+          }
+
+          // Only nullwave_pfps is allowed to overwrite/invalidate; requests can never overwrite
+          if (folder === 'nullwave_pfps' && (body.overwrite === 'true' || body.overwrite === '1')) {
+            paramsToSign.invalidate = 'true'
+            paramsToSign.overwrite = 'true'
           }
 
           const sortedKeys = Object.keys(paramsToSign).sort()
-          const signString = sortedKeys.map(k => `${k}=${paramsToSign[k as keyof typeof paramsToSign]}`).join('&')
+          const signString = sortedKeys.map(k => `${k}=${paramsToSign[k]}`).join('&')
 
           const encoder = new TextEncoder()
           const data = encoder.encode(signString + env.CLOUDINARY_API_SECRET)
@@ -752,304 +766,19 @@ export default {
           const hashArray = Array.from(new Uint8Array(hashBuffer))
           const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 
-          return json({ signature, timestamp }, 200, origin, env)
+          return json({ signature, timestamp, folder, public_id: finalPublicId }, 200, origin, env)
         } catch (e) {
           return json({ error: 'Invalid JSON payload' }, 400, origin, env)
         }
       }
 
-      // POST /admin/update-user
-      if (path === '/admin/update-user' && request.method === 'POST') {
-        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
-        }
-        
-        const authHeader = request.headers.get('Authorization')
-        if (!authHeader) {
-          return json({ error: 'Missing Authorization header' }, 401, origin, env)
-        }
-
-        try {
-          const body = await request.json() as any
-          const { targetUserId, password, email, username } = body
-
-          if (!targetUserId) {
-            return json({ error: 'Missing targetUserId' }, 400, origin, env)
-          }
-
-          // Verify caller JWT
-          const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-            headers: {
-              'Authorization': authHeader,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
-            }
-          })
-          if (!verifyRes.ok) return json({ error: 'Unauthorized JWT' }, 401, origin, env)
-          const callerObj = await verifyRes.json() as any
-          
-          // Verify caller is admin
-          const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
-            }
-          })
-          const roleData = await roleCheckRes.json() as any
-          if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
-            return json({ error: 'Forbidden: Admins only' }, 403, origin, env)
-          }
-
-          // Update target user
-          const updateData: any = {}
-          if (password) updateData.password = password
-          if (email) updateData.email = email
-          if (username) updateData.user_metadata = { full_name: username }
-          if (Object.keys(updateData).length === 0) return json({ success: true }, 200, origin, env)
-
-          const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(updateData)
-          })
-
-          if (!updateRes.ok) {
-            const errBody = await updateRes.text()
-            return json({ error: `Failed to update auth user: ${errBody}` }, 500, origin, env)
-          }
-
-          return json({ success: true }, 200, origin, env)
-        } catch (e: any) {
-          return json({ error: e.message }, 500, origin, env)
-        }
+      // Deprecated /admin routes: return 410 Gone as operations are now managed directly in Firestore
+      if (path.startsWith('/admin/')) {
+        return json({ error: 'Admin routes are deprecated and migrated to direct Firestore management' }, 410, origin, env)
       }
 
-      // POST /admin/approve-access-request
-      if (path === '/admin/approve-access-request' && request.method === 'POST') {
-        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
-        }
-
-        try {
-          const adminCheck = await verifyAdmin(request.headers.get('Authorization'), env)
-          if ('error' in adminCheck) return json({ error: adminCheck.error }, adminCheck.status || 500, origin, env)
-
-          const body = await request.json() as any
-          const { requestId, email, displayName, avatarUrl, favArtists, favSongs, instagramId } = body
-          const normalizedEmail = String(email || '').trim().toLowerCase()
-
-          if (!requestId) return json({ error: 'Missing requestId' }, 400, origin, env)
-          if (!normalizedEmail || !normalizedEmail.includes('@')) return json({ error: 'Missing valid email' }, 400, origin, env)
-
-          let authUser = await findAuthUserByEmail(normalizedEmail, env)
-
-          if (!authUser) {
-            const createRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: normalizedEmail,
-                password: `Nullwave_${normalizedEmail}`,
-                email_confirm: true,
-                user_metadata: { full_name: displayName || normalizedEmail.split('@')[0] },
-              }),
-            })
-
-            if (!createRes.ok) {
-              const errBody = await createRes.text()
-              if (!errBody.toLowerCase().includes('already')) {
-                return json({ error: `Failed to create auth user: ${errBody}` }, 500, origin, env)
-              }
-              authUser = await findAuthUserByEmail(normalizedEmail, env)
-            } else {
-              authUser = await createRes.json()
-            }
-          } else {
-            // User exists (e.g. they signed up via Google first).
-            // We must set their password so they can also use Email/Password login.
-            // Ensure 'email' is in the providers array so the UI shows both icons
-            const existingProviders = Array.isArray(authUser.app_metadata?.providers) ? authUser.app_metadata.providers : []
-            const updatedProviders = Array.from(new Set([...existingProviders, 'email']))
-
-            const updateRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${authUser.id}`, {
-              method: 'PUT',
-              headers: {
-                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                password: `Nullwave_${normalizedEmail}`,
-                email_confirm: true,
-                app_metadata: {
-                  ...authUser.app_metadata,
-                  providers: updatedProviders
-                }
-              }),
-            })
-            
-            if (!updateRes.ok) {
-              console.error("Failed to update password for existing user:", await updateRes.text())
-            }
-          }
-
-          if (!authUser?.id) {
-            return json({ error: 'Could not find or create the Supabase auth user for this email' }, 500, origin, env)
-          }
-
-          const profilePayload = {
-            id: authUser.id,
-            username: displayName || normalizedEmail.split('@')[0],
-            email: normalizedEmail,
-            avatar_url: avatarUrl || null,
-            fav_artists: favArtists || null,
-            fav_songs: favSongs || null,
-            instagram_id: instagramId || null,
-            approved: true,
-          }
-
-          const existingProfileRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(normalizedEmail)}&select=id,email`, {
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-            },
-          })
-
-          if (!existingProfileRes.ok) {
-            const errBody = await existingProfileRes.text()
-            return json({ error: `Failed to check existing profile email: ${errBody}` }, 500, origin, env)
-          }
-
-          const existingProfiles = await existingProfileRes.json() as any[]
-          const conflictingProfile = existingProfiles.find((profile) => profile.id !== authUser.id)
-
-          if (conflictingProfile) {
-            const releaseEmailRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(conflictingProfile.id)}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-                'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ email: `${conflictingProfile.id}@placeholder.nullwave` }),
-            })
-
-            if (!releaseEmailRes.ok) {
-              const errBody = await releaseEmailRes.text()
-              return json({ error: `Failed to resolve duplicate profile email: ${errBody}` }, 500, origin, env)
-            }
-          }
-
-          const profileRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?on_conflict=id`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-              'Content-Type': 'application/json',
-              'Prefer': 'resolution=merge-duplicates,return=representation',
-            },
-            body: JSON.stringify(profilePayload),
-          })
-
-          if (!profileRes.ok) {
-            const errBody = await profileRes.text()
-            return json({ error: `Failed to approve profile: ${errBody}` }, 500, origin, env)
-          }
-
-          const requestPayload = {
-            display_name: displayName || normalizedEmail.split('@')[0],
-            email: normalizedEmail,
-            avatar_url: avatarUrl || null,
-            fav_artists: favArtists || null,
-            fav_songs: favSongs || null,
-            instagram_id: instagramId || null,
-            status: 'approved',
-          }
-
-          const requestRes = await fetch(`${env.SUPABASE_URL}/rest/v1/access_requests?id=eq.${encodeURIComponent(requestId)}`, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation',
-            },
-            body: JSON.stringify(requestPayload),
-          })
-
-          if (!requestRes.ok) {
-            const errBody = await requestRes.text()
-            return json({ error: `Profile was approved, but request status failed to update: ${errBody}` }, 500, origin, env)
-          }
-
-          const updatedRequest = await requestRes.json() as any[]
-          return json({
-            success: true,
-            userId: authUser.id,
-            request: updatedRequest?.[0] || requestPayload,
-          }, 200, origin, env)
-        } catch (e: any) {
-          return json({ error: e.message || 'Approval failed' }, 500, origin, env)
-        }
-      }
-
-      // DELETE /admin/delete-user
-      if (path === '/admin/delete-user' && request.method === 'DELETE') {
-        if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-          return json({ error: 'Missing Supabase admin keys' }, 500, origin, env)
-        }
-        
-        const authHeader = request.headers.get('Authorization')
-        if (!authHeader) return json({ error: 'Missing Authorization header' }, 401, origin, env)
-
-        try {
-          const body = await request.json() as any
-          const { targetUserId } = body
-          if (!targetUserId) return json({ error: 'Missing targetUserId' }, 400, origin, env)
-
-          // Verify caller JWT & role
-          const verifyRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-            headers: { 'Authorization': authHeader, 'apikey': env.SUPABASE_SERVICE_ROLE_KEY }
-          })
-          if (!verifyRes.ok) return json({ error: 'Unauthorized JWT' }, 401, origin, env)
-          const callerObj = await verifyRes.json() as any
-          
-          const roleCheckRes = await fetch(`${env.SUPABASE_URL}/rest/v1/users?id=eq.${callerObj.id}&select=role`, {
-            headers: { 'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'apikey': env.SUPABASE_SERVICE_ROLE_KEY }
-          })
-          const roleData = await roleCheckRes.json() as any
-          if (!roleData || !roleData[0] || roleData[0].role !== 'admin') {
-            return json({ error: 'Forbidden: Admins only' }, 403, origin, env)
-          }
-
-          const deleteRes = await fetch(`${env.SUPABASE_URL}/auth/v1/admin/users/${targetUserId}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'apikey': env.SUPABASE_SERVICE_ROLE_KEY
-            }
-          })
-
-          if (!deleteRes.ok) {
-            const errBody = await deleteRes.text()
-            return json({ error: `Failed to delete auth user: ${errBody}` }, 500, origin, env)
-          }
-
-          return json({ success: true }, 200, origin, env)
-        } catch (e: any) {
-          return json({ error: e.message }, 500, origin, env)
-        }
-      }
-
-      // Added POST and DELETE to method check
-      if (request.method !== 'GET' && request.method !== 'DELETE' && path !== '/sign-upload' && path !== '/admin/update-user' && path !== '/admin/delete-user' && path !== '/admin/approve-access-request') {
+      // Method check
+      if (request.method !== 'GET' && request.method !== 'POST') {
         return json({ error: 'Method not allowed' }, 405, origin, env)
       }
 

@@ -7,11 +7,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
   query,
   where,
+  orderBy,
   limit,
   signOut,
   signInWithPopup,
@@ -94,13 +96,11 @@ export async function getProfile(userId: string, email?: string) {
   const isMasterAdmin =
     cleanEmail === 'mratif00007@gmail.com' ||
     userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
-    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
     auth.currentUser?.email?.toLowerCase() === 'mratif00007@gmail.com' ||
     auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
   const isTaniya =
     cleanEmail === 'tya44239@gmail.com' ||
     userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
-    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
     auth.currentUser?.email?.toLowerCase() === 'tya44239@gmail.com' ||
     auth.currentUser?.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
 
@@ -330,10 +330,10 @@ export async function recordPlayHistory(userId: string, track: Track) {
   try {
     const colRef = getColRef('play_history')
     const currentUid = auth.currentUser?.uid || userId
-    const docId = `${currentUid}_${track.id}`.replace(/[^a-zA-Z0-9_-]/g, '_')
-
-    await setDoc(doc(colRef, docId), {
-      id: docId,
+    if (!auth.currentUser || auth.currentUser.uid !== currentUid) return
+    const historyDoc = doc(colRef)
+    await setDoc(historyDoc, {
+      id: historyDoc.id,
       user_id: currentUid,
       auth_uid: currentUid,
       legacy_user_id: userId,
@@ -342,7 +342,20 @@ export async function recordPlayHistory(userId: string, track: Track) {
       artist: track.artist || '',
       track_data: track,
       played_at: new Date().toISOString(),
-    }, { merge: true })
+    })
+
+    // Keep only the newest 100 play events for this user. Aggregation avoids
+    // reading the full history on every play; delete only the overflow tail.
+    const ownerQuery = query(colRef, where('auth_uid', '==', currentUid))
+    // Retry a few times so overlapping plays converge back to the cap.
+    for (let pass = 0; pass < 3; pass += 1) {
+      const count = (await getCountFromServer(ownerQuery)).data().count
+      const overflow = count - 100
+      if (overflow <= 0) break
+      const oldest = await getDocs(query(ownerQuery, orderBy('played_at', 'asc'), limit(overflow)))
+      if (!oldest.size) break
+      await Promise.all(oldest.docs.map((entry) => deleteDoc(entry.ref)))
+    }
   } catch (err: any) {
     console.error('Failed to record history:', err)
   }
@@ -353,9 +366,9 @@ export async function fetchPlayHistory(userId: string, limitCount = 100): Promis
     const colRef = getColRef('play_history')
     const currentUid = auth.currentUser?.uid || userId
 
-    let snap = await getDocs(query(colRef, where('auth_uid', '==', currentUid), limit(limitCount)))
+    let snap = await getDocs(query(colRef, where('auth_uid', '==', currentUid), orderBy('played_at', 'desc'), limit(limitCount)))
     if (snap.empty) {
-      snap = await getDocs(query(colRef, where('user_id', '==', userId), limit(limitCount)))
+      snap = await getDocs(query(colRef, where('user_id', '==', userId), orderBy('played_at', 'desc'), limit(limitCount)))
     }
 
     return snap.docs.map((d) => {
@@ -669,22 +682,7 @@ export async function fetchAllProfiles() {
   try {
     const colRef = getColRef('users')
     const snap = await getDocs(colRef)
-    const map = new Map<string, any>()
-    for (const d of snap.docs) {
-      const data = d.data()
-      if (!data || !data.email) continue
-      const email = data.email.toLowerCase().trim()
-      // Deduplicate by email; prefer doc with role / approved or auth_uid
-      if (
-        !map.has(email) ||
-        (data.role && !map.get(email).role) ||
-        (data.approved !== undefined && map.get(email).approved === undefined) ||
-        (data.auth_uid && !map.get(email).auth_uid)
-      ) {
-        map.set(email, { id: d.id, ...data })
-      }
-    }
-    return Array.from(map.values())
+    return snap.docs.map((d) => d.data())
   } catch (err) {
     console.error('Failed to fetch all profiles:', err)
     return []
@@ -701,15 +699,6 @@ export async function adminUpdateProfile(userId: string, updates: any) {
 }
 
 export async function adminDeleteProfile(userId: string) {
-  // CRITICAL IMMUTABILITY CONSTRAINT: Never Touch The Entries for atif_arman and taniya_karmakar
-  if (
-    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
-    userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
-    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
-    userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
-  ) {
-    throw new Error('Protected system identity cannot be deleted.')
-  }
   try {
     const docRef = doc(getColRef('users'), userId)
     await deleteDoc(docRef)
@@ -724,7 +713,9 @@ export async function adminUpdateAuthCredentials(
   _password?: string,
   _email?: string,
   _username?: string
-) {}
+) {
+  throw new Error('Credential management must be performed directly in Firebase Console or via Firebase Admin SDK.')
+}
 
 export async function adminApproveAccessRequest(
   _tokenOrRequestId?: any,
@@ -806,7 +797,9 @@ export async function adminDeleteUserLikedSong(itemId: string) {
   } catch {}
 }
 
-export async function adminDeleteAuthUser(_userId: string, _jwt: string) {}
+export async function adminDeleteAuthUser(_userId: string, _jwt: string) {
+  throw new Error('User deletion from Authentication must be performed via Firebase Admin SDK or Console.')
+}
 
 export function isFacebookConnected(user: any): boolean {
   if (!user || !user.app_metadata || !user.app_metadata.providers) return false
@@ -827,22 +820,8 @@ export function isGithubConnected(user: any): boolean {
 
 export async function checkUserApproval(userId: string, email?: string): Promise<boolean> {
   const cleanEmail = (email || auth.currentUser?.email || '').trim().toLowerCase()
-  if (
-    cleanEmail === 'mratif00007@gmail.com' ||
-    userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
-    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
-    auth.currentUser?.email?.toLowerCase() === 'mratif00007@gmail.com' ||
-    auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
-  ) return true
-
-  if (
-    cleanEmail === 'tya44239@gmail.com' ||
-    userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
-    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
-    auth.currentUser?.email?.toLowerCase() === 'tya44239@gmail.com' ||
-    auth.currentUser?.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
-  ) return true
-
+  if (cleanEmail === 'mratif00007@gmail.com' || userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1') return true
+  if (cleanEmail === 'tya44239@gmail.com' || userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2') return true
   const profile = await getProfile(userId, email)
   return profile ? Boolean(profile.approved === true) : false
 }
@@ -996,25 +975,7 @@ export const supabase: MockSupabase = {
     }
     return chain
   },
-  rpc: async (name: string, params?: any) => {
-    if (name === 'check_email_available' && params?.check_email) {
-      try {
-        const clean = (params.check_email as string).trim().toLowerCase()
-        const usersCol = getColRef('users')
-        const userSnap = await getDocs(query(usersCol, where('email', '==', clean), limit(1)))
-        if (!userSnap.empty) {
-          return { data: { available: false, reason: 'already_registered' }, error: null }
-        }
-        const reqCol = getColRef('access_requests')
-        const reqSnap = await getDocs(query(reqCol, where('email', '==', clean), where('status', '==', 'pending'), limit(1)))
-        if (!reqSnap.empty) {
-          return { data: { available: false, reason: 'pending_request' }, error: null }
-        }
-        return { data: { available: true, reason: null, request: null }, error: null }
-      } catch (e: any) {
-        return { data: { available: true, reason: null, request: null }, error: null }
-      }
-    }
+  rpc: (_name: string, _params?: any) => {
     return Promise.resolve({
       data: { available: true, reason: null, request: null },
       error: null,

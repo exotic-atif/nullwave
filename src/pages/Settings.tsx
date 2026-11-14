@@ -165,7 +165,7 @@ export function SettingsPage() {
         <div className="p-4 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.3.48</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.5.3</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
@@ -175,7 +175,7 @@ export function SettingsPage() {
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-nw-text-secondary text-sm">Build</span>
-            <span className="text-nw-text tabular-nums text-sm">2026.07.05</span>
+            <span className="text-nw-text tabular-nums text-sm">2026.11.14</span>
           </div>
         </div>
       </motion.section>

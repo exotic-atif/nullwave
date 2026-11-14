@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { cn, encryptShareId } from '@/lib/utils'
 import type { Track } from '@/types'
 import { AlbumArt } from './AlbumArt'
@@ -22,14 +22,17 @@ interface TrackRowProps {
   onClick?: () => void
 }
 
-export function TrackRow({ track, index, showIndex = false, showAlbum = true, className, playlistId, onRemove, onClick }: TrackRowProps) {
+export const TrackRow = memo(function TrackRow({ track, index, showIndex = false, showAlbum = true, className, playlistId, onRemove, onClick }: TrackRowProps) {
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
-  const { currentTrack, isPlaying, setTrack, togglePlay } = usePlayerStore()
-  const { addToQueue, addDislikedTrack } = useQueueStore()
+  const isActive = usePlayerStore((s) => s.currentTrack?.id === track.id)
+  const isPlaying = usePlayerStore((s) => s.isPlaying)
+  const setTrack = usePlayerStore((s) => s.setTrack)
+  const togglePlay = usePlayerStore((s) => s.togglePlay)
+  const addToQueue = useQueueStore((s) => s.addToQueue)
+  const addDislikedTrack = useQueueStore((s) => s.addDislikedTrack)
   const user = useAuthStore((s) => s.user)
-  const { toggle, isLiked } = useLikedStore()
-  const isActive = currentTrack?.id === track.id
-  const liked = isLiked(track.id)
+  const toggle = useLikedStore((s) => s.toggle)
+  const liked = useLikedStore((s) => s.isLiked(track.id))
   const { isOpen, position, openContextMenu, openFromButton, close } = useContextMenu()
   const navigate = useNavigate()
 
@@ -265,4 +268,4 @@ export function TrackRow({ track, index, showIndex = false, showAlbum = true, cl
       )}
     </>
   )
-}
+})

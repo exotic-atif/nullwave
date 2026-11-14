@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-05-20"
 
 [vars]
-ALLOWED_ORIGINS = "*"
+ALLOWED_ORIGINS = "https://thenullwave.vercel.app,https://nullwave.vercel.app,http://localhost:5173,http://localhost:3000"
 
 # Secrets (set via `wrangler secret put`):
 # SPOTIFY_CLIENT

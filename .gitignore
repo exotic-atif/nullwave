@@ -30,4 +30,6 @@ temporary/
 plans/*
 ideas/*
 temporary_monochrome*
-
+ratings.md
+__pycache__/
+*.pyc

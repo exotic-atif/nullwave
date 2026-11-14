@@ -4,7 +4,7 @@ import { ChevronDown, X, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Re
 import { toast } from 'sonner'
 import { useQueueStore } from '@/store'
 import { AlbumArt } from '../ui/AlbumArt'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePlayerStore } from '@/store'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
@@ -23,13 +23,12 @@ interface FullScreenPlayerProps {
 }
 
 export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, onNext, onPrevious, isLiked, toggleLike }: FullScreenPlayerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animFrameRef = useRef<number>(0)
   const [showLyrics, setShowLyrics] = useState(false)
   const scrubberRef = useRef<HTMLInputElement>(null)
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverPos, setHoverPos] = useState(0)
-  const [, setIsDragging] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragProgress, setDragProgress] = useState<number | null>(null)
   
   const {
     isPlaying,
@@ -68,103 +67,27 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
     }
   }, [showLyrics, setProgress])
 
-  // ===== Audio Visualizer =====
-  const drawVisualizer = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas || showLyrics || !isOpen) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const analyser = audioManager.getAnalyser()
-    if (!analyser) return
-
-    const bufferLength = analyser.frequencyBinCount
-    const dataArray = new Uint8Array(bufferLength)
-
-    const render = () => {
-      animFrameRef.current = requestAnimationFrame(render)
-      analyser.getByteFrequencyData(dataArray)
-
-      const w = canvas.width
-      const h = canvas.height
-      const cx = w / 2
-      const cy = h / 2
-      const radius = Math.min(cx, cy) * 0.45 // Base radius
-
-      ctx.clearRect(0, 0, w, h)
-
-      // Calculate bass intensity for core glow/pulse
-      let bassSum = 0
-      for (let i = 0; i < 10; i++) bassSum += dataArray[i]
-      const bassAvg = bassSum / 10 / 255
-      const pulseScale = 1 + bassAvg * 0.3
-
-      const drawBlob = (offset: number, color: string, isFill: boolean, blur: number) => {
-        ctx.beginPath()
-        const points = 32
-        for (let i = 0; i <= points; i++) {
-          const dataIndex = Math.floor((i % points) * bufferLength / points)
-          const value = dataArray[dataIndex] / 255
-          
-          // Organic smoothing
-          const r = radius * pulseScale + (value * radius * 0.4) + offset
-          const angle = (i / points) * Math.PI * 2 - Math.PI / 2
-
-          const x = cx + Math.cos(angle) * r
-          const y = cy + Math.sin(angle) * r
-
-          if (i === 0) ctx.moveTo(x, y)
-          else {
-            // Use quadratic curves for organic feel (simplified here by high point count)
-            ctx.lineTo(x, y)
-          }
-        }
-        ctx.closePath()
-
-        ctx.shadowBlur = blur
-        ctx.shadowColor = color
-
-        if (isFill) {
-          ctx.fillStyle = color
-          ctx.fill()
-        } else {
-          ctx.strokeStyle = color
-          ctx.lineWidth = 3
-          ctx.stroke()
-        }
-        ctx.shadowBlur = 0 // reset
-      }
-
-      // Draw premium layers
-      drawBlob(20, 'rgba(56, 189, 248, 0.1)', true, 40) // Outer soft glow
-      drawBlob(5, 'rgba(56, 189, 248, 0.4)', false, 20) // Mid neon ring
-      drawBlob(0, 'rgba(14, 165, 233, 0.8)', false, 10) // Inner bright ring
-    }
-
-    render()
-
-    return () => cancelAnimationFrame(animFrameRef.current)
-  }, [showLyrics, isOpen])
-
-  useEffect(() => {
-    if (isOpen && !showLyrics && isPlaying) {
-      const cleanup = drawVisualizer()
-      return () => {
-        cleanup?.()
-        cancelAnimationFrame(animFrameRef.current)
-      }
-    } else {
-      cancelAnimationFrame(animFrameRef.current)
-    }
-  }, [isOpen, showLyrics, isPlaying, drawVisualizer])
-
   // Handlers passed from Player.tsx
   const handleNext = () => onNext()
   const handlePrevious = () => onPrevious()
 
-  const handleSeek = (value: number) => {
-    setProgress(value)
-    audioManager.seek(value)
+  const effectiveProgress = isDragging && dragProgress !== null ? dragProgress : progress
+
+  const commitSeek = (targetValue?: number) => {
+    const finalVal = typeof targetValue === 'number' ? targetValue : (dragProgress ?? progress)
+    setIsDragging(false)
+    setDragProgress(null)
+    setProgress(finalVal)
+    audioManager.seek(finalVal)
+  }
+
+  const handleSeekChange = (value: number) => {
+    if (isDragging) {
+      setDragProgress(value)
+    } else {
+      setProgress(value)
+      audioManager.seek(value)
+    }
   }
 
   return (
@@ -253,22 +176,6 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                 className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'hidden md:flex w-full md:w-auto scale-90' : 'w-full scale-100'}`}
               >
                 <div className={`relative ${showLyrics ? 'w-full max-w-[200px] md:max-w-[300px] aspect-square' : 'w-full max-w-[300px] md:max-w-[380px] lg:max-w-[460px] aspect-square'} flex-shrink-0 transition-all duration-500`}>
-                  {/* Audio Visualizer Canvas */}
-                  {!showLyrics && (
-                    <canvas
-                      ref={canvasRef}
-                      width={800}
-                      height={800}
-                      className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}
-                      style={{ 
-                        width: '180%', 
-                        height: '180%', 
-                        top: '50%', 
-                        left: '50%', 
-                        transform: 'translate(-50%, -50%)' 
-                      }}
-                    />
-                  )}
                   <AlbumArt
                     src={track.coverUrl}
                     alt={track.album}
@@ -277,7 +184,6 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                     showShadow
                     className="w-full h-full"
                   />
-                  <div className="absolute -inset-3 rounded-3xl border border-nw-accent/10 animate-[nw-glow-pulse_3s_ease-in-out_infinite] z-10 pointer-events-none" />
                 </div>
 
                 <div className="mt-8 w-full max-w-[320px] flex items-center justify-between">
@@ -339,7 +245,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                 <div className={`w-full max-w-md mt-10 transition-all duration-500 ${showLyrics ? 'hidden md:block' : 'block'}`}>
                   {/* Scrubber */}
                   <div className="flex items-center gap-3 w-full mb-6">
-                    <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(progress)}</span>
+                    <span className="text-xs text-nw-text-tertiary tabular-nums">{formatTime(effectiveProgress)}</span>
                     <div 
                       className="flex-1 relative group py-3"
                       onMouseMove={(e) => {
@@ -357,18 +263,17 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                         min={0}
                         max={duration || 100}
                         step={0.1}
-                        value={progress}
-                        onChange={(e) => handleSeek(Number(e.target.value))}
+                        value={effectiveProgress}
+                        onChange={(e) => handleSeekChange(Number(e.target.value))}
                         onMouseDown={() => setIsDragging(true)}
-                        onMouseUp={() => {
-                          setIsDragging(false)
-                          audioManager.seek(progress)
-                        }}
+                        onTouchStart={() => setIsDragging(true)}
+                        onMouseUp={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
+                        onTouchEnd={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
                         className="w-full cursor-pointer nw-slider h-1.5 group-hover:h-2 transition-[height] duration-200"
                         style={{
                           background: `linear-gradient(to right, #38bdf8 ${
-                            duration > 0 ? (progress / duration) * 100 : 0
-                          }%, #27272a ${duration > 0 ? (progress / duration) * 100 : 0}%)`,
+                            duration > 0 ? (effectiveProgress / duration) * 100 : 0
+                          }%, #27272a ${duration > 0 ? (effectiveProgress / duration) * 100 : 0}%)`,
                         }}
                       />
                       {/* Tooltip */}
