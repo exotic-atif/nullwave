@@ -19,6 +19,7 @@ import { getProfile } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditRequestModal } from '@/components/admin/EditRequestModal'
 import { AtSign } from 'lucide-react'
+import { auth } from '@/lib/firebase'
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected'
 
@@ -40,7 +41,14 @@ export function AdminPage() {
   }
 
   // Logged in but not admin
-  if (user.role !== 'admin') {
+  const isMasterAdmin =
+    (user.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
+    user.id === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+    user.id === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
+    (auth.currentUser?.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
+    auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
+
+  if (user.role !== 'admin' && !isMasterAdmin) {
     return <AccessDenied />
   }
 
@@ -70,7 +78,7 @@ function AdminLogin() {
       // After login, check the role from Supabase
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const profile = await getProfile(session.user.id)
+        const profile = await getProfile(session.user.id, session.user.email)
         if (profile?.role !== 'admin') {
           // Will re-render and show AccessDenied
         }

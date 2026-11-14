@@ -11,6 +11,7 @@ import {
   microsoftProvider,
   signInWithPopup,
   signInWithRedirect,
+  signOut,
 } from '@/lib/firebase'
 import { checkUserApproval } from '@/lib/supabase'
 import { FcGoogle } from 'react-icons/fc'
@@ -74,7 +75,11 @@ export function LoginPage() {
         const errorMsg = encodeURIComponent(
           `You don't have an account with the email ${trimmedEmail}. Request Access to use the app instead.`
         )
-        navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
+        await signOut(auth)
+        navigate(
+          `/req-access?complete_profile=true&email=${encodeURIComponent(trimmedEmail)}&error_msg=${errorMsg}`,
+          { replace: true }
+        )
         return
       }
       navigate(from + search, { replace: true })
@@ -93,7 +98,21 @@ export function LoginPage() {
         const errorMsg = encodeURIComponent(
           `You don't have an account with the email ${u.email || ''}. Request Access to use the app instead.`
         )
-        navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
+        const emailParam = encodeURIComponent(u.email || '')
+        const nameParam = encodeURIComponent(u.displayName || '')
+        const photoParam = encodeURIComponent(u.photoURL || '')
+
+        // Clean up from Firebase Auth so unapproved accounts do not linger in Authentication
+        try {
+          await u.delete()
+        } catch {
+          await signOut(auth)
+        }
+
+        navigate(
+          `/req-access?complete_profile=true&email=${emailParam}&name=${nameParam}&photo=${photoParam}&error_msg=${errorMsg}`,
+          { replace: true }
+        )
         return
       }
       navigate(from + search, { replace: true })

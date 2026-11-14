@@ -48,6 +48,15 @@ export const useAuthStore = create<AuthStore>()(
                 useThemeStore.getState().setTheme(profile.theme as any)
               }
 
+              const isMasterAdmin =
+                (fbUser.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
+                fbUser.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+                fbUser.uid === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc'
+              const isTaniya =
+                (fbUser.email || '').toLowerCase() === 'tya44239@gmail.com' ||
+                fbUser.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
+                fbUser.uid === '04e2ceee-cfc4-40eb-bcbf-db049e011356'
+
               const appUser: User = {
                 id: fbUser.uid,
                 email: fbUser.email || '',
@@ -55,9 +64,9 @@ export const useAuthStore = create<AuthStore>()(
                 avatarUrl,
                 favSongs: profile?.fav_songs || '',
                 favArtists: profile?.fav_artists || '',
-                role: (profile?.role as any) || 'member',
+                role: isMasterAdmin ? 'admin' : ((profile?.role as any) || 'member'),
                 createdAt: fbUser.metadata?.creationTime || new Date().toISOString(),
-                approved: Boolean(profile?.approved === true),
+                approved: isMasterAdmin || isTaniya || Boolean(profile?.approved === true),
               }
               set({ user: appUser, isAuthenticated: true, isLoading: false })
             } catch (err) {
@@ -86,6 +95,15 @@ export const useAuthStore = create<AuthStore>()(
             useThemeStore.getState().setTheme(profile.theme as any)
           }
 
+          const isMasterAdmin =
+            (u.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
+            u.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+            u.uid === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc'
+          const isTaniya =
+            (u.email || '').toLowerCase() === 'tya44239@gmail.com' ||
+            u.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
+            u.uid === '04e2ceee-cfc4-40eb-bcbf-db049e011356'
+
           const appUser: User = {
             id: u.uid,
             email: u.email || '',
@@ -93,9 +111,9 @@ export const useAuthStore = create<AuthStore>()(
             avatarUrl,
             favSongs: profile?.fav_songs || '',
             favArtists: profile?.fav_artists || '',
-            role: (profile?.role as any) || 'member',
+            role: isMasterAdmin ? 'admin' : ((profile?.role as any) || 'member'),
             createdAt: u.metadata?.creationTime || new Date().toISOString(),
-            approved: Boolean(profile?.approved === true),
+            approved: isMasterAdmin || isTaniya || Boolean(profile?.approved === true),
           }
 
           set({ user: appUser, isAuthenticated: true, isLoading: false })

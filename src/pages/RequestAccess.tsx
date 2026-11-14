@@ -33,24 +33,20 @@ export function RequestAccessPage() {
       setIsCompleteProfile(true)
       const errMsg = searchParams.get('error_msg')
       if (errMsg) setGoogleMsg(errMsg)
-      
-      // Load session info from OAuth auth
+
+      const qEmail = searchParams.get('email')
+      const qName = searchParams.get('name')
+      const qPhoto = searchParams.get('photo')
+
+      if (qEmail) setEmail(decodeURIComponent(qEmail))
+      if (qName) setDisplayName(decodeURIComponent(qName))
+      if (qPhoto) setAvatarPreview(decodeURIComponent(qPhoto))
+
+      // Load session info from OAuth auth if present
       if (auth.currentUser) {
-        setEmail(auth.currentUser.email || '')
-        setDisplayName(auth.currentUser.displayName || '')
-        if (auth.currentUser.photoURL) {
-          setAvatarPreview(auth.currentUser.photoURL)
-        }
-      } else {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            setEmail(session.user.email || '')
-            setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || '')
-            if (session.user.user_metadata?.avatar_url) {
-              setAvatarPreview(session.user.user_metadata.avatar_url)
-            }
-          }
-        })
+        if (!qEmail && auth.currentUser.email) setEmail(auth.currentUser.email)
+        if (!qName && auth.currentUser.displayName) setDisplayName(auth.currentUser.displayName)
+        if (!qPhoto && auth.currentUser.photoURL) setAvatarPreview(auth.currentUser.photoURL)
       }
     }
   }, [searchParams])

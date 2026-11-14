@@ -21,8 +21,16 @@ export function AuthGuard() {
     return <Navigate to="/login" state={{ from: location.pathname, search: location.search }} replace />
   }
 
-  // MAJOR VULNERABILITY FIX: Ensure unapproved users cannot bypass AuthGuard
-  if (user && !user.approved && location.pathname !== '/req-access') {
+  // Ensure unapproved users cannot bypass AuthGuard (Master Admin and Taniya are always exempt)
+  const isPrivileged =
+    (user?.email || '').toLowerCase() === 'mratif00007@gmail.com' ||
+    user?.id === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+    user?.id === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
+    (user?.email || '').toLowerCase() === 'tya44239@gmail.com' ||
+    user?.id === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
+    user?.id === '04e2ceee-cfc4-40eb-bcbf-db049e011356'
+
+  if (user && !user.approved && !isPrivileged && location.pathname !== '/req-access') {
     const errorMsg = encodeURIComponent(`You don't have an account with the email ${user.email}. Request Access to use the app instead.`)
     return <Navigate to={`/req-access?complete_profile=true&error_msg=${errorMsg}`} replace />
   }

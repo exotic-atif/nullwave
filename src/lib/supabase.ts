@@ -90,33 +90,89 @@ export async function mergeGoogleProfile(userId: string, googleMetadata: any) {
 }
 
 export async function getProfile(userId: string, email?: string) {
+  const cleanEmail = (email || auth.currentUser?.email || '').trim().toLowerCase()
+  const isMasterAdmin =
+    cleanEmail === 'mratif00007@gmail.com' ||
+    userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
+    auth.currentUser?.email?.toLowerCase() === 'mratif00007@gmail.com' ||
+    auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
+  const isTaniya =
+    cleanEmail === 'tya44239@gmail.com' ||
+    userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
+    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
+    auth.currentUser?.email?.toLowerCase() === 'tya44239@gmail.com' ||
+    auth.currentUser?.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+
   try {
     const usersCol = getColRef('users')
+    let foundData: any = null
 
-    // 1. Direct document by userId
+    // 1. Direct document by userId (must be a full profile doc, not just theme preference)
     const dSnap = await getDoc(doc(usersCol, userId)).catch(() => null)
     if (dSnap && dSnap.exists()) {
-      return dSnap.data()
-    }
-
-    // 2. Query by auth_uid == userId
-    const qAuth = query(usersCol, where('auth_uid', '==', userId), limit(1))
-    const authSnap = await getDocs(qAuth).catch(() => null)
-    if (authSnap && !authSnap.empty) {
-      return authSnap.docs[0].data()
-    }
-
-    // 3. Query by email
-    const cleanEmail = (email || auth.currentUser?.email || '').trim().toLowerCase()
-    if (cleanEmail) {
-      const qEmail = query(usersCol, where('email', '==', cleanEmail), limit(1))
-      const emailSnap = await getDocs(qEmail).catch(() => null)
-      if (emailSnap && !emailSnap.empty) {
-        return emailSnap.docs[0].data()
+      const d = dSnap.data()
+      if (d && (d.email || d.username || d.approved !== undefined)) {
+        foundData = d
       }
     }
 
-    // 4. Default for user not found in records: NOT approved
+    // 2. Query by auth_uid == userId
+    if (!foundData) {
+      const qAuth = query(usersCol, where('auth_uid', '==', userId), limit(1))
+      const authSnap = await getDocs(qAuth).catch(() => null)
+      if (authSnap && !authSnap.empty) {
+        foundData = authSnap.docs[0].data()
+      }
+    }
+
+    // 3. Query by email
+    if (!foundData && cleanEmail) {
+      const qEmail = query(usersCol, where('email', '==', cleanEmail), limit(1))
+      const emailSnap = await getDocs(qEmail).catch(() => null)
+      if (emailSnap && !emailSnap.empty) {
+        foundData = emailSnap.docs[0].data()
+      }
+    }
+
+    if (foundData) {
+      if (isMasterAdmin) {
+        foundData.role = 'admin'
+        foundData.approved = true
+      } else if (isTaniya) {
+        foundData.approved = true
+      }
+      return foundData
+    }
+
+    // Master Admin fallback if somehow not fetched from DB
+    if (isMasterAdmin) {
+      return {
+        id: userId || 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+        auth_uid: 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+        username: 'Exotic Atif',
+        email: 'mratif00007@gmail.com',
+        avatar_url: auth.currentUser?.photoURL || 'https://res.cloudinary.com/mian-storage/image/upload/v1793075995/nullwave_pfps/53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc.jpg',
+        approved: true,
+        role: 'admin',
+        theme: 'dark',
+      }
+    }
+
+    if (isTaniya) {
+      return {
+        id: userId || 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2',
+        auth_uid: 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2',
+        username: 'Taniya Karmakar',
+        email: 'tya44239@gmail.com',
+        avatar_url: 'https://i.ibb.co/RpKcgkQ8/Tanu-pfp.jpg',
+        approved: true,
+        role: 'member',
+        theme: 'system',
+      }
+    }
+
+    // 4. User is not in records: NOT approved
     if (auth.currentUser) {
       return {
         id: auth.currentUser.uid,
@@ -133,6 +189,18 @@ export async function getProfile(userId: string, email?: string) {
     return null
   } catch (err) {
     console.warn('Failed to fetch profile:', err)
+    if (isMasterAdmin) {
+      return {
+        id: userId || 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+        auth_uid: 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1',
+        username: 'Exotic Atif',
+        email: 'mratif00007@gmail.com',
+        avatar_url: auth.currentUser?.photoURL || null,
+        approved: true,
+        role: 'admin',
+        theme: 'dark',
+      }
+    }
     return null
   }
 }
@@ -601,7 +669,22 @@ export async function fetchAllProfiles() {
   try {
     const colRef = getColRef('users')
     const snap = await getDocs(colRef)
-    return snap.docs.map((d) => d.data())
+    const map = new Map<string, any>()
+    for (const d of snap.docs) {
+      const data = d.data()
+      if (!data || !data.email) continue
+      const email = data.email.toLowerCase().trim()
+      // Deduplicate by email; prefer doc with role / approved or auth_uid
+      if (
+        !map.has(email) ||
+        (data.role && !map.get(email).role) ||
+        (data.approved !== undefined && map.get(email).approved === undefined) ||
+        (data.auth_uid && !map.get(email).auth_uid)
+      ) {
+        map.set(email, { id: d.id, ...data })
+      }
+    }
+    return Array.from(map.values())
   } catch (err) {
     console.error('Failed to fetch all profiles:', err)
     return []
@@ -618,6 +701,15 @@ export async function adminUpdateProfile(userId: string, updates: any) {
 }
 
 export async function adminDeleteProfile(userId: string) {
+  // CRITICAL IMMUTABILITY CONSTRAINT: Never Touch The Entries for atif_arman and taniya_karmakar
+  if (
+    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
+    userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
+    userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+  ) {
+    throw new Error('Protected system identity cannot be deleted.')
+  }
   try {
     const docRef = doc(getColRef('users'), userId)
     await deleteDoc(docRef)
@@ -734,6 +826,23 @@ export function isGithubConnected(user: any): boolean {
 }
 
 export async function checkUserApproval(userId: string, email?: string): Promise<boolean> {
+  const cleanEmail = (email || auth.currentUser?.email || '').trim().toLowerCase()
+  if (
+    cleanEmail === 'mratif00007@gmail.com' ||
+    userId === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1' ||
+    userId === '53a2a0bb-77f3-46e0-a450-4dddfbd4e2dc' ||
+    auth.currentUser?.email?.toLowerCase() === 'mratif00007@gmail.com' ||
+    auth.currentUser?.uid === 'fkQeMnkZwcdfBqJv2wAQwwmDdzi1'
+  ) return true
+
+  if (
+    cleanEmail === 'tya44239@gmail.com' ||
+    userId === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2' ||
+    userId === '04e2ceee-cfc4-40eb-bcbf-db049e011356' ||
+    auth.currentUser?.email?.toLowerCase() === 'tya44239@gmail.com' ||
+    auth.currentUser?.uid === 'qhYRtYSbpsPDKT1zkXwOZ5CcgsY2'
+  ) return true
+
   const profile = await getProfile(userId, email)
   return profile ? Boolean(profile.approved === true) : false
 }
@@ -887,7 +996,25 @@ export const supabase: MockSupabase = {
     }
     return chain
   },
-  rpc: (_name: string, _params?: any) => {
+  rpc: async (name: string, params?: any) => {
+    if (name === 'check_email_available' && params?.check_email) {
+      try {
+        const clean = (params.check_email as string).trim().toLowerCase()
+        const usersCol = getColRef('users')
+        const userSnap = await getDocs(query(usersCol, where('email', '==', clean), limit(1)))
+        if (!userSnap.empty) {
+          return { data: { available: false, reason: 'already_registered' }, error: null }
+        }
+        const reqCol = getColRef('access_requests')
+        const reqSnap = await getDocs(query(reqCol, where('email', '==', clean), where('status', '==', 'pending'), limit(1)))
+        if (!reqSnap.empty) {
+          return { data: { available: false, reason: 'pending_request' }, error: null }
+        }
+        return { data: { available: true, reason: null, request: null }, error: null }
+      } catch (e: any) {
+        return { data: { available: true, reason: null, request: null }, error: null }
+      }
+    }
     return Promise.resolve({
       data: { available: true, reason: null, request: null },
       error: null,
