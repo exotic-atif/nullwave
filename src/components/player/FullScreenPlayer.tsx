@@ -18,11 +18,12 @@ import {
 import { toast } from 'sonner'
 import { useQueueStore, usePlayerStore } from '@/store'
 import { AlbumArt } from '../ui/AlbumArt'
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
-import { api, parseLRC } from '@/lib/api'
+import { api } from '@/lib/api'
 import { preloadLyrics } from '@/lib/lyrics-cache'
+import { AmllLyricsView } from './AmllLyricsView'
 
 interface FullScreenPlayerProps {
   isOpen: boolean
@@ -57,10 +58,7 @@ export function FullScreenPlayer({
   const [lyricTime, setLyricTime] = useState(progress)
   const [lyricsLoading, setLyricsLoading] = useState(false)
 
-  const lyricsContainerRef = useRef<HTMLDivElement>(null)
-  const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const isUserScrollingRef = useRef(false)
-  const scrollTimeoutRef = useRef<number | null>(null)
+
 
   const {
     isPlaying,
@@ -107,12 +105,6 @@ export function FullScreenPlayer({
     }
   }, [track.id, track.title, track.artist])
 
-  // Parse LRC synced lines
-  const syncedLines = useMemo(() => {
-    if (!lyrics?.synced) return []
-    return parseLRC(lyrics.synced)
-  }, [lyrics?.synced])
-
   // High-frequency 60fps timer for microsecond-accurate lyric synchronization
   useEffect(() => {
     if (!showLyrics) {
@@ -133,46 +125,6 @@ export function FullScreenPlayer({
     animId = requestAnimationFrame(syncLoop)
     return () => cancelAnimationFrame(animId)
   }, [showLyrics, progress])
-
-  // Determine active lyric index (giving a slight 0.2s visual lead for vocal attack)
-  const activeLyricIndex = useMemo(() => {
-    if (!syncedLines.length) return -1
-    let active = -1
-    const adjustedTime = lyricTime + 0.2
-    for (let i = 0; i < syncedLines.length; i++) {
-      if (syncedLines[i].time <= adjustedTime) {
-        active = i
-      } else {
-        break
-      }
-    }
-    return active
-  }, [syncedLines, lyricTime])
-
-  // Smoothly center the active lyric line in the scroll container
-  useEffect(() => {
-    if (!showLyrics || activeLyricIndex < 0 || isUserScrollingRef.current) return
-
-    const activeEl = lineRefs.current[activeLyricIndex]
-    const container = lyricsContainerRef.current
-    if (activeEl && container) {
-      const targetScroll =
-        activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2
-      container.scrollTo({
-        top: Math.max(0, targetScroll),
-        behavior: 'smooth',
-      })
-    }
-  }, [activeLyricIndex, showLyrics])
-
-  // Handle user scrolling lyrics manually without fighting the auto-scroll
-  const handleLyricsScroll = () => {
-    isUserScrollingRef.current = true
-    if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
-    scrollTimeoutRef.current = window.setTimeout(() => {
-      isUserScrollingRef.current = false
-    }, 2800)
-  }
 
   const effectiveProgress = isDragging && dragProgress !== null ? dragProgress : progress
 
@@ -532,63 +484,18 @@ export function FullScreenPlayer({
                     transition={{ duration: 0.3 }}
                     className="flex-1 h-full min-h-0 max-w-2xl flex flex-col items-center justify-center overflow-hidden"
                   >
-                    <div
-                      ref={lyricsContainerRef}
-                      onScroll={handleLyricsScroll}
-                      className="w-full h-full overflow-y-auto scroll-smooth py-[38vh] px-4 space-y-6 text-left [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)]"
-                    >
-                      {lyricsLoading ? (
-                        <div className="flex flex-col items-center justify-center py-24 text-center">
-                          <Loader2 size={32} className="text-nw-accent animate-spin mb-4" />
-                          <p className="text-nw-text-secondary text-sm">Fetching synchronized lyrics…</p>
-                        </div>
-                      ) : syncedLines.length > 0 ? (
-                        syncedLines.map((line, idx) => {
-                          const isActive = idx === activeLyricIndex
-                          const isPast = idx < activeLyricIndex
-                          return (
-                            <button
-                              key={`${line.time}-${idx}`}
-                              ref={(el) => {
-                                lineRefs.current[idx] = el
-                              }}
-                              onClick={() => {
-                                audioManager.seek(line.time)
-                                setProgress(line.time)
-                              }}
-                              className={`w-full text-left transition-all duration-300 rounded-2xl px-4 py-2.5 cursor-pointer block ${
-                                isActive
-                                  ? 'text-white font-extrabold text-3xl lg:text-4xl scale-[1.03] origin-left drop-shadow-[0_4px_24px_rgba(255,255,255,0.4)]'
-                                  : isPast
-                                    ? 'text-white/40 hover:text-white/80 font-semibold text-2xl lg:text-3xl'
-                                    : 'text-white/20 hover:text-white/60 font-semibold text-2xl lg:text-3xl'
-                              }`}
-                            >
-                              {line.text}
-                            </button>
-                          )
-                        })
-                      ) : lyrics?.plain ? (
-                        <div className="space-y-4 py-12">
-                          {lyrics.plain
-                            .split(/\r?\n/)
-                            .filter(Boolean)
-                            .map((line, i) => (
-                              <p key={i} className="text-xl md:text-2xl font-medium text-white/80">
-                                {line}
-                              </p>
-                            ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-24 text-center text-nw-text-secondary">
-                          <Music2 size={32} className="text-white/20 mb-3" />
-                          <p className="text-base font-medium text-white/70">Lyrics unavailable</p>
-                          <p className="text-xs text-white/40 mt-1">
-                            We couldn't find synced lyrics for this track.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <AmllLyricsView
+                      lyrics={lyrics}
+                      lyricsLoading={lyricsLoading}
+                      currentTime={lyricTime}
+                      isPlaying={isPlaying}
+                      onSeek={(time) => {
+                        audioManager.seek(time)
+                        setProgress(time)
+                      }}
+                      trackId={track.id}
+                      isMobile={false}
+                    />
                   </motion.div>
                 )}
               </div>
@@ -662,59 +569,18 @@ export function FullScreenPlayer({
                 ) : (
                   /* Mobile Lyrics Screen */
                   <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden pb-32">
-                    <div
-                      ref={lyricsContainerRef}
-                      onScroll={handleLyricsScroll}
-                      className="w-full h-full overflow-y-auto scroll-smooth py-[32vh] px-4 space-y-6 text-center [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)]"
-                    >
-                      {lyricsLoading ? (
-                        <div className="flex flex-col items-center justify-center py-24 text-center">
-                          <Loader2 size={28} className="text-nw-accent animate-spin mb-3" />
-                          <p className="text-nw-text-secondary text-sm">Loading lyrics…</p>
-                        </div>
-                      ) : syncedLines.length > 0 ? (
-                        syncedLines.map((line, idx) => {
-                          const isActive = idx === activeLyricIndex
-                          const isPast = idx < activeLyricIndex
-                          return (
-                            <button
-                              key={`${line.time}-${idx}`}
-                              ref={(el) => {
-                                lineRefs.current[idx] = el
-                              }}
-                              onClick={() => {
-                                audioManager.seek(line.time)
-                                setProgress(line.time)
-                              }}
-                              className={`w-full text-center transition-all duration-300 py-2 block ${
-                                isActive
-                                  ? 'text-white font-extrabold text-2xl scale-105 drop-shadow-[0_2px_16px_rgba(255,255,255,0.5)]'
-                                  : isPast
-                                    ? 'text-white/40 text-xl font-semibold'
-                                    : 'text-white/20 text-xl font-semibold'
-                              }`}
-                            >
-                              {line.text}
-                            </button>
-                          )
-                        })
-                      ) : lyrics?.plain ? (
-                        <div className="space-y-4 py-8">
-                          {lyrics.plain
-                            .split(/\r?\n/)
-                            .filter(Boolean)
-                            .map((line, i) => (
-                              <p key={i} className="text-lg font-medium text-white/80">
-                                {line}
-                              </p>
-                            ))}
-                        </div>
-                      ) : (
-                        <div className="py-20 text-center text-white/50 text-sm">
-                          No lyrics available
-                        </div>
-                      )}
-                    </div>
+                    <AmllLyricsView
+                      lyrics={lyrics}
+                      lyricsLoading={lyricsLoading}
+                      currentTime={lyricTime}
+                      isPlaying={isPlaying}
+                      onSeek={(time) => {
+                        audioManager.seek(time)
+                        setProgress(time)
+                      }}
+                      trackId={track.id}
+                      isMobile={true}
+                    />
 
                     {/* Floating Mobile Controller Bar */}
                     <div className="absolute bottom-6 left-4 right-4 z-50 pb-[env(safe-area-inset-bottom)]">

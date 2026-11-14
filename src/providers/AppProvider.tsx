@@ -5,6 +5,7 @@ import { useThemeInit } from '@/hooks/useThemeInit'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAuthStore, useLikedStore, useQueueStore } from '@/store'
 import { Toaster } from 'sonner'
+import { CookieBanner } from '@/components/ui/CookieBanner'
 
 export function AppProvider() {
   useThemeInit()
@@ -31,6 +32,7 @@ export function AppProvider() {
   return (
     <>
       <RouterProvider router={router} />
+      <CookieBanner />
       <Toaster
         position="bottom-center"
         offset={100}

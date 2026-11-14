@@ -4,6 +4,7 @@ import { Moon, Sun, LogOut, User, Palette, Volume2, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { RoleBadge } from '@/components/ui/RoleBadge'
+import { openCookieModal } from '@/components/ui/CookieBanner'
 
 export function SettingsPage() {
   const { theme, toggleTheme } = useThemeStore()
@@ -165,7 +166,7 @@ export function SettingsPage() {
         <div className="p-4 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.5.6</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.5.7</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
@@ -173,9 +174,21 @@ export function SettingsPage() {
               Invite Only
             </span>
           </div>
-          <div className="flex items-center justify-between py-2">
+          <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Build</span>
-            <span className="text-nw-text tabular-nums text-sm">2026.11.14</span>
+            <span className="text-nw-text tabular-nums text-sm">2026.11.15</span>
+          </div>
+          <div className="flex items-center justify-between py-2 pt-1">
+            <div className="flex flex-col">
+              <span className="text-nw-text font-medium text-sm">Cookie Preferences & Policy</span>
+              <span className="text-xs text-nw-muted">Manage telemetry, affinity seeds, & privacy policy</span>
+            </div>
+            <button
+              onClick={() => openCookieModal('preferences')}
+              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-nw-accent hover:text-white text-xs font-semibold border border-nw-accent/20 transition-all cursor-pointer"
+            >
+              Configure
+            </button>
           </div>
         </div>
       </motion.section>

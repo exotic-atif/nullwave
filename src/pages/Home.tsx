@@ -81,7 +81,7 @@ export function HomePage() {
     }
     load()
     return () => { cancelled = true }
-  }, [user?.id])
+  }, [user?.id, user?.favArtists, likedTracks.length])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()

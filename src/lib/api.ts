@@ -357,8 +357,13 @@ export const api = {
     return request(`/album?id=${encodeURIComponent(id)}`)
   },
 
-  /** Get personalized home feed */
+  /** Get personalized home feed with taste-affinity guarantee */
   async homeFeed(params: { recentArtists: string[]; favArtists: string; favSongs: string; likedTracks?: string[]; smartSeeds?: string[] }): Promise<Track[]> {
+    const userArtists = [
+      ...(params.favArtists ? params.favArtists.split(',').map((s) => s.trim().toLowerCase()) : []),
+      ...(params.recentArtists || []).map((s) => s.trim().toLowerCase()),
+    ].filter(Boolean)
+
     const query = new URLSearchParams({
       history: JSON.stringify(params.recentArtists),
       favArtists: params.favArtists,
@@ -366,20 +371,70 @@ export const api = {
       likedTracks: JSON.stringify(params.likedTracks || []),
       smartSeeds: JSON.stringify(params.smartSeeds || []),
     })
+
+    let candidateTracks: Track[] = []
+
     try {
       const data = await request<{ tracks: Track[] }>(`/home-feed?${query.toString()}`)
-      const clean = filterCleanTracks(data.tracks || [])
-      if (clean.length >= 6) {
-        return clean
-      }
-      // If live worker response is depleted by religious/devotional filters, fallback to curated top hits
-      const fallback = await api.search('Today Top Hits')
-      const fallbackClean = filterCleanTracks(fallback.tracks || [])
-      return [...clean, ...fallbackClean].slice(0, 20)
+      candidateTracks = filterCleanTracks(data.tracks || [])
     } catch {
-      const fallback = await api.search('Today Top Hits')
-      return filterCleanTracks(fallback.tracks || []).slice(0, 20)
+      candidateTracks = []
     }
+
+    // Check if response contains genuine tracks matching the user's declared artists/taste
+    const hasTasteMatch =
+      userArtists.length === 0 ||
+      candidateTracks.some((t) => {
+        const tArtist = (t.artist || '').toLowerCase()
+        return userArtists.some((ua) => tArtist.includes(ua) || ua.includes(tArtist))
+      })
+
+    // If candidate response is empty OR completely divorced from user's declared taste (e.g. stale worker fallback returning unrelated songs):
+    if (!hasTasteMatch || candidateTracks.length < 6) {
+      const targetedQueries: string[] = []
+      if (params.favArtists) {
+        targetedQueries.push(...params.favArtists.split(',').map((s) => s.trim()).filter(Boolean))
+      }
+      if (params.recentArtists?.length) {
+        targetedQueries.push(...params.recentArtists.slice(0, 2))
+      }
+      if (params.smartSeeds?.length) {
+        targetedQueries.push(...params.smartSeeds.slice(0, 2))
+      }
+      if (targetedQueries.length === 0) {
+        targetedQueries.push('Global Top Hits 2026')
+      }
+
+      const searchPromises = targetedQueries.slice(0, 3).map((q) =>
+        api.search(q).then((res) => filterCleanTracks(res.tracks || [])).catch(() => [])
+      )
+
+      const searchBatches = await Promise.all(searchPromises)
+      const directCandidates = searchBatches.flat()
+
+      const seen = new Set<string>()
+      const merged: Track[] = []
+
+      for (const track of [...directCandidates, ...candidateTracks]) {
+        const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push(track)
+        }
+      }
+
+      if (merged.length >= 6) {
+        return merged.slice(0, 20)
+      }
+    }
+
+    if (candidateTracks.length > 0) {
+      return candidateTracks.slice(0, 20)
+    }
+
+    // Final fallback: Global Top Hits (never regional religious or irrelevant dumps)
+    const fallback = await api.search('Global Top Hits 2026')
+    return filterCleanTracks(fallback.tracks || []).slice(0, 20)
   },
 
   /** Get a smart infinite radio queue */
