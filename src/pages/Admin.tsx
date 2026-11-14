@@ -212,7 +212,12 @@ function AdminDashboard() {
   useEffect(() => { loadRequests() }, [])
 
   const handleStatus = async (id: string, status: 'approved' | 'rejected') => {
-    await updateAccessRequest(id, { status })
+    const targetReq = requests.find((r) => r.id === id)
+    if (status === 'approved' && targetReq) {
+      await adminApproveAccessRequest(null, targetReq)
+    } else {
+      await updateAccessRequest(id, { status })
+    }
     setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status } : r))
     toast.success(`Request ${status}`)
   }

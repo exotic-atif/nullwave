@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthStore>()(
                 favArtists: profile?.fav_artists || '',
                 role: (profile?.role as any) || 'member',
                 createdAt: fbUser.metadata?.creationTime || new Date().toISOString(),
-                approved: profile?.approved ?? true,
+                approved: Boolean(profile?.approved === true),
               }
               set({ user: appUser, isAuthenticated: true, isLoading: false })
             } catch (err) {
@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthStore>()(
             favArtists: profile?.fav_artists || '',
             role: (profile?.role as any) || 'member',
             createdAt: u.metadata?.creationTime || new Date().toISOString(),
-            approved: profile?.approved ?? true,
+            approved: Boolean(profile?.approved === true),
           }
 
           set({ user: appUser, isAuthenticated: true, isLoading: false })

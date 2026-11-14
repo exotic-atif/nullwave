@@ -116,7 +116,7 @@ export async function getProfile(userId: string, email?: string) {
       }
     }
 
-    // 4. Default profile for currently signed in user
+    // 4. Default for user not found in records: NOT approved
     if (auth.currentUser) {
       return {
         id: auth.currentUser.uid,
@@ -124,7 +124,7 @@ export async function getProfile(userId: string, email?: string) {
         username: auth.currentUser.displayName || cleanEmail.split('@')[0] || 'User',
         email: cleanEmail,
         avatar_url: auth.currentUser.photoURL || null,
-        approved: true,
+        approved: false,
         role: 'member',
         theme: 'system',
       }
@@ -636,10 +636,52 @@ export async function adminUpdateAuthCredentials(
 
 export async function adminApproveAccessRequest(
   _tokenOrRequestId?: any,
-  _reqOrEmail?: any,
-  _updatedDataOrName?: any
+  reqOrEmail?: any,
+  updatedDataOrName?: any
 ): Promise<any> {
-  return { request: null, success: true }
+  try {
+    const req = typeof reqOrEmail === 'object' ? reqOrEmail : { id: _tokenOrRequestId, email: reqOrEmail }
+    const updated = typeof updatedDataOrName === 'object' ? updatedDataOrName : {}
+    const merged = { ...req, ...updated }
+    const cleanEmail = (merged.email || '').trim().toLowerCase()
+    const usersCol = getColRef('users')
+
+    // Check if user already has a record in users collection
+    let userDocRef = doc(usersCol)
+    if (cleanEmail) {
+      const qEmail = query(usersCol, where('email', '==', cleanEmail), limit(1))
+      const snap = await getDocs(qEmail)
+      if (!snap.empty) {
+        userDocRef = snap.docs[0].ref
+      }
+    }
+
+    const profileData = {
+      id: userDocRef.id,
+      email: cleanEmail,
+      username: merged.display_name || cleanEmail.split('@')[0] || 'User',
+      avatar_url: merged.avatar_url || null,
+      fav_artists: merged.fav_artists || null,
+      fav_songs: merged.fav_songs || null,
+      instagram_id: merged.instagram_id || null,
+      approved: true,
+      role: 'member',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    await setDoc(userDocRef, profileData, { merge: true })
+
+    if (merged.id) {
+      const reqDocRef = doc(getColRef('access_requests'), merged.id)
+      await updateDoc(reqDocRef, { status: 'approved' }).catch(() => {})
+    }
+
+    return { request: { ...merged, status: 'approved' }, success: true }
+  } catch (err: any) {
+    console.error('Failed to approve access request:', err)
+    return { request: null, success: false, error: err.message }
+  }
 }
 
 export async function adminFetchUserHistory(userId: string) {
@@ -692,9 +734,8 @@ export function isGithubConnected(user: any): boolean {
 }
 
 export async function checkUserApproval(userId: string, email?: string): Promise<boolean> {
-  if (auth.currentUser) return true
   const profile = await getProfile(userId, email)
-  return profile ? Boolean(profile.approved ?? true) : true
+  return profile ? Boolean(profile.approved === true) : false
 }
 
 // Supabase backwards compatibility adapter for any legacy references

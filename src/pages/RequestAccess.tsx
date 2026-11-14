@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Upload, CheckCircle2, User, ArrowRight, AtSign } from 'lucide-react'
 import { submitAccessRequest, cancelAccessRequest, supabase } from '@/lib/supabase'
+import { auth } from '@/lib/firebase'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
@@ -33,16 +34,24 @@ export function RequestAccessPage() {
       const errMsg = searchParams.get('error_msg')
       if (errMsg) setGoogleMsg(errMsg)
       
-      // Load session info from Google auth
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setEmail(session.user.email || '')
-          setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || '')
-          if (session.user.user_metadata?.avatar_url) {
-            setAvatarPreview(session.user.user_metadata.avatar_url)
-          }
+      // Load session info from OAuth auth
+      if (auth.currentUser) {
+        setEmail(auth.currentUser.email || '')
+        setDisplayName(auth.currentUser.displayName || '')
+        if (auth.currentUser.photoURL) {
+          setAvatarPreview(auth.currentUser.photoURL)
         }
-      })
+      } else {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            setEmail(session.user.email || '')
+            setDisplayName(session.user.user_metadata?.full_name || session.user.user_metadata?.name || '')
+            if (session.user.user_metadata?.avatar_url) {
+              setAvatarPreview(session.user.user_metadata.avatar_url)
+            }
+          }
+        })
+      }
     }
   }, [searchParams])
 

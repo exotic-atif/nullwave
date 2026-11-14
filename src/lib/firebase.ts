@@ -67,6 +67,9 @@ export const facebookProvider = new FacebookAuthProvider()
 facebookProvider.addScope('email')
 facebookProvider.addScope('public_profile')
 
+export const microsoftProvider = new OAuthProvider('microsoft.com')
+microsoftProvider.setCustomParameters({ prompt: 'select_account' })
+
 export {
   signInWithPopup,
   signInWithRedirect,

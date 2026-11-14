@@ -3,7 +3,16 @@ import { useAuthStore } from '@/store'
 import { useNavigate, useLocation, Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
-import { auth, googleProvider, githubProvider, facebookProvider, signInWithPopup, signInWithRedirect } from '@/lib/firebase'
+import {
+  auth,
+  googleProvider,
+  githubProvider,
+  facebookProvider,
+  microsoftProvider,
+  signInWithPopup,
+  signInWithRedirect,
+} from '@/lib/firebase'
+import { checkUserApproval } from '@/lib/supabase'
 import { FcGoogle } from 'react-icons/fc'
 import { FaGithub, FaFacebook } from 'react-icons/fa'
 
@@ -13,7 +22,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [searchParams] = useSearchParams()
-  const { login, isLoading, isAuthenticated } = useAuthStore()
+  const { user, login, isLoading, isAuthenticated } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -23,7 +32,14 @@ export function LoginPage() {
   // If already authenticated, redirect
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(from + search, { replace: true })
+      if (user && !user.approved) {
+        const errorMsg = encodeURIComponent(
+          `You don't have an account with the email ${user.email}. Request Access to use the app instead.`
+        )
+        navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
+      } else {
+        navigate(from + search, { replace: true })
+      }
     }
     
     // Check for URL errors (e.g. from facebook)
@@ -33,9 +49,9 @@ export function LoginPage() {
     } else if (urlError) {
       setError(decodeURIComponent(urlError))
     }
-  }, [isAuthenticated, navigate, from, search, searchParams])
+  }, [isAuthenticated, user, navigate, from, search, searchParams])
 
-  if (isAuthenticated) {
+  if (isAuthenticated && user?.approved) {
     return null
   }
 
@@ -53,53 +69,47 @@ export function LoginPage() {
 
     try {
       await login(trimmedEmail, password)
+      const isApproved = await checkUserApproval(auth.currentUser?.uid || '', trimmedEmail)
+      if (!isApproved) {
+        const errorMsg = encodeURIComponent(
+          `You don't have an account with the email ${trimmedEmail}. Request Access to use the app instead.`
+        )
+        navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
+        return
+      }
       navigate(from + search, { replace: true })
     } catch (err) {
       setError((err as Error).message || 'Invalid credentials')
     }
   }
 
-  const handleGoogleLogin = async () => {
+  const handleOAuthLogin = async (provider: any) => {
     setError('')
     try {
-      await signInWithPopup(auth, googleProvider)
+      const res = await signInWithPopup(auth, provider)
+      const u = res.user
+      const isApproved = await checkUserApproval(u.uid, u.email || undefined)
+      if (!isApproved) {
+        const errorMsg = encodeURIComponent(
+          `You don't have an account with the email ${u.email || ''}. Request Access to use the app instead.`
+        )
+        navigate(`/req-access?complete_profile=true&error_msg=${errorMsg}`, { replace: true })
+        return
+      }
       navigate(from + search, { replace: true })
     } catch (err: any) {
       if (err.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, googleProvider)
+        await signInWithRedirect(auth, provider)
       } else if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Failed to sign in with Google')
+        setError(err.message || 'Failed to authenticate')
       }
     }
   }
 
-  const handleGithubLogin = async () => {
-    setError('')
-    try {
-      await signInWithPopup(auth, githubProvider)
-      navigate(from + search, { replace: true })
-    } catch (err: any) {
-      if (err.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, githubProvider)
-      } else if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Failed to sign in with GitHub')
-      }
-    }
-  }
-
-  const handleFacebookLogin = async () => {
-    setError('')
-    try {
-      await signInWithPopup(auth, facebookProvider)
-      navigate(from + search, { replace: true })
-    } catch (err: any) {
-      if (err.code === 'auth/popup-blocked') {
-        await signInWithRedirect(auth, facebookProvider)
-      } else if (err.code !== 'auth/popup-closed-by-user') {
-        setError(err.message || 'Failed to sign in with Facebook')
-      }
-    }
-  }
+  const handleGoogleLogin = () => handleOAuthLogin(googleProvider)
+  const handleMicrosoftLogin = () => handleOAuthLogin(microsoftProvider)
+  const handleGithubLogin = () => handleOAuthLogin(githubProvider)
+  const handleFacebookLogin = () => handleOAuthLogin(facebookProvider)
 
   return (
     <div className="h-[100dvh] flex flex-col items-center justify-center py-12 bg-nw-black relative overflow-x-hidden overflow-y-auto">
@@ -225,6 +235,20 @@ export function LoginPage() {
             >
               <FcGoogle size={20} />
               Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={handleMicrosoftLogin}
+              disabled={isLoading}
+              className="w-full py-3 bg-[#2f2f2f] text-white text-sm font-semibold rounded-xl hover:bg-[#3f3f3f] border border-nw-border-subtle disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer shadow-lg"
+            >
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <path fill="#f25022" d="M1 1h10v10H1z" />
+                <path fill="#00a4ef" d="M1 13h10v10H1z" />
+                <path fill="#7fba00" d="M13 1h10v10H13z" />
+                <path fill="#ffb900" d="M13 13h10v10H13z" />
+              </svg>
+              Continue with Microsoft
             </button>
             <button
               type="button"
