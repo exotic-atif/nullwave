@@ -1,13 +1,18 @@
-import { useQueueStore, usePlayerStore } from '@/store'
+import { useState } from 'react'
+import { useQueueStore, usePlayerStore, useAuthStore } from '@/store'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { motion, Reorder } from 'framer-motion'
-import { ListMusic, Play, Trash2 } from 'lucide-react'
+import { ListMusic, Play, Trash2, Loader2 } from 'lucide-react'
 import { AlbumArt } from '@/components/ui/AlbumArt'
+import { clearPlayHistory } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 export function QueuePage() {
   const { queue, history, clearQueue, clearHistory, reorderQueue } = useQueueStore()
   const currentTrack = usePlayerStore((s) => s.currentTrack)
+  const user = useAuthStore((s) => s.user)
+  const [clearingHistory, setClearingHistory] = useState(false)
 
   return (
     <div className="px-4 md:px-8 py-6 space-y-8">
@@ -115,10 +120,32 @@ export function QueuePage() {
           action={
             history.length > 0 ? (
               <button
-                onClick={clearHistory}
-                className="text-xs text-nw-text-tertiary hover:text-nw-text transition-colors"
+                disabled={clearingHistory}
+                onClick={async () => {
+                  try {
+                    setClearingHistory(true)
+                    if (user?.id) {
+                      await clearPlayHistory(user.id)
+                    }
+                    clearHistory()
+                    toast.success('Playback history cleared')
+                  } catch (err) {
+                    console.warn('Failed to clear history:', err)
+                    toast.error('Failed to clear history')
+                  } finally {
+                    setClearingHistory(false)
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-xs text-nw-text-tertiary hover:text-nw-text transition-colors disabled:opacity-50 cursor-pointer"
               >
-                Clear history
+                {clearingHistory ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin text-nw-accent" />
+                    <span>Clearing…</span>
+                  </>
+                ) : (
+                  <span>Clear history</span>
+                )}
               </button>
             ) : undefined
           }

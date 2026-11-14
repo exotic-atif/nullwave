@@ -326,3 +326,35 @@ input[type=range].nw-slider::-webkit-slider-runnable-track {
   scrollbar-width: thin;
   scrollbar-color: var(--color-nw-border) transparent;
 }
+
+/* ===== APPLE MUSIC LYRICS TYPOGRAPHY & WORD GLOW ===== */
+.amll-apple-theme {
+  --amll-lp-font-size: max(min(4.8vh, 3.2vw), 22px);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+}
+
+@media screen and (max-width: 768px) {
+  .amll-apple-theme {
+    --amll-lp-font-size: max(min(6vw, 28px), 18px);
+  }
+}
+
+.amll-apple-theme .amll-lyric-player {
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+}
+
+.amll-apple-theme [class*="lyricLineWrapper"] {
+  font-family: inherit !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.25 !important;
+}
+
+.amll-apple-theme [class*="lyricWord"] {
+  font-family: inherit !important;
+  font-weight: 800 !important;
+}

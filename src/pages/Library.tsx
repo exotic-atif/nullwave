@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, Disc3, Heart, X } from 'lucide-react'
+import { Clock, Disc3, Heart, X, Loader2 } from 'lucide-react'
 import { ScrollableRow } from '@/components/ui/ScrollableRow'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { SectionHeader } from '@/components/ui/SectionHeader'
@@ -10,6 +10,7 @@ import type { Track, Playlist } from '@/types'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { PlaylistCover } from '@/components/ui/PlaylistCover'
+import { toast } from 'sonner'
 
 type Tab = 'liked' | 'history' | 'playlists'
 
@@ -25,6 +26,7 @@ export function LibraryPage() {
   const { likedTracks, isLoaded } = useLikedStore()
   const [history, setHistory] = useState<Track[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [isClearingHistory, setIsClearingHistory] = useState(false)
   
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [playlistsLoading, setPlaylistsLoading] = useState(false)
@@ -123,16 +125,33 @@ export function LibraryPage() {
               />
               {history.length > 0 && (
                 <button
+                  disabled={isClearingHistory}
                   onClick={async () => {
-                    if (user?.id) {
-                      await clearPlayHistory(user.id)
+                    try {
+                      setIsClearingHistory(true)
+                      if (user?.id) {
+                        await clearPlayHistory(user.id)
+                      }
                       useQueueStore.getState().clearHistory()
                       setHistory([])
+                      toast.success('Playback history cleared')
+                    } catch (err) {
+                      console.warn('Failed to clear history:', err)
+                      toast.error('Failed to clear history')
+                    } finally {
+                      setIsClearingHistory(false)
                     }
                   }}
-                  className="text-xs text-nw-text-tertiary hover:text-nw-text transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs text-nw-text-tertiary hover:text-nw-text transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  Clear History
+                  {isClearingHistory ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin text-nw-accent" />
+                      <span>Clearing…</span>
+                    </>
+                  ) : (
+                    <span>Clear History</span>
+                  )}
                 </button>
               )}
             </div>
