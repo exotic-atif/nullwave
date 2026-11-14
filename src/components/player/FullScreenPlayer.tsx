@@ -8,7 +8,8 @@ import { useEffect, useRef, useState } from 'react'
 import { usePlayerStore } from '@/store'
 import { audioManager } from '@/lib/audio'
 import { formatTime } from '@/lib/utils'
-// api import removed
+import { parseLRC } from '@/lib/api'
+import { preloadLyrics } from '@/lib/lyrics-cache'
 
 interface FullScreenPlayerProps {
   isOpen: boolean
@@ -29,6 +30,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
   const [hoverPos, setHoverPos] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState<number | null>(null)
+  const [lyrics, setLyrics] = useState<{ synced: string | null; plain: string | null } | null>(null)
   
   const {
     isPlaying,
@@ -41,31 +43,17 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
     cycleRepeat,
   } = usePlayerStore()
 
-  const amLyricsRef = useRef<HTMLElement>(null)
-
-  // Sync am-lyrics time with audio progress
   useEffect(() => {
-    if (showLyrics && amLyricsRef.current) {
-      // am-lyrics expects currentTime in milliseconds
-      ;(amLyricsRef.current as any).currentTime = progress * 1000
-    }
-  }, [progress, showLyrics])
+    let active = true
+    setLyrics(null)
+    void preloadLyrics(track.title, track.artist).then((result) => {
+      if (active) setLyrics(result)
+    })
+    return () => { active = false }
+  }, [track.id, track.title, track.artist])
 
-  // Handle line click
-  useEffect(() => {
-    const handleLineClick = (e: any) => {
-      if (e.detail && e.detail.timestamp !== undefined) {
-        audioManager.seek(e.detail.timestamp / 1000)
-        setProgress(e.detail.timestamp / 1000)
-      }
-    }
-    
-    const el = amLyricsRef.current
-    if (el) {
-      el.addEventListener('line-click', handleLineClick)
-      return () => el.removeEventListener('line-click', handleLineClick)
-    }
-  }, [showLyrics, setProgress])
+  const syncedLines = lyrics?.synced ? parseLRC(lyrics.synced) : []
+  const activeLyricIndex = syncedLines.reduce((found, line, index) => line.time <= progress ? index : found, -1)
 
   // Handlers passed from Player.tsx
   const handleNext = () => onNext()
@@ -110,7 +98,7 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 32, stiffness: 300 }}
-            className="fixed inset-0 z-[70] flex flex-col bg-nw-void overflow-hidden"
+            className="fixed inset-0 z-[70] flex h-[100dvh] flex-col overflow-y-auto bg-nw-void"
           >
             {/* Ambient background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -167,15 +155,15 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
             </div>
 
             {/* Content */}
-            <div className="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 px-5 md:px-12 pb-24 overflow-hidden">
+            <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-5 pb-24 md:flex-row md:gap-12 md:overflow-y-auto md:px-12">
               {/* Left: Album art + track info */}
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, duration: 0.4 }}
-                className={`flex flex-col items-center flex-shrink-0 transition-all duration-500 ${showLyrics ? 'hidden md:flex w-full md:w-auto scale-90' : 'w-full scale-100'}`}
+                className={`flex flex-shrink-0 flex-col items-center transition-all duration-500 ${showLyrics ? 'hidden w-full scale-90 md:flex md:w-auto' : 'w-full scale-100'}`}
               >
-                <div className={`relative ${showLyrics ? 'w-full max-w-[200px] md:max-w-[300px] aspect-square' : 'w-full max-w-[300px] md:max-w-[380px] lg:max-w-[460px] aspect-square'} flex-shrink-0 transition-all duration-500`}>
+                <div className={`relative aspect-square flex-shrink-0 transition-all duration-500 ${showLyrics ? 'w-full max-w-[200px] md:max-w-[min(300px,34dvh)]' : 'w-full max-w-[300px] md:max-w-[min(380px,42dvh)] lg:max-w-[min(460px,42dvh)]'}`}>
                   <AlbumArt
                     src={track.coverUrl}
                     alt={track.album}
@@ -329,27 +317,22 @@ export function FullScreenPlayer({ isOpen, onClose, track, progress, duration, o
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.4 }}
-                  className="flex-1 w-full max-w-2xl h-full flex flex-col items-center justify-center overflow-hidden pb-32 md:pb-0"
+                  className="flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col items-center justify-center overflow-y-auto pb-32 md:pb-0"
                 >
-                  <div className="flex-1 w-full flex items-center justify-center h-full relative">
-                    {/* @ts-expect-error am-lyrics is a custom element */}
-                    <am-lyrics
-                      ref={amLyricsRef}
-                      song-title={track.title}
-                      song-artist={track.artist}
-                      song-album={track.album || ''}
-                      song-duration={track.duration ? Math.round(track.duration * 1000) : undefined}
-                      query={`${track.title} ${track.artist}`}
-                      highlight-color="#ffffff"
-                      hover-background-color="rgba(255,255,255,0.1)"
-                      autoscroll="true"
-                      interpolate="true"
-                      class="w-full h-full block"
-                      style={{
-                        WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-                        maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-                      }}
-                    />
+                  <div className="flex min-h-full w-full flex-col items-center justify-center py-8 text-center [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)]">
+                    {!lyrics ? (
+                      <p className="text-nw-text-secondary">Loading lyrics…</p>
+                    ) : syncedLines.length ? (
+                      syncedLines.map((line, index) => (
+                        <button key={`${line.time}-${index}`} onClick={() => { audioManager.seek(line.time); setProgress(line.time) }} className={`max-w-full px-4 py-2 text-left text-2xl font-semibold transition-colors md:text-3xl ${index === activeLyricIndex ? 'text-white' : 'text-white/40 hover:text-white/75'}`}>
+                          {line.text}
+                        </button>
+                      ))
+                    ) : lyrics.plain ? (
+                      lyrics.plain.split(/\r?\n/).filter(Boolean).map((line, index) => <p key={index} className="px-4 py-2 text-2xl font-semibold text-white/75 md:text-3xl">{line}</p>)
+                    ) : (
+                      <p className="text-nw-text-secondary">Lyrics aren’t available for this track.</p>
+                    )}
                   </div>
                   
                   {/* Mobile Lyrics Controls have been moved outside the flex container to pin them at the bottom */}

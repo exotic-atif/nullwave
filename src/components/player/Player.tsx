@@ -6,6 +6,7 @@ import { audioManager } from '@/lib/audio'
 import { listeningTracker } from '@/lib/listening-tracker'
 import { recordPlayHistory } from '@/lib/supabase'
 import { api } from '@/lib/api'
+import { preloadLyrics } from '@/lib/lyrics-cache'
 import { toast } from 'sonner'
 import {
   Play,
@@ -101,6 +102,8 @@ export function Player() {
     if (!currentTrack) return
 
     const track = currentTrack
+    // Warm lyrics in parallel; playback never waits for this request.
+    void preloadLyrics(track.title, track.artist)
 
     // Record listening session for the previous track before loading the new one
     if (lastRecordedTrack.current && lastRecordedTrack.current !== track.id) {
