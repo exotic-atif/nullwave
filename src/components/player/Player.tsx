@@ -60,6 +60,8 @@ export function Player() {
   const [streamStatus, setStreamStatus] = useState<string | null>(null)
   const lastRecordedTrack = useRef<string | null>(null)
   const lastHistoryKey = useRef<string | null>(null)
+  const preloadedTrackRef = useRef<{ id: string; streamUrl: string } | null>(null)
+  const isPreloadingRef = useRef<boolean>(false)
   
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverPos, setHoverPos] = useState<number>(0)
@@ -131,33 +133,43 @@ export function Player() {
 
     async function loadStream() {
       try {
-        const result = await api.stream(track.title, track.artist)
-        if (cancelled) return
+        let streamUrl = ''
+        let via = ''
+        let streamError = ''
+
+        // Check if next track was pre-buffered during the 15s window
+        if (preloadedTrackRef.current && preloadedTrackRef.current.id === track.id) {
+          streamUrl = preloadedTrackRef.current.streamUrl
+          preloadedTrackRef.current = null
+        } else {
+          preloadedTrackRef.current = null
+          const result = await api.stream(track.title, track.artist)
+          if (cancelled) return
+          streamUrl = result.streamUrl || ''
+          via = result.server === 'fallback' ? ' (backup)' : ''
+          streamError = result.error || ''
+        }
+
         window.clearTimeout(healthPendingTimer)
         window.clearTimeout(longHealthPendingTimer)
+        if (cancelled) return
 
-        if (result.streamUrl) {
-          const via = result.server === 'fallback' ? ' (backup)' : ''
+        if (streamUrl) {
           setStreamStatus(`Buffering audio${via}...`)
-          audioManager.playUrl(result.streamUrl).then(() => {
+          audioManager.playUrl(streamUrl).then(() => {
             if (!usePlayerStore.getState().isPlaying) {
               audioManager.pause()
             }
-            // Background pre-fetch next track in queue so next song starts instantly (<0.5s)
-            const nextTrack = useQueueStore.getState().queue[0]
-            if (nextTrack) {
-              api.stream(nextTrack.title, nextTrack.artist).catch(() => {})
-            }
           })
         } else if (track.audioUrl) {
-          setStreamStatus(result.error ? `${result.error}. Playing preview.` : 'Full stream unavailable. Playing preview.')
+          setStreamStatus(streamError ? `${streamError}. Playing preview.` : 'Full stream unavailable. Playing preview.')
           audioManager.playUrl(track.audioUrl).then(() => {
             if (!usePlayerStore.getState().isPlaying) {
               audioManager.pause()
             }
           })
         } else {
-          setStreamStatus(result.error || 'No audio stream available for this track.')
+          setStreamStatus(streamError || 'No audio stream available for this track.')
           usePlayerStore.getState().setIsLoadingStream(false)
         }
       } catch {
@@ -198,6 +210,41 @@ export function Player() {
     lastHistoryKey.current = historyKey
     void recordPlayHistory(user.id, currentTrack)
   }, [currentTrack?.id, user?.id])
+
+  // ===== SMART 15s PRELOADER =====
+  // Starts preloading next track only when 15s remain in current song.
+  // Buffers the initial 30s chunk (~512KB) to minimize latency while saving bandwidth & CPU.
+  useEffect(() => {
+    if (!isPlaying || !duration || duration < 20) return
+    const remaining = duration - progress
+    if (remaining <= 15 && remaining > 0) {
+      if (preloadedTrackRef.current || isPreloadingRef.current) return
+
+      const nextTrack = useQueueStore.getState().queue[0]
+      if (!nextTrack) return
+
+      isPreloadingRef.current = true
+      // Pre-warm lyrics in parallel
+      void preloadLyrics(nextTrack.title, nextTrack.artist)
+
+      // Resolve stream URL and prime the initial ~30s (512 KB) audio chunk
+      api.stream(nextTrack.title, nextTrack.artist)
+        .then((res) => {
+          if (res.streamUrl) {
+            preloadedTrackRef.current = { id: nextTrack.id, streamUrl: res.streamUrl }
+            // Buffer the first ~30s chunk (512 KB) via HTTP Range request
+            fetch(res.streamUrl, {
+              headers: { Range: 'bytes=0-524287' },
+              mode: 'cors'
+            }).catch(() => {})
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          isPreloadingRef.current = false
+        })
+    }
+  }, [progress, duration, isPlaying])
 
   // Sync play/pause state
   useEffect(() => {

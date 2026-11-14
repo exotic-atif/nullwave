@@ -93,6 +93,7 @@ export interface SyncedLine {
 
 /** Parse LRC format "[mm:ss.xx] text" into timed lines */
 export function parseLRC(lrc: string): SyncedLine[] {
+  if (!lrc) return []
   const lines: SyncedLine[] = []
   for (const raw of lrc.split('\n')) {
     // Accept standard centiseconds, milliseconds, timestamps without fractions,
@@ -103,7 +104,7 @@ export function parseLRC(lrc: string): SyncedLine[] {
     if (!text) continue
     for (const match of timestamps) {
       const fraction = match[3] ?? ''
-      const fractionalSeconds = fraction ? Number(`0.${fraction}`) : 0
+      const fractionalSeconds = fraction ? Number(`0.${fraction.padEnd(3, '0').slice(0, 3)}`) : 0
       const time = Number(match[1]) * 60 + Number(match[2]) + fractionalSeconds
       lines.push({ time, text })
     }

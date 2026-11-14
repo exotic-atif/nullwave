@@ -158,18 +158,59 @@ interface LrcLibResult {
 
 // ===== LRCLIB — Synced Lyrics =====
 
+function cleanTrackTitle(title: string): string {
+  return (title || '')
+    .replace(/\s*[\(\[](feat|ft|official|audio|video|lyrics?|remaster(?:ed)?|from\s+"[^"]+").*?[\)\]]/gi, '')
+    .replace(/\s*-\s*(feat|ft|official|audio|video|remaster(?:ed)?).*$/gi, '')
+    .trim()
+}
+
+function cleanArtistName(artist: string): string {
+  return (artist || '')
+    .split(/[,&/]/)[0]
+    .replace(/\s*(feat|ft)\.?.*$/gi, '')
+    .trim()
+}
+
+async function fetchFromLrcLib(url: string): Promise<LrcLibResult[]> {
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'NullWave/1.0' } })
+    if (!res.ok) return []
+    return (await res.json()) as LrcLibResult[]
+  } catch {
+    return []
+  }
+}
+
 async function handleLyrics(title: string, artist: string): Promise<unknown> {
   try {
-    const res = await fetch(
-      `https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`,
-      { headers: { 'User-Agent': 'NullWave/1.0' } }
+    const cleanTitle = cleanTrackTitle(title)
+    const cleanArtist = cleanArtistName(artist)
+
+    // 1. Try exact search with cleaned track and artist names
+    let results = await fetchFromLrcLib(
+      `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`
     )
 
-    if (!res.ok) {
-      return { synced: null, plain: null }
+    // 2. If no synced lyrics found, try general query search (higher match rate)
+    if (!results.some(r => r.syncedLyrics)) {
+      const qResults = await fetchFromLrcLib(
+        `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`
+      )
+      if (qResults.length > 0) {
+        results = [...results, ...qResults]
+      }
     }
 
-    const results = (await res.json()) as LrcLibResult[]
+    // 3. Fallback: try raw title & artist
+    if (!results.some(r => r.syncedLyrics)) {
+      const rawResults = await fetchFromLrcLib(
+        `https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`
+      )
+      if (rawResults.length > 0) {
+        results = [...results, ...rawResults]
+      }
+    }
 
     if (results.length === 0) {
       return { synced: null, plain: null }
