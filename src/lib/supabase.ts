@@ -95,17 +95,33 @@ export async function mergeGoogleProfile(userId: string, googleMetadata: any) {
   }
 }
 
-export async function getProfile(userId: string) {
+export async function getProfile(userId: string, email?: string) {
   const { data, error } = await supabase
     .from('users')
     .select('username, avatar_url, theme, role, fav_songs, fav_artists, approved')
     .eq('id', userId)
     .limit(1)
+
+  if (!error && data && data.length > 0) {
+    return data[0]
+  }
+
+  if (email) {
+    const { data: emailData, error: emailError } = await supabase
+      .from('users')
+      .select('username, avatar_url, theme, role, fav_songs, fav_artists, approved')
+      .eq('email', email)
+      .limit(1)
+
+    if (!emailError && emailData && emailData.length > 0) {
+      return emailData[0]
+    }
+  }
+
   if (error) {
     console.error('Failed to fetch profile:', error.message)
-    return null
   }
-  return data && data.length > 0 ? data[0] : null
+  return null
 }
 
 export async function getSenderProfile(senderId: string) {
@@ -654,13 +670,28 @@ export function isFacebookConnected(user: any): boolean {
   return user.app_metadata.providers.includes('facebook');
 }
 
-export async function checkUserApproval(userId: string): Promise<boolean> {
+export async function checkUserApproval(userId: string, email?: string): Promise<boolean> {
   const { data, error } = await supabase
     .from('users')
     .select('approved')
     .eq('id', userId)
     .limit(1)
   
-  if (error || !data || data.length === 0) return false;
-  return !!data[0].approved;
+  if (!error && data && data.length > 0) {
+    return !!data[0].approved;
+  }
+
+  if (email) {
+    const { data: emailData, error: emailError } = await supabase
+      .from('users')
+      .select('approved')
+      .eq('email', email)
+      .limit(1)
+
+    if (!emailError && emailData && emailData.length > 0) {
+      return !!emailData[0].approved;
+    }
+  }
+
+  return false;
 }

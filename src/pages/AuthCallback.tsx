@@ -49,7 +49,7 @@ export function AuthCallback() {
         // We handle this below after checking isApproved.
 
         // Check if user is approved in our public.users table
-        const isApproved = await checkUserApproval(session.user.id)
+        const isApproved = await checkUserApproval(session.user.id, session.user.email)
 
         if (!mounted) return
 

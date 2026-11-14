@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthStore>()(
             let avatarUrl = u.user_metadata?.avatar_url
             
             // Try to fetch profile from db
-            const profile = await getProfile(u.id)
+            const profile = await getProfile(u.id, u.email)
             if (profile) {
               displayName = profile.username || displayName
               avatarUrl = profile.avatar_url || avatarUrl
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthStore>()(
         supabase.auth.onAuthStateChange((_event, session) => {
           if (session?.user) {
             const u = session.user
-            getProfile(u.id).then((profile) => {
+            getProfile(u.id, u.email).then((profile) => {
               const displayName = profile?.username || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
               const avatarUrl = profile?.avatar_url || u.user_metadata?.avatar_url
               
@@ -118,7 +118,7 @@ export const useAuthStore = create<AuthStore>()(
           let displayName = u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.display_name || u.email?.split('@')[0] || 'User'
           let avatarUrl = u.user_metadata?.avatar_url
           
-          const profile = await getProfile(u.id)
+          const profile = await getProfile(u.id, u.email)
           if (profile) {
             displayName = profile.username || displayName
             avatarUrl = profile.avatar_url || avatarUrl
