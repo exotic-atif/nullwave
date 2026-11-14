@@ -12,6 +12,7 @@ import { LoginPage } from '@/pages/Login'
 import { PlaylistDetail } from '@/pages/PlaylistDetail'
 import { ArtistDetailPage } from '@/pages/ArtistDetail'
 import { AlbumDetailPage } from '@/pages/AlbumDetail'
+import { AlbumsPage } from '@/pages/Albums'
 import { RequestAccessPage } from '@/pages/RequestAccess'
 import { AdminPage } from '@/pages/Admin'
 import { AuthCallback } from '@/pages/AuthCallback'
@@ -78,6 +79,8 @@ export const router = createBrowserRouter([
               { path: 'library', element: <LibraryPage /> },
               { path: 'playlist/:id', element: <PlaylistDetail /> },
               { path: 'artist/:name', element: <ArtistDetailPage /> },
+              { path: 'albums', element: <AlbumsPage /> },
+              { path: 'album', element: <AlbumsPage /> },
               { path: 'album/:id', element: <AlbumDetailPage /> },
               { path: 'queue', element: <QueuePage /> },
               { path: 'settings', element: <SettingsPage /> },

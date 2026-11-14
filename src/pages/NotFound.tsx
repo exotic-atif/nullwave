@@ -1,11 +1,8 @@
 import { Disc3, Home, Search } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 
 export function NotFoundPage() {
-  const location = useLocation()
-  const isAlbumPath = location.pathname.replace(/\/+$/, '') === '/album'
-
   return (
     <main className="flex min-h-[65vh] items-center justify-center px-5 py-12">
       <motion.section
@@ -19,16 +16,17 @@ export function NotFoundPage() {
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-nw-accent">404 · Lost in the mix</p>
         <h1 className="mt-3 font-display text-3xl font-bold text-nw-text sm:text-4xl">
-          {isAlbumPath ? 'That album link is incomplete' : 'This page isn’t in the library'}
+          This page isn’t in the library
         </h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-nw-text-secondary">
-          {isAlbumPath
-            ? 'Open an album from a song or album card to see its tracks. You can head back and keep listening.'
-            : 'The page may have moved, or the link may be out of date. Head home or search for what you wanted.'}
+          The page may have moved, or the link may be out of date. Head home or browse our albums and tracks.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-nw-accent px-5 py-2.5 text-sm font-semibold text-nw-black transition hover:bg-nw-accent-hover">
             <Home size={16} /> Go home
+          </Link>
+          <Link to="/albums" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-nw-text transition hover:bg-white/[0.08]">
+            <Disc3 size={16} /> Browse albums
           </Link>
           <Link to="/search" className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-nw-text transition hover:bg-white/[0.08]">
             <Search size={16} /> Search music

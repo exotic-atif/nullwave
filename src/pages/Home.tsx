@@ -12,7 +12,7 @@ import { motion } from 'framer-motion'
 import { Play, Sparkles, Search as SearchIcon } from 'lucide-react'
 import { fetchPlayHistory } from '@/lib/supabase'
 import { listeningTracker } from '@/lib/listening-tracker'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 export function HomePage() {
   const setTrack = usePlayerStore((s) => s.setTrack)
@@ -221,7 +221,15 @@ export function HomePage() {
       {/* Albums */}
       {!loading && albums.length > 0 && (
         <section>
-          <SectionHeader title="Featured Albums" subtitle="Curated selections from the underground" />
+          <SectionHeader
+            title="Featured Albums"
+            subtitle="Curated selections from the underground"
+            action={
+              <Link to="/albums" className="text-xs font-semibold text-nw-accent hover:underline">
+                See all
+              </Link>
+            }
+          />
           <ScrollableRow>
             {albums.map((album, i) => (
               <div key={album.id} className="w-[150px] sm:w-[180px] flex-shrink-0 snap-start">

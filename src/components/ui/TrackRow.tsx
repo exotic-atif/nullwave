@@ -105,7 +105,11 @@ export const TrackRow = memo(function TrackRow({ track, index, showIndex = false
     {
       label: 'Go to Album',
       icon: <Disc3 size={14} />,
-      onClick: () => navigate(`/album/${encodeURIComponent(track.albumId)}`),
+      onClick: () => {
+        const target = track.albumId || track.album || track.title
+        if (target) navigate(`/album/${encodeURIComponent(target)}`)
+        else navigate('/albums')
+      },
     },
     {
       label: 'Share',
@@ -189,7 +193,16 @@ export const TrackRow = memo(function TrackRow({ track, index, showIndex = false
 
         {/* Album */}
         {showAlbum && (
-          <button onClick={(e) => { e.stopPropagation(); if (track.albumId) navigate(`/album/${encodeURIComponent(track.albumId)}`) }} className="hidden max-w-[200px] truncate text-left text-xs text-nw-text-tertiary hover:text-nw-accent md:block" title={`Open ${track.album}`}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const target = track.albumId || track.album || track.title
+              if (target) navigate(`/album/${encodeURIComponent(target)}`)
+              else navigate('/albums')
+            }}
+            className="hidden max-w-[200px] truncate text-left text-xs text-nw-text-tertiary hover:text-nw-accent md:block cursor-pointer"
+            title={`Open ${track.album || 'album'}`}
+          >
             {track.album}
           </button>
         )}

@@ -19,7 +19,7 @@ export function PrivacyPolicy() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
               Privacy Policy
             </h1>
-            <p className="text-sm text-nw-muted">Last Updated: July 4, 2026</p>
+            <p className="text-sm text-nw-muted">Last Updated: 15 Nov 2026</p>
           </div>
 
           <div className="p-5 sm:p-8 rounded-3xl bg-nw-surface border border-nw-border space-y-8">

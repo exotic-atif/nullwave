@@ -80,7 +80,7 @@ export function AlbumCard({ album, index = 0 }: AlbumCardProps) {
         <div className="space-y-0.5 min-w-0">
           <h3 className="text-sm font-medium text-nw-text truncate">{album.title}</h3>
           <p className="text-xs text-nw-text-tertiary truncate">
-            {album.artist} • {album.year}
+            {album.artist}{album.year ? ` • ${album.year}` : ''}
           </p>
         </div>
         </motion.div>
