@@ -352,9 +352,77 @@ export const api = {
     return request(`/artist?name=${encodeURIComponent(name)}`)
   },
 
-  /** Get album details + tracks */
+  /** Get album details + tracks with multi-tier resolution */
   async album(id: string): Promise<{ album: Album; tracks: Track[] }> {
-    return request(`/album?id=${encodeURIComponent(id)}`)
+    const rawId = (id || '').trim()
+
+    // 1. Try standard worker endpoint
+    try {
+      const data = await request<{ album: Album; tracks: Track[] }>(`/album?id=${encodeURIComponent(rawId)}`)
+      if (data?.album && Array.isArray(data?.tracks) && data.tracks.length > 0) {
+        return {
+          album: data.album,
+          tracks: filterCleanTracks(data.tracks),
+        }
+      }
+    } catch {
+      // Worker failed or returned empty
+    }
+
+    // 2. If ID is non-numeric title or composite, search for album to find its numeric ID
+    try {
+      const cleanQuery = rawId.replace(/::/g, ' ').replace(/-/g, ' ').trim()
+      const searchRes = await api.search(cleanQuery).catch(() => ({ albums: [], tracks: [] }))
+
+      // If search returned albums with numeric IDs, try the first match
+      if (searchRes.albums && searchRes.albums.length > 0) {
+        for (const candidate of searchRes.albums.slice(0, 3)) {
+          if (candidate.id && /^\d+$/.test(candidate.id)) {
+            try {
+              const albumData = await request<{ album: Album; tracks: Track[] }>(`/album?id=${encodeURIComponent(candidate.id)}`)
+              if (albumData?.album && albumData.tracks?.length > 0) {
+                return {
+                  album: albumData.album,
+                  tracks: filterCleanTracks(albumData.tracks),
+                }
+              }
+            } catch {
+              // continue
+            }
+          }
+        }
+      }
+
+      // 3. Fallback: Aggregate tracks matching the album title from track search
+      if (searchRes.tracks && searchRes.tracks.length > 0) {
+        const cleanTitle = cleanQuery.toLowerCase()
+        const matchingTracks = searchRes.tracks.filter(
+          (t) =>
+            (t.album && (t.album.toLowerCase().includes(cleanTitle) || cleanTitle.includes(t.album.toLowerCase()))) ||
+            (t.title && cleanTitle.includes(t.title.toLowerCase()))
+        )
+
+        const finalTracks = matchingTracks.length > 0 ? matchingTracks : searchRes.tracks.slice(0, 15)
+        const sample = finalTracks[0]
+
+        return {
+          album: {
+            id: rawId,
+            title: sample.album || cleanQuery,
+            artist: sample.artist || 'Unknown Artist',
+            coverUrl: sample.coverUrl,
+            year: sample.year || new Date().getFullYear(),
+            totalTracks: finalTracks.length,
+            tracks: finalTracks,
+          },
+          tracks: filterCleanTracks(finalTracks),
+        }
+      }
+    } catch (err) {
+      console.warn('Album resolution fallback failed:', err)
+    }
+
+    throw new Error('Album not found')
   },
 
   /** Get personalized home feed with taste-affinity guarantee */

@@ -368,21 +368,42 @@ async function handleTrack(trackId: string): Promise<unknown> {
 }
 
 async function handleAlbum(albumId: string): Promise<unknown> {
-  const data = await saavnFetch({
-    __call: 'content.getAlbumDetails',
-    albumid: albumId,
-  })
+  let targetId = (albumId || '').trim()
 
-  const album = {
-    id: data.id || albumId,
-    title: htmlDecode(data.title || ''),
-    artist: htmlDecode(data.primary_artists || ''),
-    coverUrl: getHiResImage(data.image || ''),
-    year: data.year ? parseInt(data.year) : 0,
-    totalTracks: data.songs ? data.songs.length : 0,
+  // If albumId is not numeric or contains composite delimiters, resolve numeric ID via album search
+  const isNumeric = /^\d+$/.test(targetId)
+  if (!isNumeric) {
+    const cleanQuery = targetId.replace(/::/g, ' ').replace(/-/g, ' ').trim()
+    const searchRes = await saavnFetch({
+      __call: 'search.getAlbumResults',
+      q: cleanQuery,
+      n: '1',
+      p: '1',
+    }).catch(() => ({}))
+
+    if (searchRes?.results?.[0]?.id) {
+      targetId = searchRes.results[0].id
+    }
   }
 
-  const tracks = (data.songs || []).map((s: any) => mapTrack(s))
+  const data = await saavnFetch({
+    __call: 'content.getAlbumDetails',
+    albumid: targetId,
+  }).catch(() => ({}))
+
+  // In JioSaavn, album songs are stored in `list` (or fallback `songs`)
+  const songList = (data.list || data.songs || []) as any[]
+
+  const album = {
+    id: data.id || targetId,
+    title: htmlDecode(data.title || data.name || albumId),
+    artist: htmlDecode(data.primary_artists || data.music || data.artist || ''),
+    coverUrl: getHiResImage(data.image || ''),
+    year: data.year ? parseInt(data.year) : 0,
+    totalTracks: songList.length,
+  }
+
+  const tracks = songList.map((s: any) => mapTrack(s))
 
   return { album, tracks }
 }

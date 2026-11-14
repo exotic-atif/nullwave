@@ -1,4 +1,5 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Outlet } from 'react-router-dom'
+import { PageTracker } from '@/components/analytics/PageTracker'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { HomePage } from '@/pages/Home'
@@ -20,56 +21,70 @@ import { LandingPage } from '@/pages/Landing'
 import { DataDeletion } from '@/pages/DataDeletion'
 import { NotFoundPage } from '@/pages/NotFound'
 
+function RootTrackerLayout() {
+  return (
+    <>
+      <PageTracker />
+      <Outlet />
+    </>
+  )
+}
+
 export const router = createBrowserRouter([
   {
-    path: '/landing',
-    element: <LandingPage />,
-  },
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/req-access',
-    element: <RequestAccessPage />,
-  },
-  {
-    path: '/privacy',
-    element: <PrivacyPolicy />,
-  },
-  {
-    path: '/terms',
-    element: <TermsOfService />,
-  },
-  {
-    path: '/data-deletion',
-    element: <DataDeletion />,
-  },
-  {
-    path: '/auth/callback',
-    element: <AuthCallback />,
-  },
-  {
-    path: '/admin',
-    element: <AdminPage />,
-  },
-  {
-    element: <AuthGuard />,
+    element: <RootTrackerLayout />,
     children: [
       {
-        path: '/',
-        element: <AppLayout />,
+        path: '/landing',
+        element: <LandingPage />,
+      },
+      {
+        path: '/login',
+        element: <LoginPage />,
+      },
+      {
+        path: '/req-access',
+        element: <RequestAccessPage />,
+      },
+      {
+        path: '/privacy',
+        element: <PrivacyPolicy />,
+      },
+      {
+        path: '/terms',
+        element: <TermsOfService />,
+      },
+      {
+        path: '/data-deletion',
+        element: <DataDeletion />,
+      },
+      {
+        path: '/auth/callback',
+        element: <AuthCallback />,
+      },
+      {
+        path: '/admin',
+        element: <AdminPage />,
+      },
+      {
+        element: <AuthGuard />,
         children: [
-          { index: true, element: <HomePage /> },
-          { path: 'search', element: <SearchPage /> },
-          { path: 'library', element: <LibraryPage /> },
-          { path: 'playlist/:id', element: <PlaylistDetail /> },
-          { path: 'artist/:name', element: <ArtistDetailPage /> },
-          { path: 'album/:id', element: <AlbumDetailPage /> },
-          { path: 'queue', element: <QueuePage /> },
-          { path: 'settings', element: <SettingsPage /> },
-          { path: 'you', element: <YouPage /> },
-          { path: '*', element: <NotFoundPage /> },
+          {
+            path: '/',
+            element: <AppLayout />,
+            children: [
+              { index: true, element: <HomePage /> },
+              { path: 'search', element: <SearchPage /> },
+              { path: 'library', element: <LibraryPage /> },
+              { path: 'playlist/:id', element: <PlaylistDetail /> },
+              { path: 'artist/:name', element: <ArtistDetailPage /> },
+              { path: 'album/:id', element: <AlbumDetailPage /> },
+              { path: 'queue', element: <QueuePage /> },
+              { path: 'settings', element: <SettingsPage /> },
+              { path: 'you', element: <YouPage /> },
+              { path: '*', element: <NotFoundPage /> },
+            ],
+          },
         ],
       },
     ],
