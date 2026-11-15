@@ -1,6 +1,6 @@
 {
   "name": "nullwave-worker",
-  "version": "1.5.16-beta",
+  "version": "1.5.17-beta",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",

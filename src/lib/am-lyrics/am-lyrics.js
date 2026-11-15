@@ -3198,12 +3198,10 @@ class AmLyrics extends i {
      * Get the scroll padding top value from CSS variable
      */
     getScrollPaddingTop() {
-        if (this.cachedScrollPaddingTop !== null)
-            return this.cachedScrollPaddingTop;
         if (!this.lyricsContainer)
             return 0;
         const style = getComputedStyle(this);
-        const paddingTopValue = style.getPropertyValue('--lyrics-scroll-padding-top') || '25%';
+        const paddingTopValue = style.getPropertyValue('--lyrics-scroll-padding-top') || '33%';
         let result;
         if (paddingTopValue.includes('%')) {
             result =
@@ -3212,8 +3210,7 @@ class AmLyrics extends i {
         else {
             result = parseFloat(paddingTopValue) || 0;
         }
-        this.cachedScrollPaddingTop = result;
-        return result;
+        return result || 120;
     }
     /**
      * Animate scroll with staggered delay for smooth YouLyPlus-style scrolling
@@ -4969,37 +4966,41 @@ AmLyrics.styles = i$3 `
       --lyplus-text-secondary: color-mix(
         in srgb,
         var(--lyplus-lyrics-palette),
-        transparent 45%
+        transparent 50%
       );
 
       --lyplus-padding-base: 1em;
-      --lyplus-padding-line: 10px;
+      --lyplus-padding-line: var(--am-lyrics-padding-line, 12px 16px);
       --lyplus-padding-gap: 0.3em;
       --lyplus-border-radius-base: 0.6em;
       --lyplus-gap-dot-size: 0.4em;
       --lyplus-gap-dot-margin: 0.08em;
 
-      --lyplus-font-size-base: 32px;
+      --lyplus-font-size-base: var(--am-lyrics-font-size, 34px);
       --lyplus-font-size-base-grow: 24.5;
       --lyplus-font-size-subtext: 0.6em;
       --char-rise-y: calc(-0.035 * var(--lyplus-font-size-base));
 
-      --lyplus-blur-amount: 0.07em;
-      --lyplus-blur-amount-near: 0.035em;
+      --lyplus-blur-amount: 0.06em;
+      --lyplus-blur-amount-near: 0.03em;
       --lyplus-fade-gap-timing-function: ease-out;
       --wipe-gradient-width: 0.75em;
       --wipe-gradient-half: 0.375em;
 
-      --lyrics-scroll-padding-top: 25%;
+      --lyrics-scroll-padding-top: var(--am-lyrics-scroll-top, 33%);
 
       display: block;
+      box-sizing: border-box;
       font-family:
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
-        Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+        system-ui, -apple-system-subheadline, "Helvetica Neue", sans-serif;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
       background: transparent;
       height: 100%;
+      width: 100%;
       overflow: hidden;
-      font-weight: bold;
+      font-weight: 700;
       color: var(--lyplus-text-primary);
     }
 
@@ -5007,13 +5008,13 @@ AmLyrics.styles = i$3 `
        CONTAINER & SCROLL BEHAVIOR
        ========================================================================== */
     .lyrics-container {
-      padding: 20px;
-      padding-top: 80px;
+      padding: var(--am-lyrics-container-padding-inline, 20px);
+      padding-top: var(--am-lyrics-container-padding-top, 28vh);
+      padding-bottom: var(--am-lyrics-container-padding-bottom, 42vh);
       border-radius: 8px;
       background-color: transparent;
       width: 100%;
       height: 100%;
-      max-height: 100vh;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       -webkit-touch-callout: none;

@@ -466,7 +466,7 @@ async function handleArtist(artistId: string): Promise<unknown> {
   return { artist, tracks }
 }
 
-function interleaveByArtist(tracks: any[], maxPerArtist = 2): any[] {
+function interleaveByArtist(tracks: any[], maxPerArtist = 2, primaryArtist?: string): any[] {
   const artistBuckets = new Map<string, any[]>()
   for (const t of tracks) {
     const art = (t.artist || '').split(/[,&/]/)[0].trim().toLowerCase() || 'various'
@@ -477,8 +477,19 @@ function interleaveByArtist(tracks: any[], maxPerArtist = 2): any[] {
     }
   }
 
+  // Put alternate artists first so the next song is always fresh
+  const cleanPrimary = (primaryArtist || '').toLowerCase()
+  const bucketList = Array.from(artistBuckets.entries())
+  bucketList.sort(([artA], [artB]) => {
+    if (cleanPrimary) {
+      if (artA === cleanPrimary && artB !== cleanPrimary) return 1
+      if (artB === cleanPrimary && artA !== cleanPrimary) return -1
+    }
+    return 0
+  })
+
+  const entries = bucketList.map(([, b]) => b)
   const result: any[] = []
-  const entries = Array.from(artistBuckets.values())
   const maxLen = Math.max(...entries.map(b => b.length), 0)
 
   for (let i = 0; i < maxLen; i++) {
@@ -492,30 +503,52 @@ function interleaveByArtist(tracks: any[], maxPerArtist = 2): any[] {
   return result
 }
 
+const CURATED_MIX_ARTISTS = [
+  'The Weeknd',
+  'Tame Impala',
+  'Dua Lipa',
+  'Post Malone',
+  'Billie Eilish',
+  'Coldplay',
+  'Ariana Grande',
+  'Travis Scott',
+  'Arijit Singh',
+  'Ed Sheeran',
+  'Kendrick Lamar',
+  'Imagine Dragons'
+]
+
 async function handleRadio(
   artistId: string,
+  currentTitle: string,
   historyStr: string,
   favArtistsStr: string,
   favSongsStr: string,
   excludeIdsStr: string,
   likedTracksStr: string,
-  smartSeedsStr: string = '[]'
+  smartSeedsStr: string = '[]',
+  recentArtistsStr: string = '[]'
 ): Promise<unknown> {
   const rawArtist = (artistId || '').slice(0, 100).trim()
   if (!rawArtist) return { tracks: [] }
 
   // Extract primary artist for clean search queries
   const primaryArtist = rawArtist.split(/[,&/]/)[0].replace(/\s*(feat|ft)\.?.*$/gi, '').trim() || rawArtist
+  const currentBaseTitle = getBaseTitle(currentTitle || '')
 
   let historyExclude: string[] = []
   let excludeIds: string[] = []
   try {
     const rawHistory = JSON.parse(historyStr)
     if (Array.isArray(rawHistory)) {
-      historyExclude = rawHistory.slice(-25).map(t => getBaseTitle(String(t)))
+      historyExclude = rawHistory.slice(-30).map(t => getBaseTitle(String(t))).filter(Boolean)
     }
   } catch {
     // Ignore parse errors
+  }
+
+  if (currentBaseTitle && !historyExclude.includes(currentBaseTitle)) {
+    historyExclude.push(currentBaseTitle)
   }
 
   try {
@@ -529,43 +562,52 @@ async function handleRadio(
 
   const favArtists = favArtistsStr ? favArtistsStr.slice(0, 500).split(',').map(s => s.trim()).filter(Boolean) : []
   const favSongs = favSongsStr ? favSongsStr.slice(0, 500).split(',').map(s => s.trim()).filter(Boolean) : []
+  let recentArtists: string[] = []
+  try {
+    const rawRecent = JSON.parse(recentArtistsStr)
+    if (Array.isArray(rawRecent)) {
+      recentArtists = rawRecent.map(a => String(a).split(/[,&/]/)[0].trim()).filter(Boolean)
+    }
+  } catch {}
 
   // High quality search seeds (curated for true mixed artist variety)
   const searches: { promise: Promise<any>, reason: string }[] = []
 
-  // 1. Primary artist tracks (capped to 8 so one artist never dominates)
+  // 1. Primary artist tracks (strictly capped to 4 so one artist never dominates)
   searches.push({
-    promise: saavnFetch({ __call: 'search.getResults', q: primaryArtist, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+    promise: saavnFetch({ __call: 'search.getResults', q: primaryArtist, n: '4', p: '1' }).then(res => res.results || []).catch(() => []),
     reason: `Top tracks from ${primaryArtist}`
   })
 
-  // 2. Similar artists / radio style query
-  searches.push({
-    promise: saavnFetch({ __call: 'search.getResults', q: `${primaryArtist} radio`, n: '10', p: '1' }).then(res => res.results || []).catch(() => []),
-    reason: `Similar to ${primaryArtist}`
-  })
-
-  // 3. User's other favorite artists (for rich mixed-artist recommendations)
+  // 2. Curate 3-4 distinct alternate artists (user favorites + user recent + curated icons)
   const otherFavArtists = favArtists.filter(a => a.toLowerCase() !== primaryArtist.toLowerCase())
-  if (otherFavArtists.length > 0) {
-    for (const a of otherFavArtists.slice(0, 3)) {
-      searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: a, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
-        reason: `Because you like ${a}`
-      })
+  const otherRecent = recentArtists.filter(a => a.toLowerCase() !== primaryArtist.toLowerCase())
+  const mixedPool = [...new Set([...otherFavArtists, ...otherRecent])]
+
+  for (const icon of CURATED_MIX_ARTISTS) {
+    if (mixedPool.length >= 4) break
+    if (icon.toLowerCase() !== primaryArtist.toLowerCase() && !mixedPool.some(m => m.toLowerCase() === icon.toLowerCase())) {
+      mixedPool.push(icon)
     }
   }
 
-  // 4. Favorite song if available
+  for (const altArtist of mixedPool.slice(0, 3)) {
+    searches.push({
+      promise: saavnFetch({ __call: 'search.getResults', q: altArtist, n: '4', p: '1' }).then(res => res.results || []).catch(() => []),
+      reason: `Because you like ${altArtist}`
+    })
+  }
+
+  // 3. Favorite song if available
   if (favSongs.length > 0) {
     const randomSong = favSongs[Math.floor(Math.random() * favSongs.length)]
     searches.push({
-      promise: saavnFetch({ __call: 'search.getResults', q: randomSong, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+      promise: saavnFetch({ __call: 'search.getResults', q: randomSong, n: '4', p: '1' }).then(res => res.results || []).catch(() => []),
       reason: `Because you love ${randomSong}`
     })
   }
 
-  // 5. Smart seeds from listening habits
+  // 4. Smart seeds from listening habits
   let smartSeeds: string[] = []
   try {
     const rawSmart = JSON.parse(smartSeedsStr)
@@ -575,15 +617,15 @@ async function handleRadio(
   if (smartSeeds.length > 0) {
     for (const seedStr of smartSeeds) {
       searches.push({
-        promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+        promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '4', p: '1' }).then(res => res.results || []).catch(() => []),
         reason: `Based on your listening habits`
       })
     }
   }
 
-  // 6. Global Top Hits for fresh diverse discovery
+  // 5. Global Top Hits for fresh diverse discovery
   searches.push({
-    promise: saavnFetch({ __call: 'search.getResults', q: 'Global Hits', n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
+    promise: saavnFetch({ __call: 'search.getResults', q: 'Global Hits', n: '4', p: '1' }).then(res => res.results || []).catch(() => []),
     reason: `Trending discovery`
   })
 
@@ -609,7 +651,11 @@ async function handleRadio(
       const baseTitle = getBaseTitle(track.title)
       if (!baseTitle) continue
 
-      // Never suggest duplicate song titles in the same queue
+      // Never suggest the song that is currently playing or duplicate song titles
+      if (currentBaseTitle && (baseTitle === currentBaseTitle || baseTitle.includes(currentBaseTitle) || currentBaseTitle.includes(baseTitle))) {
+        continue
+      }
+
       if (seenTitles.has(baseTitle)) continue
       seenTitles.add(baseTitle)
 
@@ -625,15 +671,13 @@ async function handleRadio(
     }
   }
 
-  // If strict history exclusion depleted the pool, recycle eligible tracks to ensure non-stop playback
+  // If strict history exclusion depleted the pool, recycle eligible tracks that are not the currently playing song
   const candidatePool = validTracks.length >= 6 ? validTracks : allEligibleTracks
 
-  // Interleave artists (max 2 songs per artist) so queue is always a balanced, mixed-artist playlist
-  const mixedQueue = interleaveByArtist(candidatePool, 2)
+  // Interleave artists (max 2 songs per artist, alternate artists first) so queue is always a balanced, mixed-artist playlist
+  const mixedQueue = interleaveByArtist(candidatePool, 2, primaryArtist)
 
   return { tracks: mixedQueue.slice(0, 15) }
-}
-}
 }
 
 async function handleHomeFeed(
@@ -826,18 +870,20 @@ export default {
         if (!artist) return json({ error: 'Missing "artist"' }, 400, origin, env)
         if (artist.length > 200) return json({ error: 'Artist parameter too long (max 200 chars)' }, 400, origin, env)
 
+        const currentTitle = url.searchParams.get('currentTitle')?.trim() || ''
         const historyStr = url.searchParams.get('history')?.trim() || '[]'
         const favArtistsStr = url.searchParams.get('favArtists')?.trim() || ''
         const favSongsStr = url.searchParams.get('favSongs')?.trim() || ''
         const excludeIdsStr = url.searchParams.get('excludeIds')?.trim() || '[]'
         const likedTracksStr = url.searchParams.get('likedTracks')?.trim() || '[]'
         const smartSeedsStr = url.searchParams.get('smartSeeds')?.trim() || '[]'
+        const recentArtistsStr = url.searchParams.get('recentArtists')?.trim() || '[]'
 
         if (historyStr.length > 10000 || likedTracksStr.length > 10000) {
           return json({ error: 'History payload too large' }, 400, origin, env)
         }
 
-        return json(await handleRadio(artist, historyStr, favArtistsStr, favSongsStr, excludeIdsStr, likedTracksStr, smartSeedsStr), 200, origin, env)
+        return json(await handleRadio(artist, currentTitle, historyStr, favArtistsStr, favSongsStr, excludeIdsStr, likedTracksStr, smartSeedsStr, recentArtistsStr), 200, origin, env)
       }
 
       // GET /home-feed?history=X

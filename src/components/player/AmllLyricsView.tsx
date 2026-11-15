@@ -109,15 +109,18 @@ export function AmllLyricsView({
   return (
     <LyricsErrorBoundary resetKey={track.id} fallback={null}>
       <div
-        className="w-full h-full relative flex items-center justify-center overflow-hidden"
+        className="w-full h-full relative flex flex-col items-stretch justify-start overflow-hidden"
         style={{
           // Apple Music Custom Variables for NullWave (NullWave Neon Sky Glow + SF Typography)
           ['--highlight-color' as any]: '#ffffff',
           ['--lyplus-text-primary' as any]: '#ffffff',
-          ['--lyplus-text-secondary' as any]: 'rgba(255, 255, 255, 0.42)',
+          ['--lyplus-text-secondary' as any]: 'rgba(255, 255, 255, 0.45)',
           ['--lyplus-lyrics-palette' as any]: '#38bdf8', // NullWave signature sky blue glow
-          ['--lyplus-font-size-base' as any]: isMobile ? '1.45rem' : '2.65rem',
-          ['--lyplus-padding-line' as any]: isMobile ? '6px 12px' : '14px 24px',
+          ['--am-lyrics-font-size' as any]: isMobile ? 'clamp(1.35rem, 4.5vw, 1.75rem)' : 'clamp(2.1rem, 2.9vw, 3rem)',
+          ['--am-lyrics-padding-line' as any]: isMobile ? '8px 12px' : '14px 20px',
+          ['--am-lyrics-scroll-top' as any]: isMobile ? '30%' : '34%',
+          ['--am-lyrics-container-padding-top' as any]: isMobile ? '20vh' : '28vh',
+          ['--am-lyrics-container-padding-bottom' as any]: isMobile ? '35vh' : '44vh',
         }}
       >
         {/* @ts-expect-error am-lyrics is a custom element registered in main.tsx from @uimaxbai/am-lyrics */}
@@ -135,10 +138,8 @@ export function AmllLyricsView({
           interpolate="true"
           class="w-full h-full block"
           style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-            maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-            paddingTop: isMobile ? 'calc(18vh + env(safe-area-inset-top))' : '28vh',
-            paddingBottom: isMobile ? 'calc(26vh + env(safe-area-inset-bottom))' : '28vh',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 90%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 90%, transparent 100%)',
           }}
         />
       </div>

@@ -122,16 +122,17 @@ export function QueuePage() {
               <button
                 disabled={clearingHistory}
                 onClick={async () => {
+                  const toastId = toast.loading('Clearing playback history...')
                   try {
                     setClearingHistory(true)
                     if (user?.id) {
                       await clearPlayHistory(user.id)
                     }
                     clearHistory()
-                    toast.success('Playback history cleared')
+                    toast.success('Playback history cleared', { id: toastId })
                   } catch (err) {
                     console.warn('Failed to clear history:', err)
-                    toast.error('Failed to clear history')
+                    toast.error('Failed to clear history', { id: toastId })
                   } finally {
                     setClearingHistory(false)
                   }
@@ -151,7 +152,7 @@ export function QueuePage() {
           }
         />
         {history.length > 0 ? (
-          <div className="space-y-0.5">
+          <div className={`space-y-0.5 transition-opacity duration-200 ${clearingHistory ? 'opacity-40 pointer-events-none' : ''}`}>
             {history
               .slice()
               .reverse()

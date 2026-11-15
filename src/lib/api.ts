@@ -26,12 +26,30 @@ function joinUrl(baseUrl: string, endpoint: string): string {
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 6000): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  let onCallerAbort: (() => void) | undefined
+  if (options.signal) {
+    if (options.signal.aborted) {
+      clearTimeout(timer)
+      controller.abort()
+      throw new DOMException('The user aborted a request.', 'AbortError')
+    }
+    onCallerAbort = () => controller.abort()
+    options.signal.addEventListener('abort', onCallerAbort, { once: true })
+  }
+
   try {
     const res = await fetch(url, { ...options, signal: controller.signal })
     clearTimeout(timer)
+    if (options.signal && onCallerAbort) {
+      options.signal.removeEventListener('abort', onCallerAbort)
+    }
     return res
   } catch (err) {
     clearTimeout(timer)
+    if (options.signal && onCallerAbort) {
+      options.signal.removeEventListener('abort', onCallerAbort)
+    }
     throw err
   }
 }
@@ -248,14 +266,14 @@ export const api = {
   async stream(
     title: string,
     artist: string,
-    options?: { forceFallback?: boolean }
+    options?: { forceFallback?: boolean; signal?: AbortSignal }
   ): Promise<StreamResult> {
     const now = Date.now()
     const hasFallback = !!FALLBACK_STREAM_URL && FALLBACK_STREAM_URL !== PRIMARY_STREAM_URL
 
     async function tryFetchStream(baseUrl: string, serverTag: 'primary' | 'fallback', timeoutMs: number): Promise<StreamResult> {
       const endpoint = `/stream?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`
-      const res = await fetchWithTimeout(joinUrl(baseUrl, endpoint), {}, timeoutMs)
+      const res = await fetchWithTimeout(joinUrl(baseUrl, endpoint), { signal: options?.signal }, timeoutMs)
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error((body as { error?: string }).error || `HTTP ${res.status}`)
@@ -280,7 +298,10 @@ export const api = {
         const fallbackRes = await tryFetchStream(FALLBACK_STREAM_URL, 'fallback', 15000)
         streamFailoverState.activeServer = 'fallback'
         return fallbackRes
-      } catch (fbErr) {
+      } catch (fbErr: any) {
+        if (fbErr?.name === 'AbortError' || options?.signal?.aborted) {
+          return { streamUrl: '', error: 'Aborted', server: 'fallback' }
+        }
         return {
           streamUrl: '',
           error: fbErr instanceof Error ? fbErr.message : 'Fallback stream unavailable',
@@ -296,7 +317,12 @@ export const api = {
       streamFailoverState.primaryCooldownUntil = 0
       streamFailoverState.activeServer = 'primary'
       return primaryRes
-    } catch (primaryErr) {
+    } catch (primaryErr: any) {
+      // If the caller aborted because the user skipped to next song, do not treat server as down!
+      if (primaryErr?.name === 'AbortError' || options?.signal?.aborted) {
+        return { streamUrl: '', error: 'Aborted', server: 'primary' }
+      }
+
       console.warn(`[StreamManager] Primary stream failed for "${title}" (${primaryErr}). Attempting fallback server...`)
       streamFailoverState.primaryHealthy = false
       streamFailoverState.primaryCooldownUntil = now + 15_000 // Short 15s cooldown before re-checking primary
@@ -306,7 +332,10 @@ export const api = {
           const fallbackRes = await tryFetchStream(FALLBACK_STREAM_URL, 'fallback', 15000)
           streamFailoverState.activeServer = 'fallback'
           return fallbackRes
-        } catch (fbErr) {
+        } catch (fbErr: any) {
+          if (fbErr?.name === 'AbortError' || options?.signal?.aborted) {
+            return { streamUrl: '', error: 'Aborted', server: 'fallback' }
+          }
           console.warn('[StreamManager] Fallback stream also failed:', fbErr)
           return {
             streamUrl: '',
@@ -570,19 +599,23 @@ export const api = {
   /** Get a smart infinite radio queue with multi-tier fallback guarantee */
   async radio(params: {
     artist: string
+    currentTitle?: string
     historyTitles: string[]
     favArtists: string
     favSongs: string
+    recentArtists?: string[]
     excludeIds?: string[]
     likedTracks?: string[]
     smartSeeds?: string[]
   }): Promise<Track[]> {
     const query = new URLSearchParams({
       artist: params.artist,
-      history: JSON.stringify((params.historyTitles || []).slice(-15)),
+      currentTitle: params.currentTitle || '',
+      history: JSON.stringify((params.historyTitles || []).slice(-20)),
       favArtists: params.favArtists || '',
       favSongs: params.favSongs || '',
-      excludeIds: JSON.stringify((params.excludeIds || []).slice(-30)),
+      recentArtists: JSON.stringify((params.recentArtists || []).slice(-6)),
+      excludeIds: JSON.stringify((params.excludeIds || []).slice(-35)),
       likedTracks: JSON.stringify((params.likedTracks || []).slice(-15)),
       smartSeeds: JSON.stringify((params.smartSeeds || []).slice(-5)),
     })
@@ -595,35 +628,62 @@ export const api = {
       // Fall through to client-side multi-tier fallbacks
     }
 
-    // MULTI-TIER FALLBACK 1: Search by clean primary artist
+    // MULTI-TIER FALLBACK: Diverse blend (Primary artist max 2 + Favorite/Recent artist + Global Hits)
     try {
+      const results: Track[] = []
+      const seenTitles = new Set<string>()
       const cleanArtist = (params.artist || '').split(/[,&/]/)[0].replace(/\s*(feat|ft)\.?.*$/gi, '').trim()
+      const excludeSet = new Set(params.excludeIds || [])
+
+      // 1. Primary artist (max 2 songs)
       if (cleanArtist) {
-        const res = await api.search(cleanArtist)
-        if (res.tracks && res.tracks.length > 0) {
-          const excludeSet = new Set(params.excludeIds || [])
-          const fresh = res.tracks.filter(t => !excludeSet.has(t.id))
-          if (fresh.length > 0) return fresh.slice(0, 15)
-          return res.tracks.slice(0, 15)
+        const res = await api.search(cleanArtist).catch(() => ({ tracks: [] }))
+        let added = 0
+        for (const t of res.tracks || []) {
+          if (added >= 2) break
+          if (!excludeSet.has(t.id) && !seenTitles.has(t.title.toLowerCase())) {
+            seenTitles.add(t.title.toLowerCase())
+            results.push(t)
+            added++
+          }
         }
       }
-    } catch {}
 
-    // MULTI-TIER FALLBACK 2: Search by user's declared favorite artist, favorite song, or top hits
-    try {
-      const fav = (params.favArtists || params.favSongs || 'Top Hits').split(',')[0].trim()
-      const res = await api.search(fav)
-      if (res.tracks && res.tracks.length > 0) {
-        return res.tracks.slice(0, 15)
-      }
-    } catch {}
+      // 2. User's other favorite or recent artists
+      const altArtists = [
+        ...(params.favArtists ? params.favArtists.split(',') : []),
+        ...(params.recentArtists || []),
+        'The Weeknd',
+        'Tame Impala',
+        'Dua Lipa',
+      ]
+        .map(a => a.trim())
+        .filter(a => a && a.toLowerCase() !== cleanArtist.toLowerCase())
 
-    // MULTI-TIER FALLBACK 3: Global Top Hits
-    try {
-      const globalRes = await api.search('Global Top Hits')
-      if (globalRes.tracks && globalRes.tracks.length > 0) {
-        return globalRes.tracks.slice(0, 15)
+      for (const alt of altArtists.slice(0, 3)) {
+        const altRes = await api.search(alt).catch(() => ({ tracks: [] }))
+        let added = 0
+        for (const t of altRes.tracks || []) {
+          if (added >= 2) break
+          if (!excludeSet.has(t.id) && !seenTitles.has(t.title.toLowerCase())) {
+            seenTitles.add(t.title.toLowerCase())
+            results.push(t)
+            added++
+          }
+        }
       }
+
+      // 3. Global Top Hits to complete queue
+      const globalRes = await api.search('Global Top Hits').catch(() => ({ tracks: [] }))
+      for (const t of globalRes.tracks || []) {
+        if (results.length >= 12) break
+        if (!excludeSet.has(t.id) && !seenTitles.has(t.title.toLowerCase())) {
+          seenTitles.add(t.title.toLowerCase())
+          results.push(t)
+        }
+      }
+
+      if (results.length > 0) return results
     } catch {}
 
     return []

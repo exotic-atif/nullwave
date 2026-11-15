@@ -127,6 +127,7 @@ export function LibraryPage() {
                 <button
                   disabled={isClearingHistory}
                   onClick={async () => {
+                    const toastId = toast.loading('Clearing playback history...')
                     try {
                       setIsClearingHistory(true)
                       if (user?.id) {
@@ -134,10 +135,10 @@ export function LibraryPage() {
                       }
                       useQueueStore.getState().clearHistory()
                       setHistory([])
-                      toast.success('Playback history cleared')
+                      toast.success('Playback history cleared', { id: toastId })
                     } catch (err) {
                       console.warn('Failed to clear history:', err)
-                      toast.error('Failed to clear history')
+                      toast.error('Failed to clear history', { id: toastId })
                     } finally {
                       setIsClearingHistory(false)
                     }
@@ -160,7 +161,7 @@ export function LibraryPage() {
                 {Array.from({ length: 5 }).map((_, i) => <TrackRowSkeleton key={i} />)}
               </div>
             ) : history.length > 0 ? (
-              <div className="space-y-0.5">
+              <div className={`space-y-0.5 transition-opacity duration-200 ${isClearingHistory ? 'opacity-40 pointer-events-none' : ''}`}>
                 {history.map((track, i) => (
                   <div key={`hist-${track.id}-${i}`} className="group relative">
                     <TrackRow track={track} index={i + 1} showIndex className="pr-12" />

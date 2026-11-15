@@ -30,6 +30,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FullScreenPlayer } from './FullScreenPlayer'
 
+function getBaseTitle(title: string): string {
+  return (title || '')
+    .replace(/\[.*?\]|\(.*?\)/g, '')
+    .replace(/\s*-\s*(feat|ft|official|audio|video|remaster(?:ed)?|sped\s+up|slowed|instrumental).*$/gi, '')
+    .split('-')[0]
+    .replace(/[^\w\s]/gi, '')
+    .trim()
+    .toLowerCase()
+}
+
 export function Player() {
   const navigate = useNavigate()
   const {
@@ -63,6 +73,8 @@ export function Player() {
   const lastHistoryKey = useRef<string | null>(null)
   const preloadedTrackRef = useRef<{ id: string; streamUrl: string } | null>(null)
   const isPreloadingRef = useRef<boolean>(false)
+  const streamAbortControllerRef = useRef<AbortController | null>(null)
+  const streamDebounceTimerRef = useRef<number | null>(null)
   
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverPos, setHoverPos] = useState<number>(0)
@@ -100,7 +112,7 @@ export function Player() {
     })
   }, [isDragging])
 
-  // When current track changes, load audio stream + fetch lyrics
+  // When current track changes, load audio stream + fetch lyrics (with 280ms debounce and active cancellation)
   useEffect(() => {
     if (!currentTrack) return
 
@@ -116,44 +128,70 @@ export function Player() {
     }
     lastRecordedTrack.current = track.id
 
-    let cancelled = false
-    const healthPendingTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setStreamStatus('Waiting for the stream server to respond...')
-      }
-    }, 5000)
-    const longHealthPendingTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setStreamStatus('The stream server has not responded yet.')
-      }
-    }, 25000)
-    
-    // Stop and clear audio source immediately to prevent old track from resuming
+    // Cancel any pending debounce timer immediately
+    if (streamDebounceTimerRef.current) {
+      window.clearTimeout(streamDebounceTimerRef.current)
+      streamDebounceTimerRef.current = null
+    }
+
+    // Abort any in-flight stream fetch so rapid skips never overload the stream server
+    if (streamAbortControllerRef.current) {
+      streamAbortControllerRef.current.abort()
+      streamAbortControllerRef.current = null
+    }
+
+    // Stop and clear audio source immediately
     audioManager.stop()
+
+    // Fast-path: If next track was already pre-buffered during the 15s window, play immediately without debounce
+    if (preloadedTrackRef.current && preloadedTrackRef.current.id === track.id) {
+      const preloadedUrl = preloadedTrackRef.current.streamUrl
+      preloadedTrackRef.current = null
+      setStreamStatus('Buffering audio...')
+      audioManager.playUrl(preloadedUrl).then(() => {
+        if (!usePlayerStore.getState().isPlaying) {
+          audioManager.pause()
+        }
+      })
+      return
+    }
+
+    preloadedTrackRef.current = null
     setStreamStatus('Finding audio...')
 
-    async function loadStream() {
-      try {
-        let streamUrl = ''
-        let via = ''
-        let streamError = ''
+    const abortController = new AbortController()
+    streamAbortControllerRef.current = abortController
 
-        // Check if next track was pre-buffered during the 15s window
-        if (preloadedTrackRef.current && preloadedTrackRef.current.id === track.id) {
-          streamUrl = preloadedTrackRef.current.streamUrl
-          preloadedTrackRef.current = null
-        } else {
-          preloadedTrackRef.current = null
-          const result = await api.stream(track.title, track.artist)
-          if (cancelled) return
-          streamUrl = result.streamUrl || ''
-          via = result.server === 'fallback' ? ' (backup)' : ''
-          streamError = result.error || ''
+    let cancelled = false
+    let healthPendingTimer: number | null = null
+    let longHealthPendingTimer: number | null = null
+
+    // 280ms debounce on track changes protects backend stream server from rapid skip spam
+    streamDebounceTimerRef.current = window.setTimeout(async () => {
+      if (cancelled || abortController.signal.aborted) return
+
+      healthPendingTimer = window.setTimeout(() => {
+        if (!cancelled && !abortController.signal.aborted) {
+          setStreamStatus('Waiting for the stream server to respond...')
         }
+      }, 5000)
 
-        window.clearTimeout(healthPendingTimer)
-        window.clearTimeout(longHealthPendingTimer)
-        if (cancelled) return
+      longHealthPendingTimer = window.setTimeout(() => {
+        if (!cancelled && !abortController.signal.aborted) {
+          setStreamStatus('The stream server has not responded yet.')
+        }
+      }, 25000)
+
+      try {
+        const result = await api.stream(track.title, track.artist, { signal: abortController.signal })
+        if (cancelled || abortController.signal.aborted) return
+
+        if (healthPendingTimer) window.clearTimeout(healthPendingTimer)
+        if (longHealthPendingTimer) window.clearTimeout(longHealthPendingTimer)
+
+        const streamUrl = result.streamUrl || ''
+        const via = result.server === 'fallback' ? ' (backup)' : ''
+        const streamError = result.error || ''
 
         if (streamUrl) {
           setStreamStatus(`Buffering audio${via}...`)
@@ -173,10 +211,10 @@ export function Player() {
           setStreamStatus(streamError || 'No audio stream available for this track.')
           usePlayerStore.getState().setIsLoadingStream(false)
         }
-      } catch {
-        window.clearTimeout(healthPendingTimer)
-        window.clearTimeout(longHealthPendingTimer)
-        if (cancelled) return
+      } catch (err: any) {
+        if (healthPendingTimer) window.clearTimeout(healthPendingTimer)
+        if (longHealthPendingTimer) window.clearTimeout(longHealthPendingTimer)
+        if (cancelled || abortController.signal.aborted || err?.name === 'AbortError') return
 
         if (track.audioUrl) {
           setStreamStatus('Stream servers unavailable. Playing preview.')
@@ -190,15 +228,17 @@ export function Player() {
           usePlayerStore.getState().setIsLoadingStream(false)
         }
       }
-    }
-
-    loadStream()
-
+    }, 280)
 
     return () => {
       cancelled = true
-      window.clearTimeout(healthPendingTimer)
-      window.clearTimeout(longHealthPendingTimer)
+      if (streamDebounceTimerRef.current) {
+        window.clearTimeout(streamDebounceTimerRef.current)
+        streamDebounceTimerRef.current = null
+      }
+      if (healthPendingTimer) window.clearTimeout(healthPendingTimer)
+      if (longHealthPendingTimer) window.clearTimeout(longHealthPendingTimer)
+      abortController.abort()
     }
   }, [currentTrack?.id])
 
@@ -335,11 +375,20 @@ export function Player() {
         .filter(t => smartSeedIds.includes(t.id))
         .map(t => `${t.title} ${t.artist}`)
 
+      const cleanCurrentArtist = current.artist.split(/[,&/]/)[0].trim().toLowerCase()
+      const recentArtists = [...new Set(
+        history
+          .map(t => t.artist.split(/[,&/]/)[0].trim())
+          .filter(a => a && a.toLowerCase() !== cleanCurrentArtist)
+      )].slice(-6)
+
       const tracks = await api.radio({
         artist: current.artist,
+        currentTitle: current.title,
         historyTitles: history.map(t => t.title),
         favArtists: user?.favArtists || '',
         favSongs: user?.favSongs || '',
+        recentArtists,
         excludeIds: [...dislikedTracks, current.id, ...queue.map(t => t.id)],
         likedTracks: likedTracks.map(t => t.title),
         smartSeeds: seeds,
@@ -347,13 +396,29 @@ export function Player() {
 
       if (tracks && tracks.length > 0) {
         const currentQ = useQueueStore.getState().queue
-        const currentKnown = new Set([
+        const currentKnownIds = new Set([
           usePlayerStore.getState().currentTrack?.id,
           ...currentQ.map(t => t.id),
           ...dislikedTracks,
         ])
-        const fresh = tracks.filter(t => !currentKnown.has(t.id))
-        const candidates = fresh.length > 0 ? fresh : tracks
+
+        const playingBaseTitle = getBaseTitle(usePlayerStore.getState().currentTrack?.title || '')
+        const currentKnownTitles = new Set([
+          playingBaseTitle,
+          ...currentQ.map(t => getBaseTitle(t.title)),
+          ...history.slice(-30).map(t => getBaseTitle(t.title)),
+        ])
+
+        const fresh = tracks.filter(t => {
+          if (currentKnownIds.has(t.id)) return false
+          const bt = getBaseTitle(t.title)
+          if (!bt) return false
+          if (playingBaseTitle && (bt === playingBaseTitle || bt.includes(playingBaseTitle) || playingBaseTitle.includes(bt))) return false
+          if (currentKnownTitles.has(bt)) return false
+          return true
+        })
+
+        const candidates = fresh.length > 0 ? fresh : tracks.filter(t => !currentKnownIds.has(t.id))
         useQueueStore.getState().addMultipleToQueue(candidates.slice(0, 10))
       }
     } catch (err) {
