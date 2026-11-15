@@ -1,13 +1,14 @@
 import React, { Component, useEffect, useRef, type ReactNode } from 'react'
 import type { Track } from '@/types'
+import { audioManager } from '@/lib/audio'
 
 /**
  * Clean track title and artist name for 100% match rate on LyricsPlus & Apple Music catalogs
  */
 export function cleanTrackTitle(title: string): string {
   return (title || '')
-    .replace(/\s*[\(\[](feat|ft|official|audio|video|lyrics?|remaster(?:ed)?|from\s+"[^"]+").*?[\)\]]/gi, '')
-    .replace(/\s*-\s*(feat|ft|official|audio|video|remaster(?:ed)?).*$/gi, '')
+    .replace(/\s*[\(\[](feat|ft|official|audio|video|lyrics?|remaster(?:ed)?|radio\s+edit|extended|deluxe|bonus|from\s+"[^"]+").*?[\)\]]/gi, '')
+    .replace(/\s*-\s*(feat|ft|official|audio|video|remaster(?:ed)?|radio\s+edit|extended).*$/gi, '')
     .trim()
 }
 
@@ -71,18 +72,42 @@ interface AmllLyricsViewProps {
 export function AmllLyricsView({
   track,
   currentTime,
+  isPlaying = false,
   onSeek,
   isMobile = false,
 }: AmllLyricsViewProps) {
   const amLyricsRef = useRef<HTMLElement>(null)
 
-  // Sync am-lyrics time with audio progress (am-lyrics expects milliseconds)
+  // Direct High-Precision RequestAnimationFrame Loop for Buttery Smooth 60/120FPS Word-by-Word Character Wipe
   useEffect(() => {
-    const el = amLyricsRef.current as any
-    if (el) {
-      el.currentTime = Math.round(currentTime * 1000)
+    let animId: number
+    let lastSetMs = -1
+
+    const syncLoop = () => {
+      const el = amLyricsRef.current as any
+      if (el && isPlaying) {
+        const curMs = Math.round(audioManager.currentTime * 1000)
+        if (Math.abs(curMs - lastSetMs) >= 16) {
+          lastSetMs = curMs
+          el.currentTime = curMs
+        }
+      }
+      animId = requestAnimationFrame(syncLoop)
     }
-  }, [currentTime])
+
+    if (isPlaying) {
+      animId = requestAnimationFrame(syncLoop)
+    } else {
+      const el = amLyricsRef.current as any
+      if (el) {
+        el.currentTime = Math.round(currentTime * 1000)
+      }
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId)
+    }
+  }, [isPlaying, currentTime])
 
   // Handle line click seek events dispatched by am-lyrics
   useEffect(() => {
@@ -104,23 +129,23 @@ export function AmllLyricsView({
   const cleanTitle = cleanTrackTitle(track.title)
   const cleanArtist = cleanArtistName(track.artist)
   const cleanQuery = `${cleanTitle} ${cleanArtist}`
-  const durationMs = track.duration ? Math.round(track.duration * 1000) : undefined
 
   return (
     <LyricsErrorBoundary resetKey={track.id} fallback={null}>
       <div
         className="w-full h-full relative flex flex-col items-stretch justify-start overflow-hidden"
         style={{
-          // Apple Music Custom Variables for NullWave (NullWave Neon Sky Glow + SF Typography)
+          // Apple Music Signature Variables (SF Typography, NullWave Neon Sky Glow & Viewport Centering)
           ['--highlight-color' as any]: '#ffffff',
           ['--lyplus-text-primary' as any]: '#ffffff',
           ['--lyplus-text-secondary' as any]: 'rgba(255, 255, 255, 0.45)',
           ['--lyplus-lyrics-palette' as any]: '#38bdf8', // NullWave signature sky blue glow
-          ['--am-lyrics-font-size' as any]: isMobile ? 'clamp(1.35rem, 4.5vw, 1.75rem)' : 'clamp(2.1rem, 2.9vw, 3rem)',
-          ['--am-lyrics-padding-line' as any]: isMobile ? '8px 12px' : '14px 20px',
-          ['--am-lyrics-scroll-top' as any]: isMobile ? '30%' : '34%',
-          ['--am-lyrics-container-padding-top' as any]: isMobile ? '20vh' : '28vh',
-          ['--am-lyrics-container-padding-bottom' as any]: isMobile ? '35vh' : '44vh',
+          ['--am-lyrics-font-size' as any]: isMobile ? 'clamp(1.75rem, 6vw, 2.35rem)' : 'clamp(2.4rem, 3.6vw, 3.6rem)',
+          ['--am-lyrics-line-height' as any]: isMobile ? '1.3' : '1.32',
+          ['--am-lyrics-padding-line' as any]: isMobile ? '12px 14px' : '16px 24px',
+          ['--am-lyrics-scroll-top' as any]: isMobile ? '38%' : '36%',
+          ['--am-lyrics-container-padding-top' as any]: isMobile ? '36vh' : '30vh',
+          ['--am-lyrics-container-padding-bottom' as any]: isMobile ? '50vh' : '44vh',
         }}
       >
         {/* @ts-expect-error am-lyrics is a custom element registered in main.tsx from @uimaxbai/am-lyrics */}
@@ -129,8 +154,6 @@ export function AmllLyricsView({
           ref={amLyricsRef}
           song-title={cleanTitle}
           song-artist={cleanArtist}
-          song-album={track.album || ''}
-          song-duration={durationMs}
           query={cleanQuery}
           highlight-color="#ffffff"
           hover-background-color="rgba(255, 255, 255, 0.12)"
@@ -138,8 +161,8 @@ export function AmllLyricsView({
           interpolate="true"
           class="w-full h-full block"
           style={{
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 90%, transparent 100%)',
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 90%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
           }}
         />
       </div>

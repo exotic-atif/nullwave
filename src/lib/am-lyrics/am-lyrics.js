@@ -348,7 +348,6 @@ function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
 }
 const KPOE_SERVERS = [
     'https://lyricsplus.binimum.org',
-    'https://lyrics-plus-backend.vercel.app',
 ];
 const DEFAULT_KPOE_SOURCE_ORDER = 'apple,lyricsplus,musixmatch,spotify,qq,deezer,musixmatch-word';
 const GENIUS_WORKER_URL = 'https://fetch-genius.samidy.workers.dev/';
@@ -1040,64 +1039,6 @@ class AmLyrics extends i {
         return null;
     }
     static async fetchLyricsFromBiniLyrics(title, artist, isrc, metadata = {}) {
-        if ((!title || !artist) && !isrc)
-            return null;
-        try {
-            let cacheData = null;
-            if (isrc) {
-                try {
-                    const isrcUrl = `https://lyrics-api.binimum.org/?isrc=${encodeURIComponent(isrc)}`;
-                    const isrcRes = await fetchWithTimeout(isrcUrl);
-                    if (isrcRes.ok) {
-                        const data = await isrcRes.json();
-                        if (data.results && data.results.length > 0) {
-                            cacheData = data;
-                        }
-                    }
-                }
-                catch {
-                    // Fall through to title/artist search
-                }
-            }
-            if (!cacheData && title && artist) {
-                const cacheParams = new URLSearchParams({
-                    track: title,
-                    artist,
-                });
-                if (metadata.album) {
-                    cacheParams.append('album', metadata.album);
-                }
-                if (metadata.durationMs && metadata.durationMs > 0) {
-                    cacheParams.append('duration', Math.round(metadata.durationMs / 1000).toString());
-                }
-                const cacheUrl = `https://lyrics-api.binimum.org/?${cacheParams.toString()}`;
-                const cacheRes = await fetchWithTimeout(cacheUrl);
-                if (cacheRes.ok) {
-                    cacheData = await cacheRes.json();
-                }
-            }
-            if (cacheData && cacheData.results && cacheData.results.length > 0) {
-                const result = cacheData.results[0];
-                if (result.lyricsUrl) {
-                    const ttmlRes = await fetchWithTimeout(result.lyricsUrl);
-                    if (ttmlRes.ok) {
-                        const ttmlText = await ttmlRes.text();
-                        const parseResult = AmLyrics.parseTTML(ttmlText);
-                        if (parseResult && parseResult.lines.length > 0) {
-                            return {
-                                lines: parseResult.lines,
-                                source: 'BiniLyrics',
-                                songwriters: parseResult.songwriters,
-                            };
-                        }
-                    }
-                }
-            }
-        }
-        catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('Cache API failed', e);
-        }
         return null;
     }
     static async fetchLyricsFromYouLyPlus(title, artist, isrc, metadata = {}, skipBiniCache = false) {
@@ -1110,12 +1051,6 @@ class AmLyrics extends i {
             params.append('artist', artist);
         if (isrc)
             params.append('isrc', isrc);
-        if (metadata.album) {
-            params.append('album', metadata.album);
-        }
-        if (metadata.durationMs && metadata.durationMs > 0) {
-            params.append('duration', Math.round(metadata.durationMs / 1000).toString());
-        }
         if (!DEFAULT_KPOE_SOURCE_ORDER.includes('apple')) {
             params.append('source', DEFAULT_KPOE_SOURCE_ORDER);
         }
@@ -4995,7 +4930,7 @@ AmLyrics.styles = i$3 `
         -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
         system-ui, -apple-system-subheadline, "Helvetica Neue", sans-serif;
       letter-spacing: -0.02em;
-      line-height: 1.25;
+      line-height: var(--am-lyrics-line-height, 1.28);
       background: transparent;
       height: 100%;
       width: 100%;
@@ -5301,32 +5236,62 @@ AmLyrics.styles = i$3 `
       display: inline-block;
       vertical-align: baseline;
       white-space: nowrap;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word:last-child {
+      margin-right: 0;
     }
 
     .lyrics-word.allow-break {
       display: inline;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word.allow-break:last-child {
+      margin-right: 0;
     }
 
     .lyrics-word.char-rise {
       display: inline-block;
       vertical-align: baseline;
       white-space: nowrap;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word.char-rise:last-child {
+      margin-right: 0;
     }
 
     .lyrics-word.char-drag {
       display: inline-block;
       vertical-align: baseline;
       white-space: nowrap;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word.char-drag:last-child {
+      margin-right: 0;
     }
 
     .lyrics-word.char-rise.allow-break {
       display: inline;
       white-space: normal;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word.char-rise.allow-break:last-child {
+      margin-right: 0;
     }
 
     .lyrics-word.char-drag.allow-break {
       display: inline;
       white-space: normal;
+      margin-right: 0.28em;
+    }
+
+    .lyrics-word.char-drag.allow-break:last-child {
+      margin-right: 0;
     }
 
     .lyrics-syllable-wrap {
