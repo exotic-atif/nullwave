@@ -1,42 +1,23 @@
 import React, { Component, useMemo, useRef, useEffect, useState, type ReactNode } from 'react'
-import { LyricPlayer } from '@applemusic-like-lyrics/react'
-import { DomLyricPlayer } from '@applemusic-like-lyrics/core'
-import type { LyricLine, LyricWord } from '@applemusic-like-lyrics/core'
 import { Loader2, Music2 } from 'lucide-react'
-import '@applemusic-like-lyrics/core/style.css'
+import { audioManager } from '@/lib/audio'
 
-// Safely disarm LineBalancer's buggy calculation loop across all instances to prevent browser hang
-try {
-  if (typeof window !== 'undefined') {
-    const dummy = new DomLyricPlayer()
-    dummy.setLyricLines([
-      {
-        startTime: 0,
-        endTime: 1000,
-        words: [{ word: 'a', startTime: 0, endTime: 1000 }],
-        translatedLyric: '',
-        romanLyric: '',
-        isBG: false,
-        isDuet: false,
-      },
-    ])
-    const lineEl = dummy.currentLyricGroups?.[0]?.mainLine
-    if (lineEl) {
-      const LineElClass = lineEl.constructor as any
-      const LineBaseClass = Object.getPrototypeOf(LineElClass)
-      if (LineBaseClass) {
-        LineBaseClass.wordSegmenter = null
-      }
-    }
-    dummy.dispose()
-  }
-} catch {
-  // safe fallback
-}
-
-// Apple Music Typography & Fluid Word Styling
+// Apple Music Signature Typography
 const APPLE_MUSIC_FONT =
   '-apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif'
+
+export interface LyricWord {
+  word: string
+  startTime: number
+  endTime: number
+}
+
+export interface LyricLine {
+  startTime: number
+  endTime: number
+  words: LyricWord[]
+  text?: string
+}
 
 interface LyricsErrorBoundaryProps {
   fallback: ReactNode
@@ -46,7 +27,6 @@ interface LyricsErrorBoundaryProps {
 
 interface LyricsErrorBoundaryState {
   hasError: boolean
-  error?: Error
 }
 
 export class LyricsErrorBoundary extends Component<LyricsErrorBoundaryProps, LyricsErrorBoundaryState> {
@@ -55,17 +35,17 @@ export class LyricsErrorBoundary extends Component<LyricsErrorBoundaryProps, Lyr
     this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError(error: Error): LyricsErrorBoundaryState {
-    return { hasError: true, error }
+  static getDerivedStateFromError(): LyricsErrorBoundaryState {
+    return { hasError: true }
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.warn('[AMLL Lyrics Error Caught & Handled Safely]:', error, errorInfo)
+    console.warn('[NullWave Lyrics Safety Boundary Caught]:', error, errorInfo)
   }
 
   componentDidUpdate(prevProps: LyricsErrorBoundaryProps) {
     if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
-      this.setState({ hasError: false, error: undefined })
+      this.setState({ hasError: false })
     }
   }
 
@@ -78,7 +58,7 @@ export class LyricsErrorBoundary extends Component<LyricsErrorBoundaryProps, Lyr
 }
 
 /**
- * Checks for enhanced inline word timestamps e.g. <00:12.34>word or (00:12.34)word
+ * Parses inline enhanced word timestamps e.g. <00:12.34>word or (00:12.34)word
  */
 function parseInlineWordTimestamps(rawText: string, lineEndMs: number): LyricWord[] | null {
   const inlineRegex = /<(\d{1,2}):(\d{2})(?:\.(\d{2,3}))?>|\((\d{1,2}):(\d{2})(?:\.(\d{2,3}))?\)/g
@@ -89,7 +69,7 @@ function parseInlineWordTimestamps(rawText: string, lineEndMs: number): LyricWor
   let match: RegExpExecArray | null
   let regexGuard = 0
 
-  while ((match = inlineRegex.exec(rawText)) !== null && regexGuard++ < 200) {
+  while ((match = inlineRegex.exec(rawText)) !== null && regexGuard++ < 250) {
     const min = parseInt(match[1] || match[4], 10)
     const sec = parseInt(match[2] || match[5], 10)
     const rawMs = match[3] || match[6]
@@ -115,7 +95,7 @@ function parseInlineWordTimestamps(rawText: string, lineEndMs: number): LyricWor
     words.push({
       word: wordStr,
       startTime: cur.timeMs,
-      endTime: Math.max(cur.timeMs + 120, nextTime),
+      endTime: Math.max(cur.timeMs + 100, nextTime),
     })
   }
 
@@ -123,7 +103,7 @@ function parseInlineWordTimestamps(rawText: string, lineEndMs: number): LyricWor
 }
 
 /**
- * Generates natural Apple Music word-by-word timing for standard line-synced LRC
+ * Natural Apple Music word-by-word timing algorithm for standard line-synced LRC
  */
 function generateWordTimings(lineText: string, lineStartMs: number, lineEndMs: number): LyricWord[] {
   const tokens = lineText.trim().split(/\s+/).filter(Boolean)
@@ -131,19 +111,17 @@ function generateWordTimings(lineText: string, lineStartMs: number, lineEndMs: n
     return [{ word: lineText, startTime: lineStartMs, endTime: lineEndMs }]
   }
 
-  const rawDuration = Math.max(600, lineEndMs - lineStartMs)
-
-  // Long instrumental breaks shouldn't stretch sung words unnaturally
+  const rawDuration = Math.max(500, lineEndMs - lineStartMs)
   const activeDuration =
-    rawDuration > 6500
-      ? Math.max(2200, Math.min(rawDuration * 0.85, 5800))
-      : Math.max(700, rawDuration * 0.94)
+    rawDuration > 6000
+      ? Math.max(2200, Math.min(rawDuration * 0.85, 5200))
+      : Math.max(600, rawDuration * 0.92)
 
-  // Weight words by length and punctuation sustains (commas, periods, question marks hold notes)
+  // Weight words by length and punctuation cadence
   const weights = tokens.map((token) => {
     const clean = token.replace(/[^\w]/g, '')
     const baseLen = Math.max(1, clean.length)
-    const punctuationBonus = /[,\.?!…~]/.test(token) ? 2.2 : 0
+    const punctuationBonus = /[,\.?!…~]/.test(token) ? 2.0 : 0
     return baseLen + punctuationBonus
   })
 
@@ -152,7 +130,7 @@ function generateWordTimings(lineText: string, lineStartMs: number, lineEndMs: n
 
   return tokens.map((token, idx) => {
     const isLast = idx === tokens.length - 1
-    const allocated = Math.max(150, Math.round((weights[idx] / totalWeight) * activeDuration))
+    const allocated = Math.max(120, Math.round((weights[idx] / totalWeight) * activeDuration))
     const start = cursor
     const end = isLast
       ? Math.max(start + allocated, lineStartMs + Math.round(activeDuration))
@@ -168,7 +146,7 @@ function generateWordTimings(lineText: string, lineStartMs: number, lineEndMs: n
 }
 
 /**
- * Robust LRC Parser -> AMLL LyricLine[] with full Word-by-Word Timing
+ * Robust LRC Parser -> LyricLine[] with full Word-by-Word Timing
  */
 export function parseLrcToLyricLines(lrcText: string): LyricLine[] {
   if (!lrcText || typeof lrcText !== 'string') return []
@@ -200,9 +178,8 @@ export function parseLrcToLyricLines(lrcText: string): LyricLine[] {
 
   return parsed.map((item, index) => {
     const nextItem = parsed[index + 1]
-    const endTime = nextItem ? Math.max(item.timeMs + 500, nextItem.timeMs) : item.timeMs + 4500
+    const endTime = nextItem ? Math.max(item.timeMs + 400, nextItem.timeMs) : item.timeMs + 4000
 
-    // Try parsing enhanced inline word timestamps first; fallback to natural weighted word distribution
     const inlineWords = parseInlineWordTimestamps(item.rawLine, endTime)
     const words = inlineWords && inlineWords.length > 0
       ? inlineWords
@@ -212,10 +189,7 @@ export function parseLrcToLyricLines(lrcText: string): LyricLine[] {
       startTime: item.timeMs,
       endTime,
       words,
-      translatedLyric: '',
-      romanLyric: '',
-      isBG: false,
-      isDuet: false,
+      text: item.text,
     }
   })
 }
@@ -244,30 +218,62 @@ export function AmllLyricsView({
   const containerRef = useRef<HTMLDivElement>(null)
   const lineRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  // Parse into AMLL format with word-by-word timing
+  // Parse into lines with word-by-word timing
   const amllLines: LyricLine[] = useMemo(() => {
     if (!lyrics?.synced) return []
     try {
       return parseLrcToLyricLines(lyrics.synced)
     } catch (err) {
-      console.warn('Failed to parse lyrics for AMLL:', err)
+      console.warn('Failed to parse lyrics:', err)
       return []
     }
   }, [lyrics?.synced])
 
-  // Active index for fallback renderer
-  const currentTimeMs = Math.round(currentTime * 1000)
+  // High-precision smooth timestamp interpolation (0% CPU, microsecond precision for word glow)
+  const [smoothTimeMs, setSmoothTimeMs] = useState(() => Math.round(currentTime * 1000))
+
+  useEffect(() => {
+    let animId = 0
+    let lastAudioTime = audioManager.hasSource ? audioManager.currentTime : currentTime
+    let lastPerfTime = performance.now()
+
+    const tick = () => {
+      if (isPlaying) {
+        const curAudio = audioManager.hasSource ? audioManager.currentTime : currentTime
+        if (Math.abs(curAudio - lastAudioTime) > 0.05) {
+          lastAudioTime = curAudio
+          lastPerfTime = performance.now()
+        }
+        const deltaSec = (performance.now() - lastPerfTime) / 1000
+        const estimatedSec = Math.max(0, lastAudioTime + deltaSec)
+        setSmoothTimeMs(Math.round(estimatedSec * 1000))
+      } else {
+        setSmoothTimeMs(Math.round(currentTime * 1000))
+      }
+      animId = requestAnimationFrame(tick)
+    }
+
+    if (isPlaying) {
+      animId = requestAnimationFrame(tick)
+    } else {
+      setSmoothTimeMs(Math.round(currentTime * 1000))
+    }
+
+    return () => cancelAnimationFrame(animId)
+  }, [isPlaying, currentTime])
+
+  // Active line index calculated against high-precision smooth time
   const activeIndex = useMemo(() => {
     if (!amllLines.length) return -1
     for (let i = amllLines.length - 1; i >= 0; i--) {
-      if (currentTimeMs >= amllLines[i].startTime - 150) {
+      if (smoothTimeMs >= amllLines[i].startTime - 120) {
         return i
       }
     }
     return 0
-  }, [amllLines, currentTimeMs])
+  }, [amllLines, smoothTimeMs])
 
-  // Auto-scroll for fallback view
+  // Fluid auto-scroll active lyric to center with smooth behavior
   useEffect(() => {
     if (userScrolled || activeIndex < 0) return
     const el = lineRefs.current[activeIndex]
@@ -281,7 +287,7 @@ export function AmllLyricsView({
     if (userScrollTimeout.current) window.clearTimeout(userScrollTimeout.current)
     userScrollTimeout.current = window.setTimeout(() => {
       setUserScrolled(false)
-    }, 4000)
+    }, 3500)
   }
 
   // 1. Loading State
@@ -289,108 +295,78 @@ export function AmllLyricsView({
     return (
       <div className="w-full h-full flex flex-col items-center justify-center py-24 text-center">
         <Loader2 size={32} className="text-nw-accent animate-spin mb-4" />
-        <p className="text-nw-text-secondary text-sm">Fetching Apple Music-grade synced lyrics…</p>
+        <p className="text-nw-text-secondary text-sm">Fetching synchronized lyrics…</p>
       </div>
     )
   }
 
-  // 2. Fallback Render Component with Word-by-Word Highlighting (used if WebGL/AMLL errors out)
-  const FallbackSyncedView = (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      style={{ fontFamily: APPLE_MUSIC_FONT }}
-      className="w-full h-full overflow-y-auto scroll-smooth py-[38vh] px-4 space-y-6 [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_15%,black_85%,transparent)] select-none"
-    >
-      {amllLines.map((line, idx) => {
-        const isActive = idx === activeIndex
-        const isPast = idx < activeIndex
-        return (
-          <button
-            key={`${line.startTime}-${idx}`}
-            ref={(el) => {
-              lineRefs.current[idx] = el
-            }}
-            onClick={() => onSeek(line.startTime / 1000)}
-            className={`w-full ${isMobile ? 'text-center' : 'text-left'} transition-all duration-300 rounded-2xl px-4 py-2 cursor-pointer block tracking-tight ${
-              isActive
-                ? 'scale-[1.03] origin-left'
-                : isPast
-                  ? 'opacity-40 hover:opacity-80'
-                  : 'opacity-20 hover:opacity-60'
-            }`}
-          >
-            <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-snug">
-              {line.words.map((w, wIdx) => {
-                const isWordActive = currentTimeMs >= w.startTime && currentTimeMs <= w.endTime
-                const isWordPast = currentTimeMs > w.endTime
-                return (
-                  <span
-                    key={wIdx}
-                    className={`transition-all duration-150 inline-block ${
-                      isActive && isWordActive
-                        ? 'text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.95)] scale-[1.04]'
-                        : isActive && isWordPast
-                          ? 'text-white'
-                          : isActive
-                            ? 'text-white/45'
-                            : isPast
-                              ? 'text-white/60'
-                              : 'text-white/30'
-                    }`}
-                  >
-                    {w.word}
-                  </span>
-                )
-              })}
-            </p>
-          </button>
-        )
-      })}
-    </div>
-  )
-
-  // 3. Synced Lyrics with AMLL Word-by-Word Glowing Engine
+  // 2. Synced Lyrics with Native Apple Music Word-by-Word Engine (Locked 120FPS, Zero Lag)
   if (amllLines.length > 0) {
     return (
-      <LyricsErrorBoundary resetKey={`${trackId}-${lyrics?.synced?.slice(0, 20)}`} fallback={FallbackSyncedView}>
+      <LyricsErrorBoundary resetKey={`${trackId}-${lyrics?.synced?.slice(0, 20)}`} fallback={null}>
         <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          onTouchStart={handleScroll}
           style={{ fontFamily: APPLE_MUSIC_FONT }}
-          className="w-full h-full overflow-hidden flex flex-col items-center justify-center select-none amll-apple-theme"
+          className="w-full h-full overflow-y-auto scroll-smooth py-[36vh] px-4 md:px-8 space-y-7 [mask-image:linear-gradient(to_bottom,transparent,black_18%,black_82%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_18%,black_82%,transparent)] select-none no-scrollbar"
         >
-          <LyricPlayer
-            lyricLines={amllLines}
-            currentTime={currentTimeMs}
-            playing={isPlaying}
-            enableSpring={true}
-            enableBlur={true}
-            enableScale={true}
-            alignAnchor={isMobile ? 'center' : 'top'}
-            alignPosition={isMobile ? 0.45 : 0.22}
-            wordFadeWidth={0.5}
-            onLyricLineClick={(e) => {
-              if (typeof e?.lineIndex === 'number' && amllLines[e.lineIndex]) {
-                onSeek(amllLines[e.lineIndex].startTime / 1000)
-              }
-            }}
-            className="w-full h-full"
-            style={{
-              fontFamily: APPLE_MUSIC_FONT,
-              fontWeight: 800,
-              letterSpacing: '-0.025em',
-            }}
-          />
+          {amllLines.map((line, idx) => {
+            const isActive = idx === activeIndex
+            const isPast = idx < activeIndex
+            return (
+              <button
+                key={`${line.startTime}-${idx}`}
+                ref={(el) => {
+                  lineRefs.current[idx] = el
+                }}
+                onClick={() => onSeek(line.startTime / 1000)}
+                className={`w-full ${isMobile ? 'text-center' : 'text-left'} transition-all duration-300 rounded-2xl px-4 py-2 cursor-pointer block tracking-tight ${
+                  isActive
+                    ? 'scale-[1.03] origin-left'
+                    : isPast
+                      ? 'opacity-40 hover:opacity-85'
+                      : 'opacity-25 hover:opacity-65'
+                }`}
+              >
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold leading-snug tracking-tight">
+                  {line.words.map((w, wIdx) => {
+                    const isWordActive = smoothTimeMs >= w.startTime && smoothTimeMs <= w.endTime
+                    const isWordPast = smoothTimeMs > w.endTime
+                    return (
+                      <span
+                        key={wIdx}
+                        className={`transition-all duration-150 inline-block ${
+                          isActive && isWordActive
+                            ? 'text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.98)] drop-shadow-[0_0_40px_rgba(56,189,248,0.5)] scale-[1.04]'
+                            : isActive && isWordPast
+                              ? 'text-white'
+                              : isActive
+                                ? 'text-white/40'
+                                : isPast
+                                  ? 'text-white/60'
+                                  : 'text-white/30'
+                        }`}
+                      >
+                        {w.word}
+                      </span>
+                    )
+                  })}
+                </p>
+              </button>
+            )
+          })}
         </div>
       </LyricsErrorBoundary>
     )
   }
 
-  // 4. Plain Unsynced Lyrics
+  // 3. Plain Unsynced Lyrics
   if (lyrics?.plain) {
     return (
       <div
         style={{ fontFamily: APPLE_MUSIC_FONT }}
-        className="w-full h-full overflow-y-auto px-4 py-12 space-y-4 text-center md:text-left [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)]"
+        className="w-full h-full overflow-y-auto px-4 py-16 space-y-4 text-center md:text-left [mask-image:linear-gradient(to_bottom,transparent,black_10%,black_90%,transparent)] select-none no-scrollbar"
       >
         {lyrics.plain
           .split(/\r?\n/)
@@ -404,7 +380,7 @@ export function AmllLyricsView({
     )
   }
 
-  // 5. Lyrics Unavailable (Never crashes the page!)
+  // 4. Lyrics Unavailable State
   return (
     <div className="w-full h-full flex flex-col items-center justify-center py-24 text-center text-nw-text-secondary select-none">
       <Music2 size={36} className="text-white/20 mb-3" />

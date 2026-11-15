@@ -79,21 +79,26 @@ export function FullScreenPlayer({
 
   const nextTrack = useQueueStore((s) => s.queue[0])
 
-  // Fetch / Preload lyrics on track change
+  // Fetch / Preload lyrics on track change with safety timeout
   useEffect(() => {
     let active = true
     setLyrics(null)
     setLyricsLoading(true)
 
-    // Preload from cache or network
+    // Safety timeout: Never stay stuck on loading for more than 4.5 seconds
+    const safetyTimer = window.setTimeout(() => {
+      if (active) setLyricsLoading(false)
+    }, 4500)
+
     preloadLyrics(track.title, track.artist)
       .then((result) => {
         if (!active) return
         if (result && (result.synced || result.plain)) {
           setLyrics(result)
           setLyricsLoading(false)
+          window.clearTimeout(safetyTimer)
         } else {
-          // Direct fallback fetch via worker API
+          // Direct fallback fetch via worker / LRCLIB API
           return api.lyrics(track.title, track.artist)
         }
       })
@@ -101,13 +106,18 @@ export function FullScreenPlayer({
         if (!active || !directResult) return
         setLyrics(directResult)
         setLyricsLoading(false)
+        window.clearTimeout(safetyTimer)
       })
       .catch(() => {
-        if (active) setLyricsLoading(false)
+        if (active) {
+          setLyricsLoading(false)
+          window.clearTimeout(safetyTimer)
+        }
       })
 
     return () => {
       active = false
+      window.clearTimeout(safetyTimer)
     }
   }, [track.id, track.title, track.artist])
 
@@ -270,16 +280,15 @@ export function FullScreenPlayer({
               <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full bg-nw-accent-glow/[0.05] blur-[140px]" />
             </div>
 
-            {/* Mobile Lyrics Blurred Ambient Backdrop */}
+            {/* Mobile Lyrics Blurred Ambient Backdrop (Static GPU-optimized glow - Zero Lag) */}
             {showLyrics && (
               <div className="absolute inset-0 md:hidden z-0 overflow-hidden bg-nw-black pointer-events-none">
-                <motion.img
+                <img
                   src={track.coverUrl}
-                  className="absolute inset-[-50%] w-[200%] h-[200%] object-cover blur-[70px] opacity-25 mix-blend-screen"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 90, repeat: Infinity, ease: 'linear' }}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-20 scale-125"
                 />
-                <div className="absolute inset-0 bg-nw-black/60" />
+                <div className="absolute inset-0 bg-gradient-to-b from-nw-black/50 via-nw-black/80 to-nw-black" />
               </div>
             )}
 

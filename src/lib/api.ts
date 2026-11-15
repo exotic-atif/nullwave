@@ -2,7 +2,7 @@
 
 import type { Track, Album, Artist } from '@/types'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://nullwave-worker.mratif00007.workers.dev'
 
 // ===== STREAM SERVERS =====
 // Primary server: Your Oracle Cloud VM proxy (default)
@@ -36,8 +36,8 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
-async function request<T>(endpoint: string, baseUrl = BASE_URL): Promise<T> {
-  const res = await fetch(joinUrl(baseUrl, endpoint))
+async function request<T>(endpoint: string, baseUrl = BASE_URL, timeoutMs = 8000): Promise<T> {
+  const res = await fetchWithTimeout(joinUrl(baseUrl, endpoint), {}, timeoutMs)
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Request failed' }))
     throw new Error((body as { error?: string }).error || `HTTP ${res.status}`)
@@ -342,9 +342,71 @@ export const api = {
     streamFailoverState.activeServer = 'primary'
   },
 
-  /** Get synced lyrics for a track */
+  /** Get synced lyrics for a track with multi-tier fallback */
   async lyrics(title: string, artist: string): Promise<LyricsResult> {
-    return request(`/lyrics?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`)
+    const cleanTitle = (title || '')
+      .replace(/\s*\(.*?\)/g, '')
+      .replace(/\s*\[.*?\]/g, '')
+      .replace(/\s*(feat|ft)\.?.*$/gi, '')
+      .trim()
+    const cleanArtist = (artist || '')
+      .split(/[,&/]/)[0]
+      .replace(/\s*(feat|ft)\.?.*$/gi, '')
+      .trim()
+
+    // 1. Try Cloudflare Worker endpoint first (has LRCLIB proxy)
+    try {
+      const data = await request<LyricsResult>(
+        `/lyrics?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+        BASE_URL,
+        5000
+      )
+      if (data && (data.synced || data.plain)) {
+        return data
+      }
+    } catch {
+      // Fall through to direct LRCLIB fetch
+    }
+
+    // 2. Direct browser fetch to LRCLIB (CORS: *)
+    try {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`
+      const res = await fetchWithTimeout(searchUrl, { headers: { 'User-Agent': 'NullWave/1.0' } }, 4500)
+      if (res.ok) {
+        const list = (await res.json()) as Array<{ syncedLyrics?: string; plainLyrics?: string }>
+        if (Array.isArray(list) && list.length > 0) {
+          const withSynced = list.find((item) => item.syncedLyrics)
+          const best = withSynced || list[0]
+          return {
+            synced: best.syncedLyrics || null,
+            plain: best.plainLyrics || null,
+          }
+        }
+      }
+    } catch {
+      // Fall through
+    }
+
+    // 3. Fallback: Search by clean title alone
+    try {
+      const titleUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`
+      const res = await fetchWithTimeout(titleUrl, { headers: { 'User-Agent': 'NullWave/1.0' } }, 3500)
+      if (res.ok) {
+        const list = (await res.json()) as Array<{ syncedLyrics?: string; plainLyrics?: string }>
+        if (Array.isArray(list) && list.length > 0) {
+          const withSynced = list.find((item) => item.syncedLyrics)
+          const best = withSynced || list[0]
+          return {
+            synced: best.syncedLyrics || null,
+            plain: best.plainLyrics || null,
+          }
+        }
+      }
+    } catch {
+      // safe fallback
+    }
+
+    return { synced: null, plain: null }
   },
 
   /** Get artist details + top songs */
