@@ -1,3 +1,4 @@
+import type { Track } from '@/types'
 import { usePlayerStore, useQueueStore, useAuthStore, useLikedStore } from '@/store'
 import { AlbumArt } from '../ui/AlbumArt'
 import { IconButton } from '../ui/IconButton'
@@ -316,94 +317,85 @@ export function Player() {
 
   // ===== HANDLERS =====
 
-  const performNextTrack = useCallback(() => {
-    const next = useQueueStore.getState().playNext()
+  // ===== INFINITE AUTOPLAY & SMART QUEUE REPLENISHER =====
+  const isReplenishingRef = useRef<boolean>(false)
+
+  const replenishQueue = useCallback(async (current: Track) => {
+    if (isReplenishingRef.current) return
+    isReplenishingRef.current = true
+
+    try {
+      const queue = useQueueStore.getState().queue
+      const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
+      const history = useQueueStore.getState().history
+      const likedTracks = useLikedStore.getState().likedTracks
+      const user = useAuthStore.getState().user
+      const smartSeedIds = listeningTracker.getSmartSeeds(history.map(t => t.id), likedTracks.map(t => t.id), 5, dislikedTracks)
+      const seeds = [...history, ...likedTracks]
+        .filter(t => smartSeedIds.includes(t.id))
+        .map(t => `${t.title} ${t.artist}`)
+
+      const tracks = await api.radio({
+        artist: current.artist,
+        historyTitles: history.map(t => t.title),
+        favArtists: user?.favArtists || '',
+        favSongs: user?.favSongs || '',
+        excludeIds: [...dislikedTracks, current.id, ...queue.map(t => t.id)],
+        likedTracks: likedTracks.map(t => t.title),
+        smartSeeds: seeds,
+      })
+
+      if (tracks && tracks.length > 0) {
+        const currentQ = useQueueStore.getState().queue
+        const currentKnown = new Set([
+          usePlayerStore.getState().currentTrack?.id,
+          ...currentQ.map(t => t.id),
+          ...dislikedTracks,
+        ])
+        const fresh = tracks.filter(t => !currentKnown.has(t.id))
+        const candidates = fresh.length > 0 ? fresh : tracks
+        useQueueStore.getState().addMultipleToQueue(candidates.slice(0, 10))
+      }
+    } catch (err) {
+      console.warn('Queue replenishment error:', err)
+    } finally {
+      isReplenishingRef.current = false
+    }
+  }, [])
+
+  const performNextTrack = useCallback(async () => {
     const current = usePlayerStore.getState().currentTrack
     if (current) addToHistory(current)
 
+    const next = useQueueStore.getState().playNext()
+
     if (next) {
       usePlayerStore.getState().setTrack(next)
+      // Check if queue needs replenishing after consuming one
+      if (useQueueStore.getState().queue.length < 5 && next) {
+        void replenishQueue(next)
+      }
     } else if (current) {
-      // Infinite Autoplay fallback using improved supercool API radio
-      const historyTitles = useQueueStore.getState().history.map(t => t.title)
-      const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
-      const { user } = useAuthStore.getState()
-      const likedTracks = useLikedStore.getState().likedTracks
-      
-      const historyIds = useQueueStore.getState().history.map(t => t.id)
-      const likedIds = likedTracks.map(t => t.id)
-      const smartSeedIds = listeningTracker.getSmartSeeds(historyIds, likedIds, 5, dislikedTracks)
-      
-      const allTracks = [...useQueueStore.getState().history, ...likedTracks]
-      const smartSeeds = smartSeedIds
-        .map(id => allTracks.find(t => t.id === id))
-        .filter(Boolean)
-        .map(t => `${t!.title} ${t!.artist}`)
-
-      // If we are at the end of a queue/playlist, seed the radio
-      api.radio({
-        artist: current.artist,
-        historyTitles,
-        favArtists: user?.favArtists || '',
-        favSongs: user?.favSongs || '',
-        excludeIds: dislikedTracks,
-        likedTracks: likedTracks.map(t => t.title),
-        smartSeeds
-      }).then((tracks) => {
-        if (tracks.length > 0) {
-          const queue = useQueueStore.getState().queue
-          if (queue.length === 0) {
-            useQueueStore.getState().setQueue(tracks)
-            const first = useQueueStore.getState().playNext()
-            if (first) usePlayerStore.getState().setTrack(first)
-          }
-        } else {
-          usePlayerStore.setState({ isPlaying: false, progress: 0 })
-        }
-      }).catch((err) => {
-        console.error('Radio fallback failed:', err)
-        usePlayerStore.setState({ isPlaying: false, progress: 0 })
-      })
+      // Queue is completely empty! Immediately replenish and keep playing without stopping
+      usePlayerStore.getState().setIsLoadingStream(true)
+      await replenishQueue(current)
+      const first = useQueueStore.getState().playNext()
+      if (first) {
+        usePlayerStore.getState().setTrack(first)
+      } else {
+        usePlayerStore.getState().setIsLoadingStream(false)
+      }
     }
-  }, [addToHistory])
+  }, [addToHistory, replenishQueue])
 
-  // Keep a small recommendation buffer ready so playback continues after
-  // library, album, and manually queued tracks finish.
+  // Proactively keep a buffer of 6+ upcoming tracks so playback NEVER runs dry
   useEffect(() => {
-    if (!currentTrack || useQueueStore.getState().queue.length > 2) return
-    let cancelled = false
-    const queue = useQueueStore.getState().queue
-    const dislikedTracks = useQueueStore.getState().dislikedTracks.map(t => t.id)
-    const history = useQueueStore.getState().history
-    const likedTracks = useLikedStore.getState().likedTracks
-    const user = useAuthStore.getState().user
-    const smartSeedIds = listeningTracker.getSmartSeeds(history.map(t => t.id), likedTracks.map(t => t.id), 5, dislikedTracks)
-    const seeds = [...history, ...likedTracks]
-      .filter(t => smartSeedIds.includes(t.id))
-      .map(t => `${t.title} ${t.artist}`)
-
-    api.radio({
-      artist: currentTrack.artist,
-      historyTitles: history.map(t => t.title),
-      favArtists: user?.favArtists || '',
-      favSongs: user?.favSongs || '',
-      excludeIds: [...dislikedTracks, currentTrack.id, ...queue.map(t => t.id)],
-      likedTracks: likedTracks.map(t => t.title),
-      smartSeeds: seeds,
-    }).then((tracks) => {
-      if (cancelled || tracks.length === 0) return
-      const known = new Set([
-        usePlayerStore.getState().currentTrack?.id,
-        ...useQueueStore.getState().queue.map(t => t.id),
-        ...useQueueStore.getState().history.map(t => t.id),
-        ...dislikedTracks,
-      ])
-      const fresh = tracks.filter(t => !known.has(t.id)).slice(0, 8)
-      if (fresh.length) useQueueStore.getState().addMultipleToQueue(fresh)
-    }).catch(() => {})
-
-    return () => { cancelled = true }
-  }, [currentTrack?.id, useQueueStore(s => s.queue.length)])
+    if (!currentTrack) return
+    const qLen = useQueueStore.getState().queue.length
+    if (qLen < 6) {
+      void replenishQueue(currentTrack)
+    }
+  }, [currentTrack?.id, replenishQueue])
 
   const handleNext = useCallback(() => {
     performNextTrack()

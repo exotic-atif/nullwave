@@ -567,22 +567,65 @@ export const api = {
     return filterCleanTracks(fallback.tracks || []).slice(0, 20)
   },
 
-  /** Get a smart infinite radio queue */
-  async radio(params: { artist: string; historyTitles: string[]; favArtists: string; favSongs: string; excludeIds?: string[]; likedTracks?: string[]; smartSeeds?: string[] }): Promise<Track[]> {
+  /** Get a smart infinite radio queue with multi-tier fallback guarantee */
+  async radio(params: {
+    artist: string
+    historyTitles: string[]
+    favArtists: string
+    favSongs: string
+    excludeIds?: string[]
+    likedTracks?: string[]
+    smartSeeds?: string[]
+  }): Promise<Track[]> {
     const query = new URLSearchParams({
       artist: params.artist,
-      history: JSON.stringify(params.historyTitles),
-      favArtists: params.favArtists,
-      favSongs: params.favSongs,
-      excludeIds: JSON.stringify(params.excludeIds || []),
-      likedTracks: JSON.stringify(params.likedTracks || []),
-      smartSeeds: JSON.stringify(params.smartSeeds || []),
+      history: JSON.stringify((params.historyTitles || []).slice(-15)),
+      favArtists: params.favArtists || '',
+      favSongs: params.favSongs || '',
+      excludeIds: JSON.stringify((params.excludeIds || []).slice(-30)),
+      likedTracks: JSON.stringify((params.likedTracks || []).slice(-15)),
+      smartSeeds: JSON.stringify((params.smartSeeds || []).slice(-5)),
     })
+
     try {
       const data = await request<{ tracks: Track[] }>(`/radio?${query.toString()}`)
-      return filterCleanTracks(data.tracks || [])
+      const tracks = filterCleanTracks(data.tracks || [])
+      if (tracks.length >= 4) return tracks
     } catch {
-      return []
+      // Fall through to client-side multi-tier fallbacks
     }
+
+    // MULTI-TIER FALLBACK 1: Search by clean primary artist
+    try {
+      const cleanArtist = (params.artist || '').split(/[,&/]/)[0].replace(/\s*(feat|ft)\.?.*$/gi, '').trim()
+      if (cleanArtist) {
+        const res = await api.search(cleanArtist)
+        if (res.tracks && res.tracks.length > 0) {
+          const excludeSet = new Set(params.excludeIds || [])
+          const fresh = res.tracks.filter(t => !excludeSet.has(t.id))
+          if (fresh.length > 0) return fresh.slice(0, 15)
+          return res.tracks.slice(0, 15)
+        }
+      }
+    } catch {}
+
+    // MULTI-TIER FALLBACK 2: Search by user's declared favorite artist, favorite song, or top hits
+    try {
+      const fav = (params.favArtists || params.favSongs || 'Top Hits').split(',')[0].trim()
+      const res = await api.search(fav)
+      if (res.tracks && res.tracks.length > 0) {
+        return res.tracks.slice(0, 15)
+      }
+    } catch {}
+
+    // MULTI-TIER FALLBACK 3: Global Top Hits
+    try {
+      const globalRes = await api.search('Global Top Hits')
+      if (globalRes.tracks && globalRes.tracks.length > 0) {
+        return globalRes.tracks.slice(0, 15)
+      }
+    } catch {}
+
+    return []
   },
 }

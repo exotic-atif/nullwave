@@ -469,42 +469,46 @@ async function handleRadio(
   likedTracksStr: string,
   smartSeedsStr: string = '[]'
 ): Promise<unknown> {
-  // Input length guards (ratings.md security fix)
-  const cleanArtist = (artistId || '').slice(0, 100).trim()
-  if (!cleanArtist) return { tracks: [] }
-  if (historyStr.length > 2000) historyStr = historyStr.slice(0, 2000)
-  if (favArtistsStr.length > 500) favArtistsStr = favArtistsStr.slice(0, 500)
-  if (favSongsStr.length > 500) favSongsStr = favSongsStr.slice(0, 500)
-  if (excludeIdsStr.length > 2000) excludeIdsStr = excludeIdsStr.slice(0, 2000)
-  if (likedTracksStr.length > 2000) likedTracksStr = likedTracksStr.slice(0, 2000)
-  if (smartSeedsStr.length > 2000) smartSeedsStr = smartSeedsStr.slice(0, 2000)
+  const rawArtist = (artistId || '').slice(0, 100).trim()
+  if (!rawArtist) return { tracks: [] }
+
+  // Extract primary artist for clean search queries
+  const primaryArtist = rawArtist.split(/[,&/]/)[0].replace(/\s*(feat|ft)\.?.*$/gi, '').trim() || rawArtist
 
   let historyExclude: string[] = []
   let excludeIds: string[] = []
   try {
     const rawHistory = JSON.parse(historyStr)
-    if (Array.isArray(rawHistory)) historyExclude = rawHistory.map(t => getBaseTitle(String(t)))
-
-    const rawExclude = JSON.parse(excludeIdsStr)
-    if (Array.isArray(rawExclude)) excludeIds = rawExclude.map(String)
+    if (Array.isArray(rawHistory)) {
+      historyExclude = rawHistory.slice(-25).map(t => getBaseTitle(String(t)))
+    }
   } catch {
     // Ignore parse errors
   }
 
-  const favArtists = favArtistsStr ? favArtistsStr.split(',').map(s => s.trim()).filter(Boolean) : []
-  const favSongs = favSongsStr ? favSongsStr.split(',').map(s => s.trim()).filter(Boolean) : []
+  try {
+    const rawExclude = JSON.parse(excludeIdsStr)
+    if (Array.isArray(rawExclude)) {
+      excludeIds = rawExclude.slice(-50).map(String)
+    }
+  } catch {
+    // Ignore parse errors
+  }
 
-  // High quality search seeds: query artist tracks directly instead of noisy reco.getreco
+  const favArtists = favArtistsStr ? favArtistsStr.slice(0, 500).split(',').map(s => s.trim()).filter(Boolean) : []
+  const favSongs = favSongsStr ? favSongsStr.slice(0, 500).split(',').map(s => s.trim()).filter(Boolean) : []
+
+  // High quality search seeds
   const searches: { promise: Promise<any>, reason: string }[] = []
 
   // 1. Primary artist tracks & hits
   searches.push({
-    promise: saavnFetch({ __call: 'search.getResults', q: cleanArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
-    reason: `Top tracks from ${cleanArtist}`
+    promise: saavnFetch({ __call: 'search.getResults', q: primaryArtist, n: '15', p: '1' }).then(res => res.results || []).catch(() => []),
+    reason: `Top tracks from ${primaryArtist}`
   })
   searches.push({
-    promise: saavnFetch({ __call: 'search.getResults', q: `${cleanArtist} hits`, n: '10', p: '1' }).then(res => res.results || []).catch(() => []),
-    reason: `Popular hits from ${cleanArtist}`
+    promise: saavnFetch({ __call: 'search.getResults', q: `${primaryArtist} hits`, n: '12', p: '1' }).then(res => res.results || []).catch(() => []),
+    reason: `Popular hits from ${primaryArtist}`
   })
 
   // 2. Favorite artist if available
@@ -527,15 +531,25 @@ async function handleRadio(
 
   // 4. Smart seeds
   let smartSeeds: string[] = []
-  try { smartSeeds = JSON.parse(smartSeedsStr) } catch { }
+  try {
+    const rawSmart = JSON.parse(smartSeedsStr)
+    if (Array.isArray(rawSmart)) smartSeeds = rawSmart.slice(0, 3)
+  } catch { }
+
   if (smartSeeds.length > 0) {
-    for (const seedStr of smartSeeds.slice(0, 2)) {
+    for (const seedStr of smartSeeds) {
       searches.push({
         promise: saavnFetch({ __call: 'search.getResults', q: seedStr, n: '8', p: '1' }).then(res => res.results || []).catch(() => []),
         reason: `Based on your high affinity listening`
       })
     }
   }
+
+  // 5. Always include trending / similar backup query so radio NEVER runs dry
+  searches.push({
+    promise: saavnFetch({ __call: 'search.getResults', q: `${primaryArtist} radio`, n: '10', p: '1' }).then(res => res.results || []).catch(() => []),
+    reason: `Similar to ${primaryArtist}`
+  })
 
   const resultsWithReason = await Promise.all(
     searches.map(async (s) => {
@@ -547,38 +561,43 @@ async function handleRadio(
   // Filter and deduplicate
   const seen = new Set<string>()
   const validTracks = []
+  const allEligibleTracks = []
 
   for (const group of resultsWithReason) {
     for (const s of group.results) {
       if (!s.id) continue
       const track = mapTrack(s, group.reason)
-
       if (!isCleanTrack(track)) continue
-
       if (excludeIds.includes(track.id)) continue
 
       const baseTitle = getBaseTitle(track.title)
+      const key = `${baseTitle}::${track.artist.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      allEligibleTracks.push(track)
+
       const isInHistory = historyExclude.some(hx => {
         if (!baseTitle || !hx) return false
         return baseTitle === hx || baseTitle.includes(hx) || hx.includes(baseTitle)
       })
-      if (isInHistory) continue
-
-      const key = `${baseTitle}::${track.artist.toLowerCase()}`
-      if (!seen.has(key)) {
-        seen.add(key)
+      if (!isInHistory) {
         validTracks.push(track)
       }
     }
   }
 
+  // If strict history exclusion depleted the pool, recycle eligible tracks to ensure non-stop playback
+  const candidatePool = validTracks.length >= 6 ? validTracks : allEligibleTracks
+
   // Shuffle for variety
-  for (let i = validTracks.length - 1; i > 0; i--) {
+  for (let i = candidatePool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]]
+    ;[candidatePool[i], candidatePool[j]] = [candidatePool[j], candidatePool[i]]
   }
 
-  return { tracks: validTracks.slice(0, 15) }
+  return { tracks: candidatePool.slice(0, 15) }
+}
 }
 
 async function handleHomeFeed(
