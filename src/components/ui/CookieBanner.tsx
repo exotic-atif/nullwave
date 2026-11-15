@@ -315,7 +315,7 @@ export function CookieBanner() {
                   <div className="space-y-4 text-xs leading-relaxed text-nw-text-secondary pr-1">
                     <div className="space-y-1">
                       <h3 className="font-semibold text-sm text-white">NullWave Cookie & Data Policy</h3>
-                      <p className="text-nw-muted text-[11px]">Last Updated: 15 Nov 2026 • Version 1.5.12</p>
+                      <p className="text-nw-muted text-[11px]">Last Updated: 15 Nov 2026 • Version 1.5.13</p>
                     </div>
 
                     <div className="space-y-2">

@@ -19,6 +19,23 @@ import {
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
+export function formatAlbumDate(rawDate?: string | number): string {
+  if (!rawDate) return ''
+  const str = String(rawDate).trim()
+  if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(str)) return str
+
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime()) && (str.includes('-') || str.includes('/') || str.includes(','))) {
+    const day = parsed.getDate()
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const month = months[parsed.getMonth()]
+    const year = parsed.getFullYear()
+    return `${day} ${month} ${year}`
+  }
+
+  return str
+}
+
 export function AlbumDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -273,7 +290,7 @@ export function AlbumDetailPage() {
                 {albumBadge}
               </span>
               {album.year ? (
-                <span className="text-xs text-nw-muted font-medium">{album.year}</span>
+                <span className="text-xs text-nw-muted font-medium">{formatAlbumDate(album.year)}</span>
               ) : null}
             </div>
 
