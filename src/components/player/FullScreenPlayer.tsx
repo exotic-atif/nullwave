@@ -492,6 +492,7 @@ export function FullScreenPlayer({
                       className="flex-1 h-full min-h-0 max-w-2xl flex flex-col items-center justify-center overflow-hidden"
                     >
                       <AmllLyricsView
+                        track={track}
                         lyrics={lyrics}
                         lyricsLoading={lyricsLoading}
                         currentTime={effectiveProgress}
@@ -590,6 +591,7 @@ export function FullScreenPlayer({
                       className="w-full h-full flex flex-col items-center justify-center overflow-hidden pb-32"
                     >
                       <AmllLyricsView
+                        track={track}
                         lyrics={lyrics}
                         lyricsLoading={lyricsLoading}
                         currentTime={effectiveProgress}
