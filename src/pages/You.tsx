@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut, Heart, ThumbsDown, X, Link2 } from 'lucide-react'
+import { User, Camera, KeyRound, Loader2, Palette, Moon, Sun, Volume2, Info, Laptop, Smartphone, LogOut, Heart, ThumbsDown, X, ExternalLink } from 'lucide-react'
 import { updateProfileName, updateProfileAvatar, updateProfileFavs } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/ui/RoleBadge'
@@ -8,11 +8,7 @@ import { ProfilePictureModal } from '@/components/ui/ProfilePictureModal'
 import { TrackRow } from '@/components/ui/TrackRow'
 import { useAuthStore, useThemeStore, useQueueStore } from '@/store'
 import { cn } from '@/lib/utils'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { isGoogleConnected, isGithubConnected, isFacebookConnected } from '@/lib/supabase'
-import { FacebookLinkModal } from '@/components/ui/FacebookLinkModal'
-import { FaGoogle, FaGithub, FaFacebook } from 'react-icons/fa'
-import { toast } from 'sonner'
+import { useNavigate } from 'react-router-dom'
 
 export function YouPage() {
   const { user, setUser, logout } = useAuthStore()
@@ -23,11 +19,6 @@ export function YouPage() {
   const [displayName, setDisplayName] = useState(user?.displayName || '')
   const [isSavingName, setIsSavingName] = useState(false)
   const [nameSuccess, setNameSuccess] = useState(false)
-  const [isGoogleLinked, setIsGoogleLinked] = useState(false)
-  const [isGithubLinked, setIsGithubLinked] = useState(false)
-  const [isFacebookLinked, setIsFacebookLinked] = useState(false)
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [isFacebookModalOpen, setIsFacebookModalOpen] = useState(searchParams.get('confirm_facebook') === 'true')
 
   const [favSongs, setFavSongs] = useState(user?.favSongs || '')
   const [favArtists, setFavArtists] = useState(user?.favArtists || '')
@@ -50,18 +41,6 @@ export function YouPage() {
       </div>
     )
   }
-
-  useEffect(() => {
-    const checkLinkedAccounts = async () => {
-      const { data: { user: freshUser } } = await supabase.auth.getUser()
-      if (freshUser) {
-        setIsGoogleLinked(isGoogleConnected(freshUser))
-        setIsGithubLinked(isGithubConnected(freshUser))
-        setIsFacebookLinked(isFacebookConnected(freshUser))
-      }
-    }
-    checkLinkedAccounts()
-  }, [])
 
   const handleUploadPfp = async (file: File) => {
     setIsUploadingPfp(true)
@@ -564,7 +543,7 @@ export function YouPage() {
         </div>
       </motion.section>
 
-      {/* Socials */}
+      {/* NullProfile */}
       <motion.section
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -572,185 +551,47 @@ export function YouPage() {
         className="space-y-4"
       >
         <h3 className="text-sm font-semibold text-nw-text uppercase tracking-wider flex items-center gap-2">
-          <Link2 size={16} className="text-nw-text-tertiary" />
-          Socials
+          <User size={16} className="text-nw-accent" />
+          NullProfile
         </h3>
 
-        <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
-          <div className="flex justify-between items-center py-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
-                <FaGoogle size={20} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-nw-text-secondary text-sm font-medium">Google Account</span>
-                <span className="text-nw-text-tertiary text-xs">Used for fast login</span>
-              </div>
+        <div className="p-5 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-nw-surface border border-white/10 shrink-0">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.displayName || user.email}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-nw-accent/20 to-sky-500/20 text-nw-accent font-bold text-xl font-display">
+                  {(user.displayName || user.email || 'N').charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
-            {isGoogleLinked ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
-                  CONNECTED
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-white font-bold text-base truncate font-display">
+                  {user.displayName || user.email.split('@')[0]}
                 </span>
-                <button
-                  onClick={async () => {
-                    const { data: { user: freshUser } } = await supabase.auth.getUser()
-                    if (freshUser?.identities) {
-                      const identity = freshUser.identities.find(i => i.provider === 'google')
-                      if (identity) {
-                        const { error } = await supabase.auth.unlinkIdentity(identity)
-                        if (error) {
-                          toast.error(error.message)
-                        } else {
-                          await supabase.auth.refreshSession()
-                          setIsGoogleLinked(false)
-                          toast.success('Google account unlinked successfully!')
-                        }
-                      } else {
-                        await supabase.auth.refreshSession()
-                        setIsGoogleLinked(false)
-                        toast.success('Google account was already unlinked.')
-                      }
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold bg-nw-danger/10 text-nw-danger border border-nw-danger/20 hover:bg-nw-danger/20 transition-colors"
-                >
-                  UNLINK
-                </button>
+                <RoleBadge role={user.role} />
               </div>
-            ) : (
-              <button
-                onClick={() => {
-                  supabase.auth.linkIdentity({
-                    provider: 'google',
-                    options: { redirectTo: `${window.location.origin}/auth/callback` }
-                  })
-                }}
-                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-white text-black hover:bg-gray-200 transition-colors"
-              >
-                LINK
-              </button>
-            )}
+              <p className="text-nw-text-tertiary text-xs truncate mt-0.5">
+                {user.email}
+              </p>
+            </div>
           </div>
 
-          <div className="border-t border-white/5" />
-
-          <div className="flex justify-between items-center py-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
-                <FaGithub size={20} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-nw-text-secondary text-sm font-medium">GitHub Account</span>
-                <span className="text-nw-text-tertiary text-xs">Used for fast login</span>
-              </div>
-            </div>
-            {isGithubLinked ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
-                  CONNECTED
-                </span>
-                <button
-                  onClick={async () => {
-                    const { data: { user: freshUser } } = await supabase.auth.getUser()
-                    if (freshUser?.identities) {
-                      const identity = freshUser.identities.find(i => i.provider === 'github')
-                      if (identity) {
-                        const { error } = await supabase.auth.unlinkIdentity(identity)
-                        if (error) {
-                          toast.error(error.message)
-                        } else {
-                          await supabase.auth.refreshSession()
-                          setIsGithubLinked(false)
-                          toast.success('GitHub account unlinked successfully!')
-                        }
-                      } else {
-                        await supabase.auth.refreshSession()
-                        setIsGithubLinked(false)
-                        toast.success('GitHub account was already unlinked.')
-                      }
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold bg-nw-danger/10 text-nw-danger border border-nw-danger/20 hover:bg-nw-danger/20 transition-colors"
-                >
-                  UNLINK
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  supabase.auth.linkIdentity({
-                    provider: 'github',
-                    options: { redirectTo: `${window.location.origin}/auth/callback` }
-                  })
-                }}
-                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-[#24292e] text-white border border-nw-border-subtle hover:bg-[#2f363d] transition-colors"
-              >
-                LINK
-              </button>
-            )}
-          </div>
-
-          <div className="border-t border-white/5" />
-
-          <div className="flex justify-between items-center py-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#121212] flex items-center justify-center text-nw-text border border-white/5 shadow-sm">
-                <FaFacebook size={20} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-nw-text-secondary text-sm font-medium">Facebook Account</span>
-                <span className="text-nw-text-tertiary text-xs">Used for fast login</span>
-              </div>
-            </div>
-            {isFacebookLinked ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider bg-green-500/10 text-green-400 border border-green-500/20">
-                  CONNECTED
-                </span>
-                <button
-                  onClick={async () => {
-                    const { data: { user: freshUser } } = await supabase.auth.getUser()
-                    if (freshUser?.identities) {
-                      const identity = freshUser.identities.find(i => i.provider === 'facebook')
-                      if (identity) {
-                        const { error } = await supabase.auth.unlinkIdentity(identity)
-                        if (error) {
-                          toast.error(error.message)
-                        } else {
-                          await supabase.auth.refreshSession()
-                          setIsFacebookLinked(false)
-                          toast.success('Facebook account unlinked successfully!')
-                        }
-                      } else {
-                        await supabase.auth.refreshSession()
-                        setIsFacebookLinked(false)
-                        toast.success('Facebook account was already unlinked.')
-                      }
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold bg-nw-danger/10 text-nw-danger border border-nw-danger/20 hover:bg-nw-danger/20 transition-colors"
-                >
-                  UNLINK
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  supabase.auth.linkIdentity({
-                    provider: 'facebook',
-                    options: { 
-                      redirectTo: `${window.location.origin}/you?confirm_facebook=true`,
-                      scopes: 'public_profile,email' 
-                    }
-                  })
-                }}
-                className="px-4 py-1.5 rounded-full text-xs font-bold tracking-wider bg-[#1877F2] text-white border border-[#1877F2] hover:bg-[#166FE5] transition-colors"
-              >
-                LINK
-              </button>
-            )}
-          </div>
+          <a
+            href="https://nullone.web.app/profile"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold tracking-wider bg-nw-accent text-nw-black hover:bg-nw-accent/90 shadow-md shadow-nw-accent/20 transition-all active:scale-95 shrink-0"
+          >
+            Manage Null Profile
+            <ExternalLink size={14} />
+          </a>
         </div>
       </motion.section>
 
@@ -769,7 +610,7 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.5.18</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.5.19</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
@@ -794,44 +635,6 @@ export function YouPage() {
           Sign out
         </button>
       </motion.section>
-
-      <FacebookLinkModal
-        isOpen={isFacebookModalOpen}
-        onConfirm={() => {
-          // Do not close here, let the modal's internal animation finish and call onClose
-        }}
-        onCancel={async () => {
-          // unlink identity
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session?.user) {
-            if (session.user.identities) {
-              const fbIdentity = session.user.identities.find(i => i.provider === 'facebook')
-              if (fbIdentity) {
-                await supabase.auth.unlinkIdentity(fbIdentity)
-              }
-            }
-            if (session.user.user_metadata?.facebook_id) {
-              await supabase.auth.updateUser({
-                data: {
-                  facebook_id: null,
-                  facebook_name: null,
-                  facebook_pfp: null
-                }
-              })
-            }
-            setIsFacebookLinked(false)
-            // Update auth store user to reflect changes instantly
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) setUser(user as any)
-          }
-          // Do not close here, let the modal's internal animation finish and call onClose
-        }}
-        onClose={() => {
-          setIsFacebookModalOpen(false)
-          searchParams.delete('confirm_facebook')
-          setSearchParams(searchParams, { replace: true })
-        }}
-      />
     </div>
   )
 }

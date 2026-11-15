@@ -1165,8 +1165,91 @@ class AmLyrics extends i {
             catch (error) {
                 // Explicit fallback failed, ignore
             }
+
+            // If still no result and title contains lowercase words, retry with Title Case
+            // (e.g. "One of the Girls" -> "One Of The Girls" which succeeds on LyricsPlus Apple catalog)
+            if (allResults.length === 0 && title) {
+                const titleCased = title.replace(/\b[a-z]/g, c => c.toUpperCase());
+                if (titleCased !== title) {
+                    try {
+                        const tcParams = new URLSearchParams(params);
+                        tcParams.set('title', titleCased);
+                        const tcUrl = `https://lyricsplus.binimum.org/v2/lyrics/get?${tcParams.toString()}`;
+                        const response = await fetchWithTimeout(tcUrl);
+                        if (response.ok) {
+                            const payload = await response.json();
+                            if (payload) {
+                                const lines = AmLyrics.convertKPoeLyrics(payload);
+                                const sourceLabel = payload?.metadata?.source ||
+                                    payload?.metadata?.provider ||
+                                    'LyricsPlus (KPoe)';
+                                if (lines && lines.length > 0) {
+                                    allResults.push({ lines, source: sourceLabel });
+                                }
+                            }
+                        }
+                    }
+                    catch {
+                        // Title case fallback failed, ignore
+                    }
+                }
+            }
         }
         return allResults;
+    }
+    /**
+     * Synthesizes natural word-by-word karaoke syllables when only line-level timing is available.
+     * Divides line duration proportionally by word lengths and trailing punctuation cadences,
+     * giving every song fluid word-by-word wipe highlighting.
+     */
+    static generateWordSyllables(text, lineStart, lineEnd) {
+        if (!text || typeof text !== 'string')
+            return [];
+        const cleaned = text.trim();
+        if (!cleaned)
+            return [];
+        const tokens = cleaned.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0)
+            return [];
+        const totalDuration = Math.max(600, lineEnd - lineStart);
+        // Leave a natural 10-15% breath pause at the end of the line
+        const singDuration = Math.max(totalDuration * 0.75, Math.min(totalDuration * 0.90, totalDuration - 250));
+        const weights = [];
+        for (const token of tokens) {
+            let w = Math.max(1, token.length);
+            if (/[,;\.!\?…~]$/.test(token)) {
+                w += 1.5;
+            }
+            weights.push(w);
+        }
+        const totalWeight = weights.reduce((acc, val) => acc + val, 0) || 1;
+        const syllables = [];
+        let curr = lineStart;
+        for (let i = 0; i < tokens.length; i += 1) {
+            const token = tokens[i];
+            const ratio = weights[i] / totalWeight;
+            const dur = Math.max(160, Math.round(ratio * singDuration));
+            let wEnd = curr + dur;
+            if (i === tokens.length - 1) {
+                wEnd = Math.min(wEnd, lineEnd - 50);
+            }
+            else {
+                wEnd = Math.min(wEnd, lineEnd);
+            }
+            if (wEnd <= curr) {
+                wEnd = curr + 160;
+            }
+            const wordText = i < tokens.length - 1 ? `${token} ` : token;
+            syllables.push({
+                text: wordText,
+                part: false,
+                timestamp: curr,
+                endtime: wEnd,
+                lineSynced: false,
+            });
+            curr = wEnd;
+        }
+        return syllables;
     }
     /**
      * Parse LRC subtitle format into LyricsLine[].
@@ -1205,21 +1288,21 @@ class AmLyrics extends i {
                 // eslint-disable-next-line no-continue
                 continue;
             }
-            const syllable = {
-                text,
-                part: false,
-                timestamp,
-                endtime,
-                lineSynced: true,
-            };
+            const wordSyllables = AmLyrics.generateWordSyllables(text, timestamp, endtime);
             lines.push({
-                text: [syllable],
+                text: wordSyllables.length > 0 ? wordSyllables : [{
+                    text,
+                    part: false,
+                    timestamp,
+                    endtime,
+                    lineSynced: false,
+                }],
                 background: false,
                 backgroundText: [],
                 oppositeTurn: false,
                 timestamp,
                 endtime,
-                isWordSynced: false,
+                isWordSynced: true,
             });
         }
         return lines;
@@ -1729,13 +1812,19 @@ class AmLyrics extends i {
                 }
             }
             if (mainSyllables.length === 0 && lineText) {
-                mainSyllables.push({
-                    text: lineText,
-                    part: false,
-                    timestamp: lineStart,
-                    endtime: lineEnd || lineStart,
-                    lineSynced: isLineType, // Mark as line-synced
-                });
+                const wordSyllables = AmLyrics.generateWordSyllables(lineText, lineStart, lineEnd || lineStart + (lineDuration || 4000));
+                if (wordSyllables.length > 0) {
+                    mainSyllables.push(...wordSyllables);
+                }
+                else {
+                    mainSyllables.push({
+                        text: lineText,
+                        part: false,
+                        timestamp: lineStart,
+                        endtime: lineEnd || lineStart,
+                        lineSynced: false,
+                    });
+                }
             }
             const hasWordSync = mainSyllables.length > 0 || backgroundSyllables.length > 0;
             const { transliteration } = entry;
@@ -1763,7 +1852,7 @@ class AmLyrics extends i {
                         : false),
                 timestamp: lineStart,
                 endtime: start + duration,
-                isWordSynced: isLineType ? false : hasWordSync,
+                isWordSynced: true,
                 alignment,
                 songPart: entry.element?.songPart,
                 romanizedText: romanizedTextFromPayload,
