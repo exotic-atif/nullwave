@@ -116,7 +116,8 @@ export function AmllLyricsView({
           ['--lyplus-text-primary' as any]: '#ffffff',
           ['--lyplus-text-secondary' as any]: 'rgba(255, 255, 255, 0.42)',
           ['--lyplus-lyrics-palette' as any]: '#38bdf8', // NullWave signature sky blue glow
-          ['--lyplus-font-size-base' as any]: isMobile ? '1.85rem' : '2.35rem',
+          ['--lyplus-font-size-base' as any]: isMobile ? '1.45rem' : '2.65rem',
+          ['--lyplus-padding-line' as any]: isMobile ? '6px 12px' : '14px 24px',
         }}
       >
         {/* @ts-expect-error am-lyrics is a custom element registered in main.tsx from @uimaxbai/am-lyrics */}
@@ -136,8 +137,8 @@ export function AmllLyricsView({
           style={{
             WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
             maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-            paddingTop: isMobile ? 'calc(26vh + env(safe-area-inset-top))' : '32vh',
-            paddingBottom: isMobile ? 'calc(30vh + env(safe-area-inset-bottom))' : '32vh',
+            paddingTop: isMobile ? 'calc(18vh + env(safe-area-inset-top))' : '28vh',
+            paddingBottom: isMobile ? 'calc(26vh + env(safe-area-inset-bottom))' : '28vh',
           }}
         />
       </div>

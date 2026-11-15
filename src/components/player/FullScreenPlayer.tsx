@@ -489,7 +489,7 @@ export function FullScreenPlayer({
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2, ease: 'easeOut' }}
-                      className="flex-1 h-full min-h-0 max-w-2xl flex flex-col items-center justify-center overflow-hidden"
+                      className="flex-1 h-full min-h-0 w-full max-w-4xl lg:max-w-5xl flex flex-col items-center justify-center overflow-hidden"
                     >
                       <AmllLyricsView
                         track={track}
