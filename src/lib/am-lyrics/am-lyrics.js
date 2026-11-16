@@ -2444,11 +2444,12 @@ class AmLyrics extends i {
                 const combinedDuration = combinedEnd - combinedStart;
                 const isCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/.test(combinedText);
                 const isRTL = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0590-\u05FF]/.test(combinedText);
+                const isComplexScript = /[\u0900-\u0DFF\u0E00-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u1780-\u17FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F\uA8E0-\uA8FF]/.test(combinedText);
                 if (isRTL)
                     lineIsRTL = true;
                 const hasHyphen = combinedText.includes('-');
                 const wordLen = combinedText.length;
-                const canAnimateByChar = !isCJK && !isRTL && !hasHyphen && wordLen > 0;
+                const canAnimateByChar = !isCJK && !isRTL && !isComplexScript && !hasHyphen && wordLen > 0;
                 const isLineSynced = line.isWordSynced === false || line.text.some(s => s.lineSynced);
                 let isGrowableVW = canAnimateByChar && wordLen > 0 && wordLen <= 7;
                 if (isGrowableVW) {
@@ -4566,7 +4567,9 @@ class AmLyrics extends i {
                       >`
                             : '';
                         let syllableContent = text;
-                        if (isAnimatedByChar) {
+                        const isComplexOrIndic = /[\u0900-\u0DFF\u0E00-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u1780-\u17FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u0590-\u05FF\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F\uA8E0-\uA8FF]/.test(text);
+                        const canAnimateThisSyllableByChar = isAnimatedByChar && !isComplexOrIndic;
+                        if (canAnimateThisSyllableByChar) {
                             const numCharsInSyllable = text.replace(/\s/g, '').length || 1;
                             const hasVirtualTiming = wordDuration > 0 && Number.isFinite(virtualWordStart);
                             const syllableStartRatio = hasVirtualTiming
@@ -4675,7 +4678,7 @@ class AmLyrics extends i {
                   ><span
                     class="lyrics-syllable${groupLineSynced
                             ? ' line-synced'
-                            : ''}${isAnimatedByChar ? ' has-chars' : ' no-chars'}"
+                            : ''}${canAnimateThisSyllableByChar ? ' has-chars' : ' no-chars'}"
                     data-start-time="${startTimeMs}"
                     data-end-time="${endTimeMs}"
                     data-duration="${durationMs}"
@@ -5016,8 +5019,11 @@ AmLyrics.styles = i$3 `
       display: block;
       box-sizing: border-box;
       font-family:
-        -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-        system-ui, -apple-system-subheadline, "Helvetica Neue", sans-serif;
+        var(--am-lyrics-font-family,
+          -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "SF Pro Text",
+          "Inter", "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Arabic",
+          "Noto Sans Gurmukhi", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Thai",
+          "Nirmala UI", "Segoe UI", system-ui, -apple-system-subheadline, "Helvetica Neue", sans-serif);
       letter-spacing: -0.02em;
       line-height: var(--am-lyrics-line-height, 1.28);
       background: transparent;

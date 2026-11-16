@@ -19,6 +19,9 @@ export function cleanArtistName(artist: string): string {
     .trim()
 }
 
+export const UNIVERSAL_LYRICS_FONT_FAMILY =
+  "Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'SF Pro Display', 'SF Pro Text', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Arabic', 'Noto Sans Gurmukhi', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Thai', 'Nirmala UI', 'Segoe UI', system-ui, sans-serif"
+
 interface LyricsErrorBoundaryProps {
   fallback: ReactNode
   resetKey: string
@@ -140,6 +143,7 @@ export function AmllLyricsView({
           ['--lyplus-text-primary' as any]: '#ffffff',
           ['--lyplus-text-secondary' as any]: 'rgba(255, 255, 255, 0.45)',
           ['--lyplus-lyrics-palette' as any]: '#38bdf8', // NullWave signature sky blue glow
+          ['--am-lyrics-font-family' as any]: UNIVERSAL_LYRICS_FONT_FAMILY,
           ['--am-lyrics-font-size' as any]: isMobile ? 'clamp(1.75rem, 6vw, 2.35rem)' : 'clamp(2.4rem, 3.6vw, 3.6rem)',
           ['--am-lyrics-line-height' as any]: isMobile ? '1.3' : '1.32',
           ['--am-lyrics-padding-line' as any]: isMobile ? '12px 14px' : '16px 24px',
@@ -152,6 +156,7 @@ export function AmllLyricsView({
         <am-lyrics
           key={track.id}
           ref={amLyricsRef}
+          font-family={UNIVERSAL_LYRICS_FONT_FAMILY}
           song-title={cleanTitle}
           song-artist={cleanArtist}
           query={cleanQuery}
