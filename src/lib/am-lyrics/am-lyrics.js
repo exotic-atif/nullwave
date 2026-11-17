@@ -333,7 +333,7 @@ const NEXT_WORD_PRE_WIPE_MIN_DURATION_MS = 80;
 const NEXT_WORD_PRE_WIPE_MAX_DURATION_MS = 240;
 const BASE_WIPE_GRADIENT_EM = 0.75;
 const LONG_WORD_WIPE_EXTRA_EM = 0.45;
-const LONG_WORD_WIPE_EXTRA_RATIO = 0.35;
+const LONG_WORD_WIPE_EXTRA_RATIO = 0;
 const SHORT_WORD_DRAG_MIN_DURATION_MS = 760;
 const SHORT_WORD_GLOW_MIN_DURATION_MS = 1320;
 const WORD_PRE_WIPE_HANDOFF_LEAD_MS = 100;
@@ -719,7 +719,7 @@ class AmLyrics extends i {
     }
     static getRankForCollected(sourceLabel, parsedLines) {
         const lower = sourceLabel.toLowerCase();
-        const hasWordSync = parsedLines.some((line) => line.text && Array.isArray(line.text) && line.text.length > 1);
+        const hasWordSync = parsedLines.some((line) => line.isWordSynced);
         const isUnsynced = parsedLines.length > 0 &&
             parsedLines.every((line) => line.timestamp === 0 && line.endtime === 0);
         const isQQ = lower.includes('qq') || lower.includes('lyricsplus');
@@ -1056,7 +1056,7 @@ class AmLyrics extends i {
         }
         const getRank = (sourceLabel, parsedLines) => {
             const lower = sourceLabel.toLowerCase();
-            const hasWordSync = parsedLines.some((line) => line.text && Array.isArray(line.text) && line.text.length > 1);
+            const hasWordSync = parsedLines.some((line) => line.isWordSynced);
             const isUnsynced = parsedLines.length > 0 &&
                 parsedLines.every((line) => line.timestamp === 0 && line.endtime === 0);
             const isQQ = lower.includes('qq') || lower.includes('lyricsplus');
@@ -1288,21 +1288,20 @@ class AmLyrics extends i {
                 // eslint-disable-next-line no-continue
                 continue;
             }
-            const wordSyllables = AmLyrics.generateWordSyllables(text, timestamp, endtime);
             lines.push({
-                text: wordSyllables.length > 0 ? wordSyllables : [{
+                text: [{
                     text,
                     part: false,
                     timestamp,
                     endtime,
-                    lineSynced: false,
+                    lineSynced: true,
                 }],
                 background: false,
                 backgroundText: [],
                 oppositeTurn: false,
                 timestamp,
                 endtime,
-                isWordSynced: true,
+                isWordSynced: false,
             });
         }
         return lines;
@@ -1812,21 +1811,18 @@ class AmLyrics extends i {
                 }
             }
             if (mainSyllables.length === 0 && lineText) {
-                const wordSyllables = AmLyrics.generateWordSyllables(lineText, lineStart, lineEnd || lineStart + (lineDuration || 4000));
-                if (wordSyllables.length > 0) {
-                    mainSyllables.push(...wordSyllables);
-                }
-                else {
-                    mainSyllables.push({
-                        text: lineText,
-                        part: false,
-                        timestamp: lineStart,
-                        endtime: lineEnd || lineStart,
-                        lineSynced: false,
-                    });
-                }
+                mainSyllables.push({
+                    text: lineText,
+                    part: false,
+                    timestamp: lineStart,
+                    endtime: lineEnd || lineStart,
+                    lineSynced: true,
+                });
             }
-            const hasWordSync = mainSyllables.length > 0 || backgroundSyllables.length > 0;
+            const hasWordSync = !isLineType && (
+                mainSyllables.some(s => !s.lineSynced && Number.isFinite(s.endtime) && s.endtime > s.timestamp) ||
+                backgroundSyllables.some(s => !s.lineSynced && Number.isFinite(s.endtime) && s.endtime > s.timestamp)
+            );
             const { transliteration } = entry;
             let romanizedTextFromPayload;
             if (transliteration) {
@@ -1852,7 +1848,7 @@ class AmLyrics extends i {
                         : false),
                 timestamp: lineStart,
                 endtime: start + duration,
-                isWordSynced: true,
+                isWordSynced: hasWordSync,
                 alignment,
                 songPart: entry.element?.songPart,
                 romanizedText: romanizedTextFromPayload,
@@ -2449,7 +2445,7 @@ class AmLyrics extends i {
                     lineIsRTL = true;
                 const hasHyphen = combinedText.includes('-');
                 const wordLen = combinedText.length;
-                const canAnimateByChar = !isCJK && !isRTL && !isComplexScript && !hasHyphen && wordLen > 0;
+                const canAnimateByChar = false;
                 const isLineSynced = line.isWordSynced === false || line.text.some(s => s.lineSynced);
                 let isGrowableVW = canAnimateByChar && wordLen > 0 && wordLen <= 7;
                 if (isGrowableVW) {
@@ -3513,10 +3509,7 @@ class AmLyrics extends i {
         return (element.textContent || '').replace(/\s/g, '').length;
     }
     static getLongWordWipeScale(charCount) {
-        if (charCount <= 6)
-            return 1;
-        return (1 +
-            AmLyrics.clamp((charCount - 6) / 10, 0, 1) * LONG_WORD_WIPE_EXTRA_RATIO);
+        return 1;
     }
     static applyWipeShape(element, charCount) {
         const extra = AmLyrics.clamp((charCount - 6) / 10, 0, 1) * LONG_WORD_WIPE_EXTRA_EM;

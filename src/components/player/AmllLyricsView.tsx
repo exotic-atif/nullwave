@@ -90,7 +90,7 @@ export function AmllLyricsView({
       const el = amLyricsRef.current as any
       if (el && isPlaying) {
         const curMs = Math.round(audioManager.currentTime * 1000)
-        if (Math.abs(curMs - lastSetMs) >= 16) {
+        if (curMs !== lastSetMs) {
           lastSetMs = curMs
           el.currentTime = curMs
         }
@@ -163,7 +163,7 @@ export function AmllLyricsView({
           highlight-color="#ffffff"
           hover-background-color="rgba(255, 255, 255, 0.12)"
           autoscroll="true"
-          interpolate="true"
+          interpolate="false"
           class="w-full h-full block"
           style={{
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
