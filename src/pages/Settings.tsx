@@ -1,6 +1,6 @@
 import { useThemeStore, useAuthStore } from '@/store'
 import { motion } from 'framer-motion'
-import { Moon, Sun, LogOut, User, Palette, Volume2, Info } from 'lucide-react'
+import { Moon, Sun, LogOut, User, Palette, Volume2, Info, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import { RoleBadge } from '@/components/ui/RoleBadge'
@@ -35,24 +35,34 @@ export function SettingsPage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="p-5 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle"
+          className="p-5 rounded-2xl bg-nw-surface/40 border border-nw-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-nw-accent/30 to-nw-accent-glow/20 flex items-center justify-center ring-2 ring-nw-accent-ring overflow-hidden">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-nw-accent/30 to-nw-accent-glow/20 flex items-center justify-center ring-2 ring-nw-accent-ring overflow-hidden shrink-0">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
               ) : (
                 <User size={22} className="text-nw-accent" />
               )}
             </div>
-            <div>
-              <p className="font-medium text-nw-text">{user.displayName}</p>
-              <p className="text-sm text-nw-text-tertiary">{user.email}</p>
+            <div className="min-w-0">
+              <p className="font-medium text-nw-text truncate">{user.displayName}</p>
+              <p className="text-sm text-nw-text-tertiary truncate">{user.email}</p>
               <div className="mt-2">
                 <RoleBadge role={user.role} />
               </div>
             </div>
           </div>
+
+          <a
+            href="https://nullone.web.app/profile"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wider bg-nw-accent text-nw-black hover:bg-nw-accent/90 shadow-md shadow-nw-accent/20 transition-all active:scale-95 shrink-0"
+          >
+            Manage Null Profile
+            <ExternalLink size={13} />
+          </a>
         </motion.section>
       )}
 
