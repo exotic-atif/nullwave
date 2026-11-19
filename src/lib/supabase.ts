@@ -142,6 +142,18 @@ export async function getProfile(userId: string, email?: string) {
       } else if (isTaniya) {
         foundData.approved = true
       }
+
+      // Automatically link auth_uid and replicate doc to userId for instant direct lookup
+      if (userId && (!foundData.auth_uid || foundData.auth_uid !== userId)) {
+        foundData.auth_uid = userId
+        if (foundData.id) {
+          setDoc(doc(usersCol, foundData.id), { auth_uid: userId }, { merge: true }).catch(() => {})
+        }
+        if (foundData.id !== userId) {
+          setDoc(doc(usersCol, userId), { ...foundData, id: userId, auth_uid: userId }, { merge: true }).catch(() => {})
+        }
+      }
+
       return foundData
     }
 
