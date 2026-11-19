@@ -143,7 +143,8 @@ service cloud.firestore {
         request.auth.uid == userId ||
         (data != null && (
           ('auth_uid' in data && data.auth_uid == request.auth.uid) ||
-          ('user_id' in data && data.user_id == request.auth.uid)
+          ('user_id' in data && data.user_id == request.auth.uid) ||
+          (('email' in data) && request.auth.token.email != null && data.email == request.auth.token.email)
         ))
       );
     }

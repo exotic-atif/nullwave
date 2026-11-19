@@ -657,6 +657,7 @@ export interface AccessRequest {
   id: string
   display_name: string
   email: string
+  auth_uid?: string | null
   avatar_url: string | null
   fav_artists: string | null
   fav_songs: string | null
@@ -668,6 +669,7 @@ export interface AccessRequest {
 export async function submitAccessRequest(data: {
   display_name: string
   email: string
+  auth_uid?: string
   avatar_url?: string
   fav_artists?: string
   fav_songs?: string
@@ -790,8 +792,9 @@ export async function adminApproveAccessRequest(
     const cleanEmail = (merged.email || '').trim().toLowerCase()
     const usersCol = getColRef('users')
 
-    // Check if user already has a record in users collection
-    let userDocRef = doc(usersCol)
+    // Check if user already has a record in users collection or auth_uid is known
+    const targetUid = merged.auth_uid || merged.uid || merged.user_id
+    let userDocRef = targetUid ? doc(usersCol, targetUid) : doc(usersCol)
     if (cleanEmail) {
       const qEmail = query(usersCol, where('email', '==', cleanEmail), limit(1))
       const snap = await getDocs(qEmail)
@@ -800,7 +803,7 @@ export async function adminApproveAccessRequest(
       }
     }
 
-    const profileData = {
+    const profileData: any = {
       id: userDocRef.id,
       email: cleanEmail,
       username: merged.display_name || cleanEmail.split('@')[0] || 'User',
@@ -813,8 +816,16 @@ export async function adminApproveAccessRequest(
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
+    if (targetUid) {
+      profileData.auth_uid = targetUid
+    }
 
     await setDoc(userDocRef, profileData, { merge: true })
+
+    // Also ensure direct record at targetUid if targetUid is known
+    if (targetUid && userDocRef.id !== targetUid) {
+      await setDoc(doc(usersCol, targetUid), { ...profileData, id: targetUid, auth_uid: targetUid }, { merge: true }).catch(() => {})
+    }
 
     if (merged.id) {
       const reqDocRef = doc(getColRef('access_requests'), merged.id)
