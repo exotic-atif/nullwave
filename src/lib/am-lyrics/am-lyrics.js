@@ -378,6 +378,9 @@ class AmLyrics extends i {
         this.isUserScrolling = false;
         this.isProgrammaticScroll = false;
         this.isClickSeeking = false;
+        this._rawLines = null;
+        this._lyricDurationMs = undefined;
+        this.durationOffset = 0;
         // Cached DOM elements for animation updates
         this.cachedLyricsLines = [];
         // Cached line elements array for scroll/position queries
@@ -581,6 +584,9 @@ class AmLyrics extends i {
         this.fetchAbortController = controller;
         this.isLoading = true;
         this.lyrics = undefined;
+        this._rawLines = null;
+        this._lyricDurationMs = undefined;
+        this.durationOffset = 0;
         this.lyricsSource = null;
         this.availableSources = [];
         this.currentSourceIndex = 0;
@@ -591,16 +597,19 @@ class AmLyrics extends i {
             if (this.ttml) {
                 const parseResult = AmLyrics.parseTTML(this.ttml);
                 if (parseResult && parseResult.lines.length > 0) {
-                    this.lyrics = parseResult.lines;
+                    this._rawLines = parseResult.lines;
+                    this._lyricDurationMs = parseResult.durationMs;
+                    this.applyDurationMatching();
                     this.lyricsSource = 'Local';
                     if (parseResult.songwriters) {
                         this.songwriters = parseResult.songwriters;
                     }
                     this.availableSources = [
                         {
-                            lines: this.lyrics,
+                            lines: this._rawLines,
                             source: 'Local',
                             songwriters: this.songwriters,
+                            durationMs: this._lyricDurationMs,
                         },
                     ];
                     this.currentSourceIndex = 0;
@@ -670,7 +679,9 @@ class AmLyrics extends i {
                 this.availableSources = AmLyrics.mergeAndSortSources(collectedSources);
                 this.currentSourceIndex = 0;
                 const sourceResult = this.availableSources[0];
-                this.lyrics = sourceResult.lines;
+                this._rawLines = sourceResult.lines;
+                this._lyricDurationMs = sourceResult.durationMs;
+                this.applyDurationMatching();
                 this.lyricsSource = sourceResult.source;
                 if (sourceResult.songwriters) {
                     this.songwriters = sourceResult.songwriters;
@@ -686,6 +697,69 @@ class AmLyrics extends i {
             if (!controller.signal.aborted) {
                 this.isLoading = false;
             }
+        }
+    }
+    applyDurationMatching() {
+        if (!this._rawLines || this._rawLines.length === 0) {
+            this.lyrics = this._rawLines;
+            return;
+        }
+        // Audio length in ms
+        const audioLength = (typeof this.songDurationMs === 'number' && this.songDurationMs > 0)
+            ? this.songDurationMs
+            : (typeof this.duration === 'number' && this.duration > 0 ? this.duration : 0);
+
+        // Lyric length in ms: use explicit metadata duration if available, else last line's end
+        let lyricLength = this._lyricDurationMs || 0;
+        if (!lyricLength) {
+            const lastLine = this._rawLines[this._rawLines.length - 1];
+            if (lastLine) {
+                lyricLength = lastLine.endtime || (lastLine.timestamp ? lastLine.timestamp + 3000 : 0);
+            }
+        }
+
+        // Formula: audio length - lyric length = x
+        // if x > 0 then start the audio after x seconds (shift lyrics forward by +x so lyrics start when audio reaches x)
+        // if x < 0 then start the lyric x seconds before (shift lyrics backward by -|x|, which is +x)
+        // if x = 0 then start at the same time (offset 0)
+        let x = 0;
+        if (audioLength > 0 && lyricLength > 0) {
+            x = Math.round(audioLength - lyricLength);
+        }
+
+        // Safety threshold: only apply duration matching offset if within 45 seconds (45000ms),
+        // preventing destructive shift if an entirely wrong track length was reported
+        if (Math.abs(x) > 45000) {
+            x = 0;
+        }
+
+        this.durationOffset = x;
+
+        if (x !== 0) {
+            this.lyrics = this._rawLines.map((line) => {
+                const newLine = {
+                    ...line,
+                    timestamp: Math.max(0, (line.timestamp || 0) + x),
+                    endtime: Math.max(0, (line.endtime || 0) + x),
+                };
+                if (Array.isArray(line.text)) {
+                    newLine.text = line.text.map((s) => ({
+                        ...s,
+                        timestamp: Math.max(0, (s.timestamp || 0) + x),
+                        endtime: Math.max(0, (s.endtime || 0) + x),
+                    }));
+                }
+                if (Array.isArray(line.backgroundText)) {
+                    newLine.backgroundText = line.backgroundText.map((s) => ({
+                        ...s,
+                        timestamp: Math.max(0, (s.timestamp || 0) + x),
+                        endtime: Math.max(0, (s.endtime || 0) + x),
+                    }));
+                }
+                return newLine;
+            });
+        } else {
+            this.lyrics = this._rawLines;
         }
     }
     async onLyricsLoaded() {
@@ -819,7 +893,9 @@ class AmLyrics extends i {
         if (!sourceResult)
             return;
         this.currentSourceIndex = index;
-        this.lyrics = sourceResult.lines;
+        this._rawLines = sourceResult.lines;
+        this._lyricDurationMs = sourceResult.durationMs;
+        this.applyDurationMatching();
         this.lyricsSource = sourceResult.source;
         if (sourceResult.songwriters) {
             this.songwriters = sourceResult.songwriters;
@@ -1131,7 +1207,13 @@ class AmLyrics extends i {
                         payload?.metadata?.provider ||
                         'LyricsPlus (KPoe)';
                     const rank = getRank(sourceLabel, lines);
-                    const result = { lines, source: sourceLabel };
+                    let durationMs = undefined;
+                    if (payload?.metadata?.totalDuration) {
+                        durationMs = AmLyrics.parseDurationStringToMs(payload.metadata.totalDuration);
+                    } else if (typeof payload?.metadata?.duration === 'number' && payload.metadata.duration > 0) {
+                        durationMs = payload.metadata.duration;
+                    }
+                    const result = { lines, source: sourceLabel, durationMs };
                     allResults.push(result);
                     // If source is Apple synced, we have the best so we can just immediately break the sweep
                     if (rank === 1) {
@@ -1157,7 +1239,13 @@ class AmLyrics extends i {
                             'LyricsPlus (KPoe)';
                         const hasWordSync = lines?.some((line) => line.text && Array.isArray(line.text) && line.text.length > 1);
                         if (lines && lines.length > 0 && hasWordSync) {
-                            allResults.push({ lines, source: sourceLabel });
+                            let durationMs = undefined;
+                            if (payload?.metadata?.totalDuration) {
+                                durationMs = AmLyrics.parseDurationStringToMs(payload.metadata.totalDuration);
+                            } else if (typeof payload?.metadata?.duration === 'number' && payload.metadata.duration > 0) {
+                                durationMs = payload.metadata.duration;
+                            }
+                            allResults.push({ lines, source: sourceLabel, durationMs });
                         }
                     }
                 }
@@ -1184,7 +1272,13 @@ class AmLyrics extends i {
                                     payload?.metadata?.provider ||
                                     'LyricsPlus (KPoe)';
                                 if (lines && lines.length > 0) {
-                                    allResults.push({ lines, source: sourceLabel });
+                                    let durationMs = undefined;
+                                    if (payload?.metadata?.totalDuration) {
+                                        durationMs = AmLyrics.parseDurationStringToMs(payload.metadata.totalDuration);
+                                    } else if (typeof payload?.metadata?.duration === 'number' && payload.metadata.duration > 0) {
+                                        durationMs = payload.metadata.duration;
+                                    }
+                                    allResults.push({ lines, source: sourceLabel, durationMs });
                                 }
                             }
                         }
@@ -1336,7 +1430,10 @@ class AmLyrics extends i {
             if (bestMatch.syncedLyrics) {
                 const lines = AmLyrics.parseLrcSubtitles(bestMatch.syncedLyrics);
                 if (lines.length > 0) {
-                    return { lines, source: 'LRCLIB' };
+                    const durationMs = typeof bestMatch.duration === 'number' && bestMatch.duration > 0
+                        ? Math.round(bestMatch.duration * 1000)
+                        : undefined;
+                    return { lines, source: 'LRCLIB', durationMs };
                 }
             }
             // Fall back to plain lyrics (unsynced)
@@ -1730,7 +1827,12 @@ class AmLyrics extends i {
                     oppositeTurn: alignment === 'end',
                 });
             }
-            return { lines, songwriters };
+            let durationMs;
+            const durAttr = doc.documentElement?.getAttribute('dur') || doc.documentElement?.getAttribute('duration');
+            if (durAttr) {
+                durationMs = timeToMs(durAttr);
+            }
+            return { lines, songwriters, durationMs };
         }
         catch (e) {
             // eslint-disable-next-line no-console
@@ -1871,6 +1973,26 @@ class AmLyrics extends i {
             return Math.round(num * 1000);
         }
         return Math.max(0, Math.round(num));
+    }
+    static parseDurationStringToMs(str) {
+        if (!str) return 0;
+        if (typeof str === 'number') {
+            return str > 1000 ? Math.round(str) : Math.round(str * 1000);
+        }
+        if (typeof str !== 'string') return 0;
+        const clean = str.trim();
+        const parts = clean.split(':');
+        let seconds = 0;
+        if (parts.length === 2) {
+            seconds = parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+        } else if (parts.length === 3) {
+            seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
+        } else {
+            const parsed = parseFloat(clean);
+            if (!isNaN(parsed)) return parsed > 1000 ? Math.round(parsed) : Math.round(parsed * 1000);
+            return 0;
+        }
+        return Math.round(seconds * 1000);
     }
     firstUpdated() {
         // Set up scroll event listener for user scroll detection
@@ -2227,10 +2349,18 @@ class AmLyrics extends i {
             changedProperties.has('ttml') ||
             changedProperties.has('songTitle') ||
             changedProperties.has('songArtist') ||
-            changedProperties.has('songAlbum') ||
-            changedProperties.has('songDurationMs')) &&
+            changedProperties.has('songAlbum')) &&
             !changedProperties.has('currentTime')) {
             this.fetchLyrics();
+        }
+        if (changedProperties.has('songDurationMs') &&
+            !changedProperties.has('query') &&
+            !changedProperties.has('songTitle') &&
+            !changedProperties.has('currentTime')) {
+            if (this._rawLines) {
+                this.applyDurationMatching();
+                this.requestUpdate();
+            }
         }
         if (changedProperties.has('currentTime') && this.lyrics) ;
     }

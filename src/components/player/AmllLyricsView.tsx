@@ -132,6 +132,7 @@ export function AmllLyricsView({
   const cleanTitle = cleanTrackTitle(track.title)
   const cleanArtist = cleanArtistName(track.artist)
   const cleanQuery = `${cleanTitle} ${cleanArtist}`
+  const songDurationMs = Math.round((audioManager.duration || track.duration || 0) * 1000)
 
   return (
     <LyricsErrorBoundary resetKey={track.id} fallback={null}>
@@ -160,6 +161,7 @@ export function AmllLyricsView({
           song-title={cleanTitle}
           song-artist={cleanArtist}
           query={cleanQuery}
+          song-duration={songDurationMs > 0 ? songDurationMs : undefined}
           highlight-color="#ffffff"
           hover-background-color="rgba(255, 255, 255, 0.12)"
           autoscroll="true"
