@@ -610,7 +610,7 @@ export function YouPage() {
         <div className="p-4 rounded-3xl bg-nw-surface/40 border border-nw-border-subtle space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Version</span>
-            <span className="text-nw-text font-medium text-sm">Beta 1.5.21</span>
+            <span className="text-nw-text font-medium text-sm">Beta 1.5.22</span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-white/5">
             <span className="text-nw-text-secondary text-sm">Access</span>
@@ -620,7 +620,7 @@ export function YouPage() {
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-nw-text-secondary text-sm">Build</span>
-            <span className="text-nw-text font-medium text-sm">17 Nov 2026</span>
+            <span className="text-nw-text font-medium text-sm">20 Nov 2026</span>
           </div>
         </div>
         

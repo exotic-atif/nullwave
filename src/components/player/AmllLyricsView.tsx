@@ -163,7 +163,7 @@ export function AmllLyricsView({
           highlight-color="#ffffff"
           hover-background-color="rgba(255, 255, 255, 0.12)"
           autoscroll="true"
-          interpolate="false"
+          interpolate="true"
           class="w-full h-full block"
           style={{
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
